@@ -113,7 +113,7 @@ fn test_daily_digest_write() {
 
     let date = "2026-02-14";
     let digest = format!(
-        "---\ndate: {}\nsources: [ingest]\n---\n\n# Daily Memories — {}\n\n## Decisions\n- Chose Rust for the rewrite\n",
+        "---\ndate: {}\nsources: [import]\n---\n\n# Daily Memories — {}\n\n## Decisions\n- Chose Rust for the rewrite\n",
         date, date
     );
     fs::write(memories_dir.join(format!("{}.md", date)), &digest).unwrap();
@@ -154,7 +154,7 @@ fn test_people_file_format() {
 
 #[test]
 fn test_export_frontmatter_stripping() {
-    let input = "---\ndate: 2026-02-14\nsources: [ingest]\n---\n\n# Daily Memories\n\nContent here";
+    let input = "---\ndate: 2026-02-14\nsources: [import]\n---\n\n# Daily Memories\n\nContent here";
     let re = regex::Regex::new(r"^---[\s\S]*?---\s*\n?").unwrap();
     let stripped = re.replace(input, "").trim().to_string();
     assert_eq!(stripped, "# Daily Memories\n\nContent here");
@@ -238,7 +238,7 @@ fn test_full_vault_workflow() {
     let memories_dir = tmp.path().join("memories");
     let date = "2026-02-14";
     let digest = format!(
-        "---\ndate: {}\nsources: [ingest]\n---\n\n# Daily Memories — {}\n\n## Identity\n- Name is Gaurang\n- Based in Houston\n\n## Topics\n- **Rust**: Learning for CLI rewrite\n",
+        "---\ndate: {}\nsources: [import]\n---\n\n# Daily Memories — {}\n\n## Identity\n- Name is Gaurang\n- Based in Houston\n\n## Topics\n- **Rust**: Learning for CLI rewrite\n",
         date, date
     );
     fs::write(memories_dir.join(format!("{}.md", date)), &digest).unwrap();

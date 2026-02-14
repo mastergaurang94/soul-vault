@@ -4,8 +4,8 @@ Last updated: 2026-02-14
 
 ## ✅ Completed
 
-- [x] Rust rewrite — full CLI with 6 commands (init, import, export, status, watch, interactive TUI)
-- [x] 154 tests (72 unit + 70 CLI UX + 12 integration), zero clippy warnings
+- [x] Rust rewrite — full CLI with 7 commands (init, import, export, status, watch, reset, interactive TUI)
+- [x] 200 tests (84 unit + 104 CLI UX + 12 integration), zero clippy warnings
 - [x] Vault format: `~/soma/` with structured markdown (identity/, preferences/, memories/, topics/, people/, sources/)
 - [x] Verification: clean bill of health
 - [x] Cleanup: TS archived to `soma-ts-archive/`, Rust promoted to primary at `/Users/gaurangpatel/Documents/dev/soma/`
@@ -23,7 +23,7 @@ Last updated: 2026-02-14
 - [x] UX polish (2026-02-14):
   - Renamed `ingest` → `import` everywhere (CLI, help, status, docs); `ingest` kept as hidden alias
   - Fixed `soma status` box-drawing alignment — proper fixed-width formatting, emoji handling
-  - Interactive menu reordered: Init → Status → Import → Export → Watch → Quit
+  - Interactive menu reordered: Init → Status → Import → Export → Watch → Reset → Quit
   - Import from interactive menu now prompts for folder path instead of showing usage
   - Non-TTY fallback updated to use "import" terminology
   - `soma import` (no args) shows helpful error with usage example instead of clap error

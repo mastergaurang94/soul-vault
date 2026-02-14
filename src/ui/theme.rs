@@ -59,15 +59,16 @@ pub mod rat {
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 
-pub const ICON_CHECK: &str = "✓";
-pub const ICON_CROSS: &str = "✗";
+// All icons are plain ASCII to guarantee consistent 1-column width across all terminals.
+pub const ICON_CHECK: &str = "+";
+pub const ICON_CROSS: &str = "x";
 #[allow(dead_code)]
-pub const ICON_ARROW: &str = "▶";
-pub const ICON_DOT: &str = "○";
-pub const ICON_STAR: &str = "✦";
-pub const ICON_FOLDER: &str = "📁";
-pub const ICON_BRAIN: &str = "🧠";
-pub const ICON_KEY: &str = "🔑";
+pub const ICON_ARROW: &str = ">";
+pub const ICON_DOT: &str = "-";
+pub const ICON_STAR: &str = "*";
+pub const ICON_FOLDER: &str = "#";
+pub const ICON_BRAIN: &str = "*";
+pub const ICON_KEY: &str = ">";
 
 // ─── Formatted Elements ──────────────────────────────────────────────────────
 

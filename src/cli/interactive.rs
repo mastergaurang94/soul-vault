@@ -35,6 +35,7 @@ enum Action {
     Import,
     Export,
     Watch,
+    Reset,
     Quit,
 }
 
@@ -68,6 +69,12 @@ const MENU_ITEMS: &[MenuItem] = &[
         description: "Auto-import on file changes",
         icon: "👁 ",
         action: Action::Watch,
+    },
+    MenuItem {
+        label: "Reset",
+        description: "Delete vault and start over",
+        icon: "🗑 ",
+        action: Action::Reset,
     },
     MenuItem {
         label: "Quit",
@@ -205,6 +212,9 @@ pub fn run() -> Result<()> {
             Action::Status => {
                 crate::cli::status::run()?;
             }
+            Action::Reset => {
+                crate::cli::reset::run(false)?;
+            }
             Action::Quit => {}
         }
     }
@@ -327,6 +337,10 @@ fn print_non_tty_help() {
     );
     println!("    {}            Export vault context", cyan("soma export"));
     println!("    {}            Show vault summary", cyan("soma status"));
+    println!(
+        "    {}            Delete vault and start over",
+        cyan("soma reset")
+    );
     println!(
         "    {}            Show all commands",
         dim("soma --help")

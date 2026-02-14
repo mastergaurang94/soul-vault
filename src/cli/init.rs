@@ -159,15 +159,20 @@ pub fn run() -> Result<()> {
         dim(&format!("→ {}", vault_root().display()))
     );
     println!("\n{}", dim("  Next steps:"));
-    println!(
-        "    {}  Import your AI conversations",
-        cyan("soma import <folder>")
-    );
-    println!("    {}            Check your vault", cyan("soma status"));
-    println!(
-        "    {}            Output context for any AI",
-        cyan("soma export")
-    );
+    let next_steps: &[(&str, &str)] = &[
+        ("soma import <folder>", "Import your AI conversations"),
+        ("soma status", "Check your vault"),
+        ("soma export", "Output context for any AI"),
+    ];
+    let col_width = 24; // visible width for command column
+    for (cmd, desc) in next_steps {
+        let pad = if cmd.len() < col_width {
+            col_width - cmd.len()
+        } else {
+            2
+        };
+        println!("    {}{}{}", cyan(cmd), " ".repeat(pad), dim(desc));
+    }
     println!();
 
     Ok(())

@@ -161,7 +161,8 @@ fn help_watch_subcommand() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Watch a folder"))
-        .stdout(predicate::str::contains("FOLDER"));
+        .stdout(predicate::str::contains("FOLDER"))
+        .stdout(predicate::str::contains("Path to folder to watch"));
 }
 
 #[test]
@@ -547,17 +548,17 @@ fn watch_no_folder_arg_errors() {
         .arg("watch")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("FOLDER")
-            .or(predicate::str::contains("required arguments")));
+        .stderr(predicate::str::contains("Missing folder path"))
+        .stderr(predicate::str::contains("Usage: soma watch <folder>"))
+        .stderr(predicate::str::contains("Example:"));
 }
 
 #[test]
-fn watch_no_folder_exits_2() {
-    // clap exits with code 2 for missing required args
+fn watch_no_folder_exits_1() {
     soma()
         .arg("watch")
         .assert()
-        .code(2);
+        .code(1);
 }
 
 #[test]
@@ -1094,14 +1095,14 @@ fn status_all_boxes_aligned() {
         let first_line = section
             .lines()
             .next()
-            .map(|l| strip_ansi(l))
+            .map(strip_ansi)
             .unwrap_or_default();
         let first_width = visible_width(first_line.trim_start());
         if i > 0 {
             let prev_first_line = sections[i - 1]
                 .lines()
                 .next()
-                .map(|l| strip_ansi(l))
+                .map(strip_ansi)
                 .unwrap_or_default();
             let prev_width = visible_width(prev_first_line.trim_start());
             assert_eq!(
@@ -1518,7 +1519,7 @@ fn status_box_structure_complete() {
 
     let sections = extract_box_sections(&stdout);
     for (i, section) in sections.iter().enumerate() {
-        let lines: Vec<String> = section.lines().map(|l| strip_ansi(l)).collect();
+        let lines: Vec<String> = section.lines().map(strip_ansi).collect();
 
         assert!(
             lines.len() >= 4,
@@ -1592,4 +1593,320 @@ fn status_consistent_indentation() {
             );
         }
     }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 20. ERROR FORMATTING CONSISTENCY
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn import_nonexistent_no_double_blank_lines() {
+    // Regression: banner() ends with \n, and the error handler in main()
+    // used to prepend \n, creating a double blank line between banner and error.
+    let output = soma()
+        .args(["import", "/nonexistent"])
+        .output()
+        .expect("should run");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let combined = format!("{}{}", stdout, stderr);
+    let stripped = strip_ansi(&combined);
+
+    // Should not contain 3+ consecutive newlines (= 2+ blank lines in a row)
+    assert!(
+        !stripped.contains("\n\n\n"),
+        "Double blank line found in import error output. Got:\n{}",
+        stripped
+    );
+}
+
+#[test]
+fn watch_nonexistent_no_double_blank_lines() {
+    let output = soma()
+        .args(["watch", "/nonexistent"])
+        .output()
+        .expect("should run");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let combined = format!("{}{}", stdout, stderr);
+    let stripped = strip_ansi(&combined);
+
+    assert!(
+        !stripped.contains("\n\n\n"),
+        "Double blank line found in watch error output. Got:\n{}",
+        stripped
+    );
+}
+
+#[test]
+fn watch_no_folder_error_has_cross_icon() {
+    // Watch (no args) should use ✗ icon like import does
+    soma()
+        .arg("watch")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("✗"));
+}
+
+#[test]
+fn watch_no_folder_error_shows_usage() {
+    soma()
+        .arg("watch")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Usage: soma watch"));
+}
+
+#[test]
+fn watch_and_import_no_args_errors_consistent() {
+    // Both import and watch should produce the same error format for missing folder
+    let import_out = soma()
+        .arg("import")
+        .output()
+        .expect("should run");
+    let watch_out = soma()
+        .arg("watch")
+        .output()
+        .expect("should run");
+
+    let import_stderr = strip_ansi(&String::from_utf8_lossy(&import_out.stderr));
+    let watch_stderr = strip_ansi(&String::from_utf8_lossy(&watch_out.stderr));
+
+    // Both should contain "Missing folder path"
+    assert!(import_stderr.contains("Missing folder path"),
+        "Import error missing expected text. Got: {}", import_stderr);
+    assert!(watch_stderr.contains("Missing folder path"),
+        "Watch error missing expected text. Got: {}", watch_stderr);
+
+    // Both should contain ✗
+    assert!(import_stderr.contains("✗"), "Import error missing ✗ icon");
+    assert!(watch_stderr.contains("✗"), "Watch error missing ✗ icon");
+
+    // Both should exit with code 1
+    assert_eq!(import_out.status.code(), Some(1));
+    assert_eq!(watch_out.status.code(), Some(1));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 21. NO LEFTOVER "INGEST" IN USER-FACING OUTPUT
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn export_no_ingest_references() {
+    // User-facing output should say "import" not "ingest"
+    let output = soma()
+        .arg("export")
+        .output()
+        .expect("should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // The word "ingest" should NOT appear in the export output
+    // (except potentially in conversation content, which would be user data)
+    // Check the frontmatter specifically
+    assert!(
+        !stdout.contains("sources: [ingest]"),
+        "Export output contains 'sources: [ingest]' — should be 'sources: [import]'"
+    );
+}
+
+#[test]
+fn status_no_ingest_references() {
+    let output = soma()
+        .arg("status")
+        .output()
+        .expect("should run");
+    assert!(output.status.success());
+    let stdout = strip_ansi(&String::from_utf8_lossy(&output.stdout));
+
+    // "ingest" should not appear in user-facing status output
+    // (internal variable names won't be in the output)
+    let lower = stdout.to_lowercase();
+    assert!(
+        !lower.contains("ingest"),
+        "Status output contains 'ingest' — all user-facing text should say 'import'. Output:\n{}",
+        stdout
+    );
+}
+
+#[test]
+fn help_no_ingest_references() {
+    // Main help should not mention "ingest"
+    let output = soma()
+        .arg("--help")
+        .output()
+        .expect("should run");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let lower = stdout.to_lowercase();
+
+    assert!(
+        !lower.contains("ingest"),
+        "Help output contains 'ingest'. Output:\n{}",
+        stdout
+    );
+}
+
+#[test]
+fn import_help_no_ingest_references() {
+    let output = soma()
+        .args(["import", "--help"])
+        .output()
+        .expect("should run");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let lower = stdout.to_lowercase();
+
+    assert!(
+        !lower.contains("ingest"),
+        "Import help contains 'ingest'. Output:\n{}",
+        stdout
+    );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 22. RESET COMMAND
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn help_reset_subcommand() {
+    soma()
+        .args(["help", "reset"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Reset vault"))
+        .stdout(predicate::str::contains("--force"));
+}
+
+#[test]
+fn reset_dash_dash_help() {
+    soma()
+        .args(["reset", "--help"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("--force"))
+        .stdout(predicate::str::contains("Skip confirmation"));
+}
+
+#[test]
+fn help_flag_shows_reset_command() {
+    soma()
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("reset"));
+}
+
+#[test]
+fn reset_without_vault_shows_nothing_to_reset() {
+    // Set HOME to a temp dir so ~/soma/ doesn't exist
+    let tmp = tempdir().unwrap();
+    soma()
+        .env("HOME", tmp.path().to_str().unwrap())
+        .arg("reset")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Nothing to reset"));
+}
+
+#[test]
+fn reset_force_without_vault_shows_nothing_to_reset() {
+    let tmp = tempdir().unwrap();
+    soma()
+        .env("HOME", tmp.path().to_str().unwrap())
+        .args(["reset", "--force"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Nothing to reset"));
+}
+
+#[test]
+fn reset_force_with_temp_vault_deletes_vault() {
+    // Create a fake vault in a temp home directory
+    let tmp_home = tempdir().unwrap();
+    let vault_root = tmp_home.path().join("soma");
+    let config_dir = vault_root.join(".config");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(vault_root.join("memories")).unwrap();
+    fs::create_dir_all(vault_root.join("topics")).unwrap();
+    fs::create_dir_all(vault_root.join("people")).unwrap();
+    fs::create_dir_all(vault_root.join("identity")).unwrap();
+    fs::create_dir_all(vault_root.join("sources")).unwrap();
+
+    // Write a minimal config.json so is_initialized() returns true
+    let config = r#"{
+        "providers": [],
+        "processingLlm": "claude",
+        "vaultPath": "/tmp/soma",
+        "createdAt": "2026-02-14T00:00:00Z"
+    }"#;
+    fs::write(config_dir.join("config.json"), config).unwrap();
+
+    // Write some memories
+    fs::write(vault_root.join("memories").join("test.md"), "# Memory").unwrap();
+
+    // Verify vault exists
+    assert!(vault_root.exists());
+    assert!(config_dir.join("config.json").exists());
+
+    // Run reset --force with HOME set to our temp dir
+    soma()
+        .env("HOME", tmp_home.path().to_str().unwrap())
+        .args(["reset", "--force"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Vault reset"));
+
+    // Verify vault is deleted
+    assert!(!vault_root.exists(), "Vault directory should be deleted after reset --force");
+}
+
+#[test]
+fn reset_without_force_in_non_tty_fails() {
+    // In tests, stdin is not a TTY, so `soma reset` without --force should fail
+    // But only if the vault exists. Use a temp home with a vault.
+    let tmp_home = tempdir().unwrap();
+    let vault_root = tmp_home.path().join("soma");
+    let config_dir = vault_root.join(".config");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(vault_root.join("memories")).unwrap();
+    fs::create_dir_all(vault_root.join("topics")).unwrap();
+    fs::create_dir_all(vault_root.join("people")).unwrap();
+
+    let config = r#"{
+        "providers": [],
+        "processingLlm": "claude",
+        "vaultPath": "/tmp/soma",
+        "createdAt": "2026-02-14T00:00:00Z"
+    }"#;
+    fs::write(config_dir.join("config.json"), config).unwrap();
+
+    soma()
+        .env("HOME", tmp_home.path().to_str().unwrap())
+        .arg("reset")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("--force")
+            .or(predicate::str::contains("non-interactive")));
+}
+
+#[test]
+fn reset_no_panic() {
+    let output = soma()
+        .arg("reset")
+        .output()
+        .expect("should run");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(!stderr.contains("panicked"), "Reset should not panic. Stderr: {}", stderr);
+    assert!(!stdout.contains("panicked"), "Reset should not panic. Stdout: {}", stdout);
+}
+
+#[test]
+fn reset_force_short_flag() {
+    let tmp = tempdir().unwrap();
+    soma()
+        .env("HOME", tmp.path().to_str().unwrap())
+        .args(["reset", "-f"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Nothing to reset"));
 }

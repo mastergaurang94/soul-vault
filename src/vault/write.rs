@@ -113,7 +113,7 @@ fn write_daily_digest(memories: &ExtractedMemories, date: &str) -> Result<()> {
         fs::write(&file_path, format!("{}\n\n{}", existing, new_content))?;
     } else {
         let header = format!(
-            "---\ndate: {}\nsources: [ingest]\n---\n\n# Daily Memories — {}\n\n",
+            "---\ndate: {}\nsources: [import]\n---\n\n# Daily Memories — {}\n\n",
             date, date
         );
         fs::write(&file_path, format!("{}{}", header, new_content))?;

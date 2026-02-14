@@ -53,7 +53,7 @@ enum Commands {
     /// Watch a folder and auto-import on changes
     Watch {
         /// Path to folder to watch
-        folder: String,
+        folder: Option<String>,
     },
 
     /// Export vault as context document
@@ -73,6 +73,13 @@ enum Commands {
 
     /// Show vault summary and imported sources
     Status,
+
+    /// Reset vault — delete all data and return to pre-init state
+    Reset {
+        /// Skip confirmation prompt (for scripting/testing)
+        #[arg(short, long)]
+        force: bool,
+    },
 }
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -98,17 +105,26 @@ async fn main() {
                 }
             }
         }
-        Some(Commands::Watch { folder }) => cli::watch::run(&folder).await,
+        Some(Commands::Watch { folder }) => match folder {
+            Some(f) => cli::watch::run(&f).await,
+            None => {
+                eprintln!("\n  {} Missing folder path.\n", ui::theme::red("✗"));
+                eprintln!("  Usage: soma watch <folder>\n");
+                eprintln!("  Example: soma watch ~/Documents/chatgpt-exports\n");
+                std::process::exit(1);
+            }
+        },
         Some(Commands::Export {
             output,
             format,
             topic,
         }) => cli::export::run(output.as_deref(), &format, topic.as_deref()),
         Some(Commands::Status) => cli::status::run(),
+        Some(Commands::Reset { force }) => cli::reset::run(force),
     };
 
     if let Err(e) = result {
-        eprintln!("\n  {} {}\n", ui::theme::red("✗"), e);
+        eprintln!("  {} {}\n", ui::theme::red("✗"), e);
         std::process::exit(1);
     }
 }
