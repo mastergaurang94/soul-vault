@@ -29,6 +29,14 @@ Last updated: 2026-02-14
   - `soma import` (no args) shows helpful error with usage example instead of clap error
   - 70 CLI UX regression tests added (tests/cli_ux_test.rs)
   - Binary symlinked to `~/.local/bin/soma` for global access
+- [x] `soma reset` command (2026-02-14):
+  - Destructive vault wipe with safety rails
+  - Path validation (`is_safe_to_delete()`) prevents deleting outside home/soma
+  - Interactive confirmation requires typing "reset" (not just y/n)
+  - `--force` / `-f` flag for scripting/testing
+  - Shows what will be deleted (path, config dir, file counts) before confirming
+  - Added to interactive TUI menu as option 6 (after Watch, before Quit)
+  - 21 tests (12 unit + 9 CLI UX) covering safety checks, temp vault deletion, non-TTY behavior
 
 ## 🔨 In Progress
 
@@ -58,5 +66,5 @@ Last updated: 2026-02-14
 - **Vault:** `~/soma/` (identity/, preferences/, memories/, topics/, people/, sources/)
 - **Config:** `~/soma/.config/config.json` + `keys.json` (0600 perms) + `sources.json`
 - **Default extraction model:** `claude-sonnet-4-20250514`
-- **Codebase:** 25 source files, ~4,500+ lines of Rust
+- **Codebase:** 26 source files, ~4,700+ lines of Rust
 - **Stack:** clap, ratatui+crossterm, reqwest (rustls), serde, tokio, indicatif, colored, anyhow+thiserror, sha2, notify, chrono, regex, dirs

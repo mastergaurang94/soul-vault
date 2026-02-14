@@ -5,6 +5,26 @@ Agents: append entries here after completing work.
 
 ---
 
+## 2026-02-14 — Reset Command
+
+### `soma reset`
+- New command to completely wipe vault and config, returning to pre-init state
+- Safety-first design:
+  - `is_safe_to_delete()` validates path is inside home directory and contains "soma"
+  - Rejects `/`, `~`, home dir, and paths outside home
+  - Interactive confirmation requires typing "reset" (not just y/n)
+  - Non-TTY environments require `--force` flag
+- Shows detailed summary before deletion: vault path, config dir, file counts
+- `--force` / `-f` flag skips confirmation (for scripting/CI)
+- Graceful handling of non-existent vault: "Nothing to reset — vault not initialized."
+- Added to interactive TUI menu as option 6 (after Watch, before Quit)
+- Added to non-TTY help text
+- New file: `src/cli/reset.rs` (~165 lines)
+- 21 tests: 12 unit tests (safety validation, file counting) + 9 CLI UX tests (temp vault deletion, non-TTY behavior, help text)
+- Total test count: 200 (84 unit + 104 CLI UX + 12 integration)
+
+---
+
 ## 2026-02-14 — UX Polish
 
 ### Rename: ingest → import
