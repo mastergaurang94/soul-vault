@@ -1,0 +1,38 @@
+{
+  "title": "Discussing travel plans",
+  "mapping": {
+    "node-1": {
+      "message": {
+        "author": { "role": "system" },
+        "content": { "parts": ["You are a helpful assistant."] }
+      }
+    },
+    "node-2": {
+      "message": {
+        "author": { "role": "user" },
+        "content": { "parts": ["I'm planning a trip to Japan with my family. My daughter Avni would love the cherry blossoms."] }
+      }
+    },
+    "node-3": {
+      "message": {
+        "author": { "role": "assistant" },
+        "content": { "parts": ["Japan is wonderful for families! Cherry blossom season runs from late March to early April."] }
+      }
+    },
+    "node-4": {
+      "message": {
+        "author": { "role": "user" },
+        "content": { "parts": ["We visited in 2019 and loved it. Want to explore Kyoto's tea culture this time — I'm really into tea."] }
+      }
+    },
+    "node-5": {
+      "message": {
+        "author": { "role": "assistant" },
+        "content": { "parts": ["Kyoto's Uji district is famous for matcha. You could visit traditional tea houses and attend a tea ceremony."] }
+      }
+    },
+    "node-empty": {
+      "message": null
+    }
+  }
+}

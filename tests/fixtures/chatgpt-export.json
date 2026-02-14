@@ -1,0 +1,20 @@
+[
+  {
+    "title": "Recipe Discussion",
+    "messages": [
+      { "role": "user", "content": "What's a good recipe for masala chai? I like it strong with lots of ginger." },
+      { "role": "assistant", "content": "Here's a recipe for strong masala chai with extra ginger..." },
+      { "role": "user", "content": "Perfect. My wife prefers less ginger, more cardamom. Can you adjust?" },
+      { "role": "assistant", "content": "Sure, here's an adjusted version with more cardamom and less ginger..." }
+    ]
+  },
+  {
+    "title": "Programming Help",
+    "messages": [
+      { "role": "user", "content": "I need help setting up a TypeScript project with ESM modules. I keep running into module resolution issues." },
+      { "role": "assistant", "content": "The key settings for ESM in TypeScript are..." },
+      { "role": "user", "content": "I'm using Node 20+ so I want the latest features. Also using React for a CLI project with Ink." },
+      { "role": "assistant", "content": "For Ink with ESM and Node 20+, you'll want..." }
+    ]
+  }
+]

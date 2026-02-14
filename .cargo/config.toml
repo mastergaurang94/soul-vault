@@ -1,0 +1,8 @@
+# Configure git hooks directory for this project.
+# Applied automatically when building with cargo in this repo.
+#
+# To set up git hooks after cloning:
+#   git config core.hooksPath .githooks
+#
+# Or run the setup script:
+#   ./scripts/setup-hooks.sh

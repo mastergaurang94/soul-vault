@@ -1,0 +1,20 @@
+[
+  {
+    "title": "Tea Discussion",
+    "messages": [
+      { "role": "user", "content": "I've been exploring different types of oolong tea. Any recommendations?" },
+      { "role": "assistant", "content": "For oolong, try Taiwanese Dong Ding or Chinese Da Hong Pao. Both have complex flavor profiles." },
+      { "role": "user", "content": "I actually got a puer cake from Yunnan last month. The aging process is fascinating." },
+      { "role": "assistant", "content": "Puer is a wonderful rabbit hole. Aged puer develops earthy, complex flavors over decades." }
+    ]
+  },
+  {
+    "title": "Crypto Portfolio Chat",
+    "messages": [
+      { "role": "user", "content": "I'm mostly in ETH and SOL. Thinking about some AI token exposure too." },
+      { "role": "assistant", "content": "AI tokens have been trending. Some projects like Render and Fetch.ai are worth researching." },
+      { "role": "user", "content": "Yeah, I'm particularly interested in the intersection of AI agents and onchain activity." },
+      { "role": "assistant", "content": "That's a growing space. Agent-to-agent transactions and onchain memory are exciting frontiers." }
+    ]
+  }
+]

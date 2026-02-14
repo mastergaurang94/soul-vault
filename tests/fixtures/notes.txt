@@ -1,0 +1,12 @@
+Quick notes from today:
+
+- Meeting with the Portola team about Tolan app. Quinten Farmer is the founder.
+- Need to follow up on the NFT marketplace idea
+- Avni's school event is next Thursday
+- Started learning Rust — want to build some high-performance tooling
+- Tea order arrived: got some premium oolong and a nice puer cake from Yunnan
+- Thinking about switching from VS Code to Cursor for AI-assisted coding
+- OpenClaw project is progressing well — it's my AI assistant framework
+- Need to schedule dentist appointment
+- Reading "The Art of War" — finding interesting parallels to business strategy
+- Crypto portfolio: mostly ETH, some SOL positions, interested in AI tokens

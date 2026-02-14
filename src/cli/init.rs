@@ -1,0 +1,184 @@
+//! `soma init` — first-time setup wizard.
+
+use anyhow::Result;
+use std::io::{self, Write};
+
+use crate::types::{Provider, ProviderConfig, SomaConfig};
+use crate::ui::theme::*;
+use crate::vault::config::{
+    create_default_files, create_gitignore, create_vault_structure, is_initialized, set_api_key,
+    vault_root, write_config,
+};
+
+// ─── Init Command ─────────────────────────────────────────────────────────────
+
+pub fn run() -> Result<()> {
+    println!("{}", banner());
+    println!("{}", dim("  First-time setup wizard\n"));
+    println!("{}", line());
+
+    if is_initialized() {
+        println!(
+            "\n  {} Soma vault already initialized at {}",
+            amber(ICON_STAR),
+            cyan(&vault_root().display().to_string())
+        );
+        let answer = ask(&format!(
+            "  Reinitialize? This won't delete existing memories. {} ",
+            dim("(y/N)")
+        ))?;
+        if answer.to_lowercase() != "y" {
+            println!("{}", dim("\n  Cancelled.\n"));
+            return Ok(());
+        }
+        println!();
+    }
+
+    // Step 1: Create vault structure
+    print!("  Creating vault structure... ");
+    io::stdout().flush()?;
+    create_vault_structure()?;
+    create_gitignore()?;
+    create_default_files()?;
+    println!("{}", check("Vault structure created"));
+
+    // Step 2: Provider selection
+    println!("\n{}\n", purple("  Select providers to connect:"));
+    let mut providers = Vec::new();
+
+    for provider in &[Provider::Claude, Provider::ChatGpt, Provider::Gemini] {
+        let answer = ask(&format!(
+            "    Connect {}? {} ",
+            bold_white(provider.display_name()),
+            dim("(Y/n)")
+        ))?;
+        let enabled = answer.to_lowercase() != "n";
+        providers.push(ProviderConfig {
+            name: provider.clone(),
+            enabled,
+            last_pull: None,
+        });
+        if enabled {
+            println!("{}", check(&format!("{} enabled", provider.display_name())));
+        } else {
+            println!(
+                "    {} {} skipped",
+                dim(ICON_DOT),
+                provider.display_name()
+            );
+        }
+    }
+
+    // Step 3: Processing LLM selection
+    println!("\n{}", purple("  Select processing LLM:"));
+    println!(
+        "{}",
+        dim("  This is the AI that will extract memories from your conversations.\n")
+    );
+
+    let llm_options = [Provider::Claude, Provider::ChatGpt, Provider::Gemini];
+    let llm_labels = ["Claude (recommended)", "ChatGPT", "Gemini"];
+
+    for (i, label) in llm_labels.iter().enumerate() {
+        println!("    {} {}", dim(&format!("{}.", i + 1)), label);
+    }
+
+    let choice = ask(&format!("\n  Choose {} ", dim("(1-3, default: 1)")))?;
+    let llm_index: usize = choice.trim().parse().unwrap_or(1);
+    let processing_llm = if (1..=3).contains(&llm_index) {
+        llm_options[llm_index - 1].clone()
+    } else {
+        Provider::Claude
+    };
+    println!(
+        "{}",
+        check(&format!("Processing LLM: {}", processing_llm.display_name()))
+    );
+
+    // Step 4: API Keys
+    let enabled_providers: Vec<&ProviderConfig> =
+        providers.iter().filter(|p| p.enabled).collect();
+    if !enabled_providers.is_empty() || processing_llm != Provider::Gemini {
+        println!("\n{}", purple("  API Keys:"));
+        println!(
+            "{}",
+            dim("  Keys are stored locally in ~/soma/.config/keys.json\n")
+        );
+
+        let mut needed: Vec<Provider> = vec![processing_llm.clone()];
+        for p in &enabled_providers {
+            if !needed.contains(&p.name) {
+                needed.push(p.name.clone());
+            }
+        }
+
+        for provider in &needed {
+            let key_input = ask(&format!(
+                "    {} {} API key {} ",
+                ICON_KEY,
+                provider.display_name(),
+                dim(&format!("({})", provider.api_key_hint()))
+            ))?;
+
+            let key = key_input.trim();
+            if !key.is_empty() {
+                set_api_key(&provider.to_string(), key)?;
+                println!(
+                    "{}",
+                    check(&format!("{} key saved", provider.display_name()))
+                );
+            } else {
+                println!(
+                    "    {} {} key skipped (you can add it later)",
+                    dim(ICON_DOT),
+                    provider.display_name()
+                );
+            }
+        }
+    }
+
+    // Step 5: Save config
+    print!("  Saving configuration... ");
+    io::stdout().flush()?;
+    let config = SomaConfig {
+        providers,
+        processing_llm,
+        vault_path: vault_root().display().to_string(),
+        created_at: chrono::Utc::now().to_rfc3339(),
+        last_sync: None,
+    };
+    write_config(&config)?;
+    println!("{}", check("Configuration saved"));
+
+    // Done!
+    println!("\n{}", line());
+    println!(
+        "\n  {} {} {}",
+        amber(ICON_STAR),
+        bold_purple("Soma vault initialized!"),
+        dim(&format!("→ {}", vault_root().display()))
+    );
+    println!("\n{}", dim("  Next steps:"));
+    println!(
+        "    {}  Import your AI conversations",
+        cyan("soma ingest <folder>")
+    );
+    println!("    {}           Check your vault", cyan("soma status"));
+    println!(
+        "    {}           Output context for any AI",
+        cyan("soma export")
+    );
+    println!();
+
+    Ok(())
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+fn ask(prompt: &str) -> Result<String> {
+    print!("{}", prompt);
+    io::stdout().flush()?;
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+    Ok(input.trim().to_string())
+}
