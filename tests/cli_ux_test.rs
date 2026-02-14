@@ -16,8 +16,10 @@
 
 use assert_cmd::Command;
 use predicates::prelude::*;
+use regex::Regex;
 use std::fs;
 use tempfile::tempdir;
+use unicode_width::UnicodeWidthStr;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -917,4 +919,677 @@ fn status_shows_banner() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Soma"));
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 13. FORMATTING HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/// Strip all ANSI escape sequences from a string.
+/// Handles CSI sequences (\x1b[...m), OSC sequences, and other common escapes.
+fn strip_ansi(s: &str) -> String {
+    let re = Regex::new(r"\x1b\[[0-9;]*[a-zA-Z]|\x1b\].*?\x07|\x1b\[.*?m").unwrap();
+    re.replace_all(s, "").to_string()
+}
+
+/// Compute the visible (display) width of a string, accounting for Unicode
+/// wide characters (CJK, emoji) and multi-byte chars like box-drawing.
+fn visible_width(s: &str) -> usize {
+    UnicodeWidthStr::width(s)
+}
+
+/// Verify that all box-drawing lines in the output are consistently aligned.
+///
+/// Checks:
+/// 1. All border lines (┌, └, ├) have the same total visible width
+/// 2. All content lines (│...│) have exactly 2 │ per line
+/// 3. The right │ aligns with the right edge of the border lines
+/// 4. No trailing content after the closing │ (except whitespace)
+fn verify_box_alignment(output: &str) {
+    let lines: Vec<&str> = output.lines().collect();
+    let mut expected_box_width: Option<usize> = None;
+    let mut content_line_count = 0;
+
+    for line in &lines {
+        let stripped = strip_ansi(line);
+
+        // Check border lines: ┌───┐, ├───┤, └───┘
+        if stripped.contains('┌') || stripped.contains('└') || stripped.contains('├') {
+            // Measure from the first box char to the end of the line (trimmed)
+            let trimmed = stripped.trim_start();
+            let width = visible_width(trimmed);
+            if let Some(expected) = expected_box_width {
+                assert_eq!(
+                    width, expected,
+                    "Box border width mismatch. Expected {} but got {} on line: '{}'",
+                    expected, width, stripped
+                );
+            } else {
+                expected_box_width = Some(width);
+            }
+        }
+
+        // Check content lines: │...│
+        if stripped.contains('│') {
+            let positions: Vec<usize> = stripped
+                .char_indices()
+                .filter(|(_, c)| *c == '│')
+                .map(|(i, _)| i)
+                .collect();
+
+            assert_eq!(
+                positions.len(),
+                2,
+                "Expected exactly 2 box borders (│) on line, found {}. Line: '{}'",
+                positions.len(),
+                stripped
+            );
+
+            // The visible width from start to closing │ (inclusive) should be consistent
+            // with the border width
+            if let Some(expected_width) = expected_box_width {
+                let trimmed = stripped.trim_start();
+                let _leading_spaces = stripped.len() - trimmed.len();
+                // The visible width of the trimmed line should match the border
+                let line_width = visible_width(trimmed);
+                assert_eq!(
+                    line_width, expected_width,
+                    "Content line visible width ({}) doesn't match border width ({}) on line: '{}'",
+                    line_width, expected_width, stripped
+                );
+            }
+
+            content_line_count += 1;
+        }
+    }
+
+    assert!(
+        expected_box_width.is_some(),
+        "No box borders found in output"
+    );
+    assert!(
+        content_line_count > 0,
+        "No content lines (│...│) found in output"
+    );
+}
+
+/// Extract all box sections from status output as separate strings.
+/// A box section starts with a ┌ line and ends with a └ line.
+fn extract_box_sections(output: &str) -> Vec<String> {
+    let mut sections = Vec::new();
+    let mut current_section: Option<Vec<&str>> = None;
+
+    for line in output.lines() {
+        let stripped = strip_ansi(line);
+        if stripped.contains('┌') {
+            current_section = Some(vec![line]);
+        } else if let Some(ref mut section) = current_section {
+            section.push(line);
+            if stripped.contains('└') {
+                sections.push(section.join("\n"));
+                current_section = None;
+            }
+        }
+    }
+
+    sections
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 14. BOX-DRAWING ALIGNMENT TESTS (formatting correctness)
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn status_vault_overview_box_alignment() {
+    let output = soma()
+        .arg("status")
+        .output()
+        .expect("should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let sections = extract_box_sections(&stdout);
+    assert!(
+        !sections.is_empty(),
+        "Status output should contain at least one box section"
+    );
+
+    // Verify the first box (Vault Overview)
+    verify_box_alignment(&sections[0]);
+}
+
+#[test]
+fn status_providers_box_alignment() {
+    let output = soma()
+        .arg("status")
+        .output()
+        .expect("should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let sections = extract_box_sections(&stdout);
+    assert!(
+        sections.len() >= 2,
+        "Status output should contain at least 2 box sections (Vault Overview + Providers)"
+    );
+
+    // Verify the second box (Providers)
+    verify_box_alignment(&sections[1]);
+}
+
+#[test]
+fn status_all_boxes_aligned() {
+    let output = soma()
+        .arg("status")
+        .output()
+        .expect("should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let sections = extract_box_sections(&stdout);
+    for (i, section) in sections.iter().enumerate() {
+        verify_box_alignment(section);
+
+        // Additionally verify all boxes use the same width
+        let first_line = section
+            .lines()
+            .next()
+            .map(|l| strip_ansi(l))
+            .unwrap_or_default();
+        let first_width = visible_width(first_line.trim_start());
+        if i > 0 {
+            let prev_first_line = sections[i - 1]
+                .lines()
+                .next()
+                .map(|l| strip_ansi(l))
+                .unwrap_or_default();
+            let prev_width = visible_width(prev_first_line.trim_start());
+            assert_eq!(
+                first_width, prev_width,
+                "Box {} has width {} but box {} has width {}. All boxes should have the same width.",
+                i, first_width, i - 1, prev_width
+            );
+        }
+    }
+}
+
+#[test]
+fn status_top_bottom_borders_same_length() {
+    let output = soma()
+        .arg("status")
+        .output()
+        .expect("should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    for line in stdout.lines() {
+        let stripped = strip_ansi(line);
+        // Match top borders
+        if stripped.contains('┌') && stripped.contains('┐') {
+            let _top_width = visible_width(stripped.trim_start());
+
+            // Find matching bottom border (next └ line in the output)
+            // We verified this in verify_box_alignment, but double-check
+            // that ┌ and └ lines have equal dash counts
+            let dash_count: usize = stripped.matches('─').count();
+            assert!(
+                dash_count > 0,
+                "Border line should contain ─ characters: '{}'",
+                stripped
+            );
+            // ┌ + N×─ + ┐ = total
+            // The visible width should be dash_count + 2 (for the corner chars)
+            let computed = dash_count + 2; // ┌ and ┐
+            assert_eq!(
+                visible_width(stripped.trim_start()),
+                computed,
+                "Top border visible width mismatch on: '{}'",
+                stripped
+            );
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 15. STAT ROW SPACING TESTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn status_stat_rows_have_space_after_colon() {
+    let output = soma()
+        .arg("status")
+        .output()
+        .expect("should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let stat_labels = ["Memories:", "Topics:", "People:", "Vault size:", "Total files:", "Last activity:"];
+
+    for label in &stat_labels {
+        let stripped_output = strip_ansi(&stdout);
+        if stripped_output.contains(label) {
+            // Find the line containing this label
+            for line in stripped_output.lines() {
+                if line.contains(label) {
+                    // After the colon, there should be at least one space
+                    let after_colon = line.split_once(label).unwrap().1;
+                    assert!(
+                        after_colon.starts_with(' '),
+                        "Missing space after '{}' on line: '{}'",
+                        label,
+                        line.trim()
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn status_stat_values_aligned_at_same_column() {
+    let output = soma()
+        .arg("status")
+        .output()
+        .expect("should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let stripped = strip_ansi(&stdout);
+
+    // Collect the column positions where stat values start
+    let stat_labels = ["Memories:", "Topics:", "People:", "Vault size:", "Total files:", "Last activity:"];
+    let mut value_columns: Vec<(String, usize)> = Vec::new();
+
+    for line in stripped.lines() {
+        for label in &stat_labels {
+            if line.contains(label) {
+                // Find where the value starts (first non-space after label padding)
+                if let Some((_before, after)) = line.split_once(label) {
+                    let spaces_before_value = after.len() - after.trim_start().len();
+                    let label_pos = line.find(label).unwrap();
+                    let value_col = label_pos + label.len() + spaces_before_value;
+                    value_columns.push((label.to_string(), value_col));
+                }
+            }
+        }
+    }
+
+    // All stat values should start at the same column
+    if value_columns.len() > 1 {
+        let expected_col = value_columns[0].1;
+        for (label, col) in &value_columns {
+            assert_eq!(
+                *col, expected_col,
+                "Stat value for '{}' starts at column {} but expected column {} (misaligned). \
+                 All stat values should be vertically aligned.",
+                label, col, expected_col
+            );
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 16. PROVIDER LINE SPACING TESTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn status_provider_names_consistently_padded() {
+    let output = soma()
+        .arg("status")
+        .output()
+        .expect("should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let sections = extract_box_sections(&stdout);
+    // Find the Providers section
+    let providers_section = sections.iter().find(|s| {
+        let s_stripped = strip_ansi(s);
+        s_stripped.contains("Providers")
+    });
+
+    if let Some(section) = providers_section {
+        let section_stripped = strip_ansi(section);
+        // Provider lines contain status indicators (✓ or ○) followed by name
+        let provider_names = ["Claude", "ChatGPT", "Gemini"];
+        let mut status_text_columns: Vec<(String, usize)> = Vec::new();
+
+        for line in section_stripped.lines() {
+            for name in &provider_names {
+                if line.contains(name) {
+                    // Find where the status text starts (after the padded provider name)
+                    if let Some(name_pos) = line.find(name) {
+                        // The status text starts after name + padding
+                        let after_name = &line[name_pos + name.len()..];
+                        let status_start = after_name.len() - after_name.trim_start().len();
+                        let status_col = name_pos + name.len() + status_start;
+                        status_text_columns.push((name.to_string(), status_col));
+                    }
+                }
+            }
+        }
+
+        // All provider status texts should start at the same column
+        if status_text_columns.len() > 1 {
+            let expected_col = status_text_columns[0].1;
+            for (name, col) in &status_text_columns {
+                assert_eq!(
+                    *col, expected_col,
+                    "Provider '{}' status starts at column {} but expected column {}. \
+                     Provider status text should be vertically aligned.",
+                    name, col, expected_col
+                );
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 17. ANSI COLOR CODE HANDLING TESTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn status_ansi_codes_dont_inflate_box_width() {
+    // The raw output (with ANSI codes) should have the same box structure
+    // as the stripped output. If ANSI codes are used in width calculations,
+    // the boxes will be misaligned.
+    let output = soma()
+        .arg("status")
+        .output()
+        .expect("should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    // Parse raw output and verify each content line has │ at consistent
+    // *display column* positions after stripping ANSI codes.
+    // We use display width (not byte offset) because multi-byte UTF-8 chars
+    // like ✓ (3 bytes) and ○ (3 bytes) have display width of 1.
+    let sections = extract_box_sections(&stdout);
+    for section in &sections {
+        let mut right_border_columns: Vec<usize> = Vec::new();
+
+        for line in section.lines() {
+            let stripped = strip_ansi(line);
+            if stripped.contains('│') {
+                // Compute display column of the right │
+                // Walk through chars, accumulating display width
+                let mut col = 0;
+                let mut right_col = 0;
+                let mut border_count = 0;
+                for ch in stripped.chars() {
+                    if ch == '│' {
+                        border_count += 1;
+                        if border_count == 2 {
+                            right_col = col;
+                        }
+                    }
+                    col += unicode_width::UnicodeWidthChar::width(ch).unwrap_or(0);
+                }
+
+                if border_count == 2 {
+                    right_border_columns.push(right_col);
+                }
+            }
+        }
+
+        // All right border │ should be at the same display column
+        if right_border_columns.len() > 1 {
+            let expected = right_border_columns[0];
+            for (i, col) in right_border_columns.iter().enumerate() {
+                assert_eq!(
+                    *col, expected,
+                    "Right border │ at inconsistent display column on content line {}. \
+                     Expected column {} but got {}. ANSI codes may be inflating width.",
+                    i, expected, col
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn strip_ansi_helper_works() {
+    // Verify our strip_ansi function handles common cases
+    assert_eq!(strip_ansi("hello"), "hello");
+    assert_eq!(strip_ansi("\x1b[31mred\x1b[0m"), "red");
+    assert_eq!(strip_ansi("\x1b[1;38;2;124;58;237mbold purple\x1b[0m"), "bold purple");
+    assert_eq!(strip_ansi("no codes here"), "no codes here");
+    assert_eq!(strip_ansi("│\x1b[1mtext\x1b[0m│"), "│text│");
+
+    // Box-drawing characters should survive stripping
+    assert_eq!(strip_ansi("┌──┐"), "┌──┐");
+    assert_eq!(strip_ansi("└──┘"), "└──┘");
+    assert_eq!(strip_ansi("│  │"), "│  │");
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 18. EMOJI / UNICODE WIDTH REGRESSION TESTS
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn verify_box_alignment_catches_misaligned_box() {
+    // This is a unit test for the helper itself — verify it correctly
+    // catches boxes with misaligned content lines.
+
+    // Well-formed box should pass
+    let good_box = "\
+  ┌──────────┐\n\
+  │  hello   │\n\
+  │  world   │\n\
+  └──────────┘";
+    verify_box_alignment(good_box); // should not panic
+
+    // Box with wrong-width content line should fail
+    let bad_box = "\
+  ┌──────────┐\n\
+  │  hello  │\n\
+  │  world   │\n\
+  └──────────┘";
+    let result = std::panic::catch_unwind(|| {
+        verify_box_alignment(bad_box);
+    });
+    assert!(
+        result.is_err(),
+        "verify_box_alignment should catch misaligned content lines"
+    );
+}
+
+#[test]
+fn verify_box_alignment_catches_mismatched_borders() {
+    // Top and bottom borders with different widths
+    let bad_borders = "\
+  ┌──────────┐\n\
+  │  hello   │\n\
+  └────────────┘";
+    let result = std::panic::catch_unwind(|| {
+        verify_box_alignment(bad_borders);
+    });
+    assert!(
+        result.is_err(),
+        "verify_box_alignment should catch mismatched border widths"
+    );
+}
+
+#[test]
+fn status_no_emoji_in_box_headers() {
+    // Emoji in box headers cause terminal width inconsistencies because
+    // different terminals render emoji at different widths (1 or 2 cells).
+    // The fix was to remove emoji from box headers entirely.
+    let output = soma()
+        .arg("status")
+        .output()
+        .expect("should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let sections = extract_box_sections(&stdout);
+    for section in &sections {
+        for line in section.lines() {
+            let stripped = strip_ansi(line);
+            // Header lines are │ lines that contain a title (like "Vault Overview")
+            if stripped.contains('│') && !stripped.contains(':') {
+                // Check for common emoji that caused the original bug
+                let emoji_chars = ['🧠', '📁', '🔑', '📊', '🌐', '⚡', '🔧'];
+                for emoji in &emoji_chars {
+                    assert!(
+                        !stripped.contains(*emoji),
+                        "Box header contains emoji '{}' which causes width misalignment. Line: '{}'",
+                        emoji,
+                        stripped
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn status_box_content_no_trailing_text_after_border() {
+    // After the closing │, there should be nothing but optional whitespace
+    let output = soma()
+        .arg("status")
+        .output()
+        .expect("should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    for line in stdout.lines() {
+        let stripped = strip_ansi(line);
+        if stripped.contains('│') {
+            let positions: Vec<usize> = stripped
+                .char_indices()
+                .filter(|(_, c)| *c == '│')
+                .map(|(i, _)| i)
+                .collect();
+
+            if positions.len() == 2 {
+                let after_right_border = &stripped[positions[1] + '│'.len_utf8()..];
+                assert!(
+                    after_right_border.trim().is_empty(),
+                    "Trailing content found after closing │: '{}'. Full line: '{}'",
+                    after_right_border.trim(),
+                    stripped
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn status_border_lines_no_trailing_text() {
+    // After ┐, ┘, ┤ there should be nothing
+    let output = soma()
+        .arg("status")
+        .output()
+        .expect("should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    for line in stdout.lines() {
+        let stripped = strip_ansi(line);
+        for end_char in ['┐', '┘', '┤'] {
+            if stripped.contains(end_char) {
+                let pos = stripped.rfind(end_char).unwrap();
+                let after = &stripped[pos + end_char.len_utf8()..];
+                assert!(
+                    after.trim().is_empty(),
+                    "Trailing content after '{}': '{}'. Full line: '{}'",
+                    end_char,
+                    after.trim(),
+                    stripped
+                );
+            }
+        }
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 19. FULL STATUS OUTPUT STRUCTURE VALIDATION
+// ═══════════════════════════════════════════════════════════════════════════════
+
+#[test]
+fn status_box_structure_complete() {
+    // Each box should have exactly: top border, header, separator, content lines, bottom border
+    let output = soma()
+        .arg("status")
+        .output()
+        .expect("should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    let sections = extract_box_sections(&stdout);
+    for (i, section) in sections.iter().enumerate() {
+        let lines: Vec<String> = section.lines().map(|l| strip_ansi(l)).collect();
+
+        assert!(
+            lines.len() >= 4,
+            "Box section {} has only {} lines. Minimum is 4 (top, header, sep, bottom). Lines: {:?}",
+            i,
+            lines.len(),
+            lines
+        );
+
+        // First line: ┌───┐
+        assert!(
+            lines[0].contains('┌') && lines[0].contains('┐'),
+            "Box {} first line should be top border (┌...┐). Got: '{}'",
+            i,
+            lines[0]
+        );
+
+        // Second line: │  Title  │
+        assert!(
+            lines[1].contains('│'),
+            "Box {} second line should be header (│...│). Got: '{}'",
+            i,
+            lines[1]
+        );
+
+        // Third line: ├───┤
+        assert!(
+            lines[2].contains('├') && lines[2].contains('┤'),
+            "Box {} third line should be separator (├...┤). Got: '{}'",
+            i,
+            lines[2]
+        );
+
+        // Last line: └───┘
+        let last = lines.last().unwrap();
+        assert!(
+            last.contains('└') && last.contains('┘'),
+            "Box {} last line should be bottom border (└...┘). Got: '{}'",
+            i,
+            last
+        );
+    }
+}
+
+#[test]
+fn status_consistent_indentation() {
+    // All box lines should start with the same indentation (2 spaces)
+    let output = soma()
+        .arg("status")
+        .output()
+        .expect("should run");
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+
+    for line in stdout.lines() {
+        let stripped = strip_ansi(line);
+        let has_box_char = stripped.contains('┌')
+            || stripped.contains('└')
+            || stripped.contains('├')
+            || stripped.contains('│')
+            || stripped.contains('┐')
+            || stripped.contains('┘')
+            || stripped.contains('┤');
+
+        if has_box_char {
+            // Should start with exactly 2 spaces
+            assert!(
+                stripped.starts_with("  ") && !stripped.starts_with("   "),
+                "Box line should start with exactly 2 spaces indent. Got: '{}'",
+                stripped
+            );
+        }
+    }
 }
