@@ -25,7 +25,7 @@ pub async fn run(folder_path: &str, force: bool) -> Result<()> {
     assert_path_exists(&abs_path)?;
 
     println!(
-        "  {} Ingesting from {}\n",
+        "  {} Importing from {}\n",
         ICON_FOLDER,
         cyan(&abs_path.display().to_string())
     );
@@ -42,15 +42,15 @@ pub async fn run(folder_path: &str, force: bool) -> Result<()> {
         println!(
             "\n{}",
             check(&format!(
-                "All {} files unchanged. Nothing to ingest.",
+                "All {} files unchanged. Nothing to import.",
                 skipped_count
             ))
         );
         println!(
             "\n  {} {} {}",
             dim("Use"),
-            cyan("soma ingest --force <folder>"),
-            dim("to re-ingest everything.")
+            cyan("soma import --force <folder>"),
+            dim("to re-import everything.")
         );
         println!();
         return Ok(());
@@ -356,13 +356,13 @@ fn print_summary(
     println!(
         "\n  {} {}\n",
         amber(ICON_STAR),
-        bold_purple("Ingestion complete!")
+        bold_purple("Import complete!")
     );
 
-    // Ingestion stats
+    // Import stats
     println!(
         "  {} {} new, {} updated, {} skipped",
-        dim(&format!("{:<18}", "Ingested")),
+        dim(&format!("{:<18}", "Imported")),
         bold_white(&new_count.to_string()),
         amber(&modified_count.to_string()),
         dim(&skipped_count.to_string())

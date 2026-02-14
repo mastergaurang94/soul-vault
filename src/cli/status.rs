@@ -9,6 +9,11 @@ use crate::vault::config::{assert_initialized, vault_root};
 use crate::vault::read::get_vault_stats;
 use crate::vault::sources::get_source_stats;
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+/// Inner content width (between the │ borders). Total line = "  │" + content + "│"
+const INNER_WIDTH: usize = 50;
+
 // ─── Status Command ───────────────────────────────────────────────────────────
 
 pub fn run() -> Result<()> {
@@ -28,117 +33,89 @@ pub fn run() -> Result<()> {
     println!();
 
     // ─── Vault Overview Box ───────────────────────────────────────────────
-    println!("  {}", dim("┌─────────────────────────────────────────────────────┐"));
-    println!(
-        "  {}  {}{}  {}",
-        dim("│"),
-        purple("📊"),
-        bold_white("  Vault Overview"),
-        dim(&format!(
-            "{}│",
-            " ".repeat(35 - "  Vault Overview".len())
-        ))
-    );
-    println!("  {}", dim("├─────────────────────────────────────────────────────┤"));
+    print_box_top();
+    print_box_header("Vault Overview");
+    print_box_sep();
 
-    // Stats rows
     let vault_size = compute_vault_size(&vault_root());
     let vault_file_count = count_all_files(&vault_root());
 
-    print_box_row("Memories", &stats.memory_count.to_string(), false);
-    print_box_row("Topics", &stats.topic_count.to_string(), false);
-    print_box_row("People", &stats.people_count.to_string(), false);
-    print_box_row("Vault size", &format_bytes(vault_size), false);
-    print_box_row("Total files", &vault_file_count.to_string(), false);
+    print_stat_row("Memories", &stats.memory_count.to_string());
+    print_stat_row("Topics", &stats.topic_count.to_string());
+    print_stat_row("People", &stats.people_count.to_string());
+    print_stat_row("Vault size", &format_bytes(vault_size));
+    print_stat_row("Total files", &vault_file_count.to_string());
 
     let last_sync_display = match &stats.last_sync {
         Some(ls) => format_time_ago(ls),
-        None => dim("never"),
+        None => "never".to_string(),
     };
-    print_box_row("Last activity", &last_sync_display, false);
+    print_stat_row("Last activity", &last_sync_display);
 
-    println!("  {}", dim("└─────────────────────────────────────────────────────┘"));
+    print_box_bottom();
     println!();
 
     // ─── Providers Box ────────────────────────────────────────────────────
-    println!("  {}", dim("┌─────────────────────────────────────────────────────┐"));
-    println!(
-        "  {}  {}{}  {}",
-        dim("│"),
-        purple("🔌"),
-        bold_white("  Providers"),
-        dim(&format!(
-            "{}│",
-            " ".repeat(35 - "  Providers".len())
-        ))
-    );
-    println!("  {}", dim("├─────────────────────────────────────────────────────┤"));
+    print_box_top();
+    print_box_header("Providers");
+    print_box_sep();
 
     for p in &stats.providers {
         let name = p.name.display_name();
-        let (icon, status) = if p.connected {
+        let (icon, status_text) = if p.connected {
             let pull_info = match &p.last_pull {
                 Some(lp) => format!("last: {}", format_time_ago(lp)),
                 None => "no pulls yet".to_string(),
             };
-            (emerald(ICON_CHECK), dim(&pull_info))
+            (emerald(ICON_CHECK), pull_info)
         } else {
-            (dim(ICON_DOT), dim("not connected"))
+            (dim(ICON_DOT), "not connected".to_string())
         };
-        println!(
-            "  {}    {} {:<14}{}{}",
-            dim("│"),
-            icon,
-            bold_white(name),
-            status,
-            pad_to_box_end(&format!("    {} {:<14}{}", icon, name, &status_stripped_len(&status)), 53)
-        );
+
+        // Build the visible content: "  ✓ Claude         no pulls yet"
+        // icon(1) + space(1) + name(padded to 14) + status
+        let visible_content = format!("  {} {:<14}{}", "X", name, &status_text);
+        let vis_len = visible_content.len(); // no ANSI here, plain measurement
+
+        // Now build with colors
+        let colored_content = format!("  {} {:<14}{}", icon, name, dim(&status_text));
+        let pad = if vis_len < INNER_WIDTH {
+            INNER_WIDTH - vis_len
+        } else {
+            1
+        };
+        println!("  │{}{}│", colored_content, " ".repeat(pad));
     }
 
-    println!("  {}", dim("└─────────────────────────────────────────────────────┘"));
+    print_box_bottom();
     println!();
 
-    // ─── Ingested Sources Box ─────────────────────────────────────────────
+    // ─── Imported Sources Box ─────────────────────────────────────────────
     if !sources.is_empty() {
-        println!("  {}", dim("┌─────────────────────────────────────────────────────┐"));
-        println!(
-            "  {}  {}{}  {}",
-            dim("│"),
-            purple("📁"),
-            bold_white("  Ingested Sources"),
-            dim(&format!(
-                "{}│",
-                " ".repeat(35 - "  Ingested Sources".len())
-            ))
-        );
-        println!("  {}", dim("├─────────────────────────────────────────────────────┤"));
+        print_box_top();
+        print_box_header("Imported Sources");
+        print_box_sep();
 
         for source in &sources {
-            // Truncate long paths
             let display_path = truncate_path(&source.path, 40);
             let last = format_time_ago(&source.last_ingested);
-            println!(
-                "  {}    {} {}",
-                dim("│"),
-                cyan(&display_path),
-                dim("│")
-            );
-            println!(
-                "  {}      {} files, last: {}{}",
-                dim("│"),
-                bold_white(&source.files_ingested.to_string()),
-                dim(&last),
-                dim(" │")
+            print_content_row(&format!("  {}", &display_path), Some(&cyan));
+            print_content_row(
+                &format!(
+                    "    {} files, last: {}",
+                    source.files_ingested, &last
+                ),
+                Some(&dim),
             );
         }
 
-        println!("  {}", dim("└─────────────────────────────────────────────────────┘"));
+        print_box_bottom();
     } else {
-        println!("  {}", dim("No sources ingested yet."));
+        println!("  {}", dim("No sources imported yet."));
         println!(
             "  {} {} {}",
             dim("Run"),
-            cyan("soma ingest <folder>"),
+            cyan("soma import <folder>"),
             dim("to get started.")
         );
     }
@@ -148,34 +125,73 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Box Drawing ──────────────────────────────────────────────────────────────
 
-fn print_box_row(label: &str, value: &str, _highlight: bool) {
+fn print_box_top() {
+    println!("  ┌{}┐", "─".repeat(INNER_WIDTH));
+}
+
+fn print_box_bottom() {
+    println!("  └{}┘", "─".repeat(INNER_WIDTH));
+}
+
+fn print_box_sep() {
+    println!("  ├{}┤", "─".repeat(INNER_WIDTH));
+}
+
+fn print_box_header(title: &str) {
+    // Simple header: "  │  TITLE                           │"
+    // No emoji — they cause inconsistent terminal widths across terminals.
+    // Visible: 2 (indent) + title.len()
+    let visible_used = 2 + title.len();
+    let pad = if visible_used < INNER_WIDTH {
+        INNER_WIDTH - visible_used
+    } else {
+        1
+    };
+    println!("  │  {}{}│", bold_white(title), " ".repeat(pad));
+}
+
+fn print_stat_row(label: &str, value: &str) {
+    // Layout: "    Label:         Value"
+    // 4 spaces indent + label + ":" + padding to col 20 + value
+    let label_with_colon = format!("{}:", label);
+    let visible = format!("    {:<16}{}", label_with_colon, value);
+    let vis_len = visible.len();
+    let pad = if vis_len < INNER_WIDTH {
+        INNER_WIDTH - vis_len
+    } else {
+        1
+    };
+    // Apply colors: label dim, value bold
     println!(
-        "  {}    {:<16}{}{}",
-        dim("│"),
-        dim(&format!("{}:", label)),
+        "  │    {:<16}{}{}│",
+        dim(&label_with_colon),
         bold_white(value),
-        dim(" │")
+        " ".repeat(pad)
     );
 }
 
-fn pad_to_box_end(_content: &str, _width: usize) -> String {
-    // For the provider rows, we just close the box
-    dim(" │").to_string()
+fn print_content_row(text: &str, color_fn: Option<&dyn Fn(&str) -> String>) {
+    let vis_len = text.len();
+    let colored = match color_fn {
+        Some(f) => f(text),
+        None => text.to_string(),
+    };
+    let pad = if vis_len < INNER_WIDTH {
+        INNER_WIDTH - vis_len
+    } else {
+        1
+    };
+    println!("  │{}{}│", colored, " ".repeat(pad));
 }
 
-fn status_stripped_len(s: &str) -> String {
-    // Strip ANSI codes for length calculation (approximate)
-    let _ = s;
-    String::new()
-}
+// ─── Path & Size Helpers ──────────────────────────────────────────────────────
 
 fn truncate_path(path: &str, max_len: usize) -> String {
     if path.len() <= max_len {
         return path.to_string();
     }
-    // Show ~/... prefix
     let home = dirs::home_dir()
         .map(|h| h.display().to_string())
         .unwrap_or_default();

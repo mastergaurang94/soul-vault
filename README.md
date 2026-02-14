@@ -80,10 +80,10 @@ First-time setup wizard:
 3. Selects which LLM to use for memory extraction
 4. Collects API keys (stored locally in `~/soma/.config/keys.json`)
 
-### Ingest Files
+### Import Files
 
 ```bash
-soma ingest ~/Documents/ai-conversations/
+soma import ~/Documents/ai-conversations/
 ```
 
 **The killer feature.** Point at any folder and Soma:
@@ -120,6 +120,14 @@ soma status
 ```
 
 Shows vault summary: memory counts, topics, people, provider status.
+
+### Watch
+
+```bash
+soma watch ~/Documents/ai-conversations/
+```
+
+Watches a folder for changes and automatically imports new or modified files.
 
 ## Vault Structure
 
@@ -219,9 +227,10 @@ src/
   cli/                 # Command implementations
     interactive.rs     # Ratatui TUI menu
     init.rs            # Setup wizard
-    ingest.rs          # File ingestion pipeline
+    ingest.rs          # File import pipeline
     export.rs          # Vault export
     status.rs          # Vault summary
+    watch.rs           # File watcher
   core/                # Business logic
     processor.rs       # Claude API calls via reqwest
     parser.rs          # JSON response parsing

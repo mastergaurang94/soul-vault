@@ -14,7 +14,7 @@ use ratatui::{
     widgets::Paragraph,
     Frame, Terminal,
 };
-use std::io;
+use std::io::{self, Write};
 
 use crate::ui::theme::rat;
 use crate::vault::config::is_initialized;
@@ -30,32 +30,20 @@ struct MenuItem {
 
 #[derive(Clone)]
 enum Action {
-    Ingest,
-    Watch,
-    Export,
-    Status,
     Init,
+    Status,
+    Import,
+    Export,
+    Watch,
     Quit,
 }
 
 const MENU_ITEMS: &[MenuItem] = &[
     MenuItem {
-        label: "Ingest",
-        description: "Import local files & transcripts",
-        icon: "📥",
-        action: Action::Ingest,
-    },
-    MenuItem {
-        label: "Watch",
-        description: "Auto-ingest on file changes",
-        icon: "👁 ",
-        action: Action::Watch,
-    },
-    MenuItem {
-        label: "Export",
-        description: "Output context for any AI",
-        icon: "📤",
-        action: Action::Export,
+        label: "Init",
+        description: "Setup or reconfigure",
+        icon: "⚙️ ",
+        action: Action::Init,
     },
     MenuItem {
         label: "Status",
@@ -64,10 +52,22 @@ const MENU_ITEMS: &[MenuItem] = &[
         action: Action::Status,
     },
     MenuItem {
-        label: "Init",
-        description: "Setup or reconfigure",
-        icon: "⚙️ ",
-        action: Action::Init,
+        label: "Import",
+        description: "Import local files & transcripts",
+        icon: "📥",
+        action: Action::Import,
+    },
+    MenuItem {
+        label: "Export",
+        description: "Output context for any AI",
+        icon: "📤",
+        action: Action::Export,
+    },
+    MenuItem {
+        label: "Watch",
+        description: "Auto-import on file changes",
+        icon: "👁 ",
+        action: Action::Watch,
     },
     MenuItem {
         label: "Quit",
@@ -167,13 +167,37 @@ pub fn run() -> Result<()> {
             Action::Init => {
                 crate::cli::init::run()?;
             }
-            Action::Ingest => {
-                println!("\n  Usage: soma ingest <folder>\n");
-                println!("  Example: soma ingest ~/Documents/chatgpt-exports\n");
+            Action::Import => {
+                // Prompt user for folder path interactively
+                print!("\n  Enter folder path: ");
+                io::stdout().flush()?;
+                let mut input = String::new();
+                io::stdin().read_line(&mut input)?;
+                let folder = input.trim();
+                if folder.is_empty() {
+                    println!("\n  No folder path provided.\n");
+                    println!("  Usage: soma import <folder>");
+                    println!("  Example: soma import ~/Documents/chatgpt-exports\n");
+                } else {
+                    // We need a runtime to run the async ingest
+                    let rt = tokio::runtime::Handle::current();
+                    rt.block_on(crate::cli::ingest::run(folder, false))?;
+                }
             }
             Action::Watch => {
-                println!("\n  Usage: soma watch <folder>\n");
-                println!("  Example: soma watch ~/Documents/chatgpt-exports\n");
+                print!("\n  Enter folder path to watch: ");
+                io::stdout().flush()?;
+                let mut input = String::new();
+                io::stdin().read_line(&mut input)?;
+                let folder = input.trim();
+                if folder.is_empty() {
+                    println!("\n  No folder path provided.\n");
+                    println!("  Usage: soma watch <folder>");
+                    println!("  Example: soma watch ~/Documents/chatgpt-exports\n");
+                } else {
+                    let rt = tokio::runtime::Handle::current();
+                    rt.block_on(crate::cli::watch::run(folder))?;
+                }
             }
             Action::Export => {
                 crate::cli::export::run(None, "markdown", None)?;
@@ -293,8 +317,14 @@ fn print_non_tty_help() {
     println!("  Interactive mode requires a terminal (TTY).");
     println!("  Use a subcommand instead:\n");
     println!("    {}              Initialize vault", cyan("soma init"));
-    println!("    {}   Import files", cyan("soma ingest <folder>"));
-    println!("    {}    Watch folder for changes", cyan("soma watch <folder>"));
+    println!(
+        "    {}  Import files",
+        cyan("soma import <folder>")
+    );
+    println!(
+        "    {}   Watch folder for changes",
+        cyan("soma watch <folder>")
+    );
     println!("    {}            Export vault context", cyan("soma export"));
     println!("    {}            Show vault summary", cyan("soma status"));
     println!(

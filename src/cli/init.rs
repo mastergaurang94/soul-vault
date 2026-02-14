@@ -77,7 +77,7 @@ pub fn run() -> Result<()> {
     );
 
     let llm_options = [Provider::Claude, Provider::ChatGpt, Provider::Gemini];
-    let llm_labels = ["Claude (recommended)", "ChatGPT", "Gemini"];
+    let llm_labels = ["Claude", "ChatGPT", "Gemini"];
 
     for (i, label) in llm_labels.iter().enumerate() {
         println!("    {} {}", dim(&format!("{}.", i + 1)), label);
@@ -161,11 +161,11 @@ pub fn run() -> Result<()> {
     println!("\n{}", dim("  Next steps:"));
     println!(
         "    {}  Import your AI conversations",
-        cyan("soma ingest <folder>")
+        cyan("soma import <folder>")
     );
-    println!("    {}           Check your vault", cyan("soma status"));
+    println!("    {}            Check your vault", cyan("soma status"));
     println!(
-        "    {}           Output context for any AI",
+        "    {}            Output context for any AI",
         cyan("soma export")
     );
     println!();

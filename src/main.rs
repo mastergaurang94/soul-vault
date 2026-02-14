@@ -30,16 +30,27 @@ enum Commands {
     Init,
 
     /// Import and process local files into your vault
-    Ingest {
-        /// Path to folder containing files to ingest
-        folder: String,
+    Import {
+        /// Path to folder containing files to import
+        folder: Option<String>,
 
-        /// Force re-ingestion of all files, ignoring source tracking
+        /// Force re-import of all files, ignoring source tracking
         #[arg(short, long)]
         force: bool,
     },
 
-    /// Watch a folder and auto-ingest on changes
+    /// Import and process local files into your vault (alias for import)
+    #[command(hide = true)]
+    Ingest {
+        /// Path to folder containing files to import
+        folder: Option<String>,
+
+        /// Force re-import of all files, ignoring source tracking
+        #[arg(short, long)]
+        force: bool,
+    },
+
+    /// Watch a folder and auto-import on changes
     Watch {
         /// Path to folder to watch
         folder: String,
@@ -60,7 +71,7 @@ enum Commands {
         topic: Option<String>,
     },
 
-    /// Show vault summary and ingested sources
+    /// Show vault summary and imported sources
     Status,
 }
 
@@ -76,7 +87,17 @@ async fn main() {
             cli::interactive::run()
         }
         Some(Commands::Init) => cli::init::run(),
-        Some(Commands::Ingest { folder, force }) => cli::ingest::run(&folder, force).await,
+        Some(Commands::Import { folder, force }) | Some(Commands::Ingest { folder, force }) => {
+            match folder {
+                Some(f) => cli::ingest::run(&f, force).await,
+                None => {
+                    eprintln!("\n  {} Missing folder path.\n", ui::theme::red("✗"));
+                    eprintln!("  Usage: soma import <folder>\n");
+                    eprintln!("  Example: soma import ~/Documents/chatgpt-exports\n");
+                    std::process::exit(1);
+                }
+            }
+        }
         Some(Commands::Watch { folder }) => cli::watch::run(&folder).await,
         Some(Commands::Export {
             output,

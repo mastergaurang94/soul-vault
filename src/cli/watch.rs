@@ -27,7 +27,7 @@ pub async fn run(folder_path: &str) -> Result<()> {
     assert_path_exists(&abs_path)?;
 
     println!(
-        "  👁 Watching {} for changes\n",
+        "  👁  Watching {} for changes\n",
         cyan(&abs_path.display().to_string())
     );
     println!("{}", line());
@@ -135,12 +135,12 @@ pub async fn run(folder_path: &str) -> Result<()> {
                             );
                         }
 
-                        // Run ingestion
+                        // Run import
                         match crate::cli::ingest::run_for_files(&abs_path, &files_to_ingest).await
                         {
                             Ok(()) => {
                                 println!(
-                                    "  {}   {} ingested, {} skipped",
+                                    "  {}   {} imported, {} skipped",
                                     dim(&" ".repeat(8)),
                                     bold_white(&files_to_ingest.len().to_string()),
                                     dim(&skipped.to_string())
