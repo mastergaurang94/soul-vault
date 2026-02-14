@@ -1,22 +1,17 @@
-//! `soma` (no args) — ratatui interactive menu with arrow key / vim bindings.
+//! `soma` (no args) — inline interactive menu with arrow key / vim bindings.
+//! No alternate screen — renders in the normal terminal flow.
 
 use anyhow::Result;
 use crossterm::{
+    cursor,
     event::{self, Event, KeyCode, KeyEventKind},
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    style::Print,
+    terminal::{self, Clear, ClearType},
     ExecutableCommand,
-};
-use ratatui::{
-    backend::CrosstermBackend,
-    layout::{Constraint, Layout, Rect},
-    style::{Modifier, Style},
-    text::{Line, Span},
-    widgets::Paragraph,
-    Frame, Terminal,
 };
 use std::io::{self, Write};
 
-use crate::ui::theme::rat;
+use crate::ui::theme::*;
 use crate::vault::config::is_initialized;
 
 // ─── Menu Items ───────────────────────────────────────────────────────────────
@@ -24,7 +19,6 @@ use crate::vault::config::is_initialized;
 struct MenuItem {
     label: &'static str,
     description: &'static str,
-    icon: &'static str,
     action: Action,
 }
 
@@ -43,85 +37,39 @@ const MENU_ITEMS: &[MenuItem] = &[
     MenuItem {
         label: "Init",
         description: "Setup or reconfigure",
-        icon: "⚙️ ",
         action: Action::Init,
     },
     MenuItem {
         label: "Status",
         description: "What's in your vault",
-        icon: "📊",
         action: Action::Status,
     },
     MenuItem {
         label: "Import",
         description: "Import local files & transcripts",
-        icon: "📥",
         action: Action::Import,
     },
     MenuItem {
         label: "Export",
         description: "Output context for any AI",
-        icon: "📤",
         action: Action::Export,
     },
     MenuItem {
         label: "Watch",
         description: "Auto-import on file changes",
-        icon: "👁 ",
         action: Action::Watch,
     },
     MenuItem {
         label: "Reset",
         description: "Delete vault and start over",
-        icon: "🗑 ",
         action: Action::Reset,
     },
     MenuItem {
         label: "Quit",
         description: "",
-        icon: "👋",
         action: Action::Quit,
     },
 ];
-
-// ─── App State ────────────────────────────────────────────────────────────────
-
-struct App {
-    selected: usize,
-    should_quit: bool,
-    chosen_action: Option<Action>,
-}
-
-impl App {
-    fn new() -> Self {
-        Self {
-            selected: 0,
-            should_quit: false,
-            chosen_action: None,
-        }
-    }
-
-    fn move_up(&mut self) {
-        if self.selected > 0 {
-            self.selected -= 1;
-        } else {
-            self.selected = MENU_ITEMS.len() - 1;
-        }
-    }
-
-    fn move_down(&mut self) {
-        if self.selected < MENU_ITEMS.len() - 1 {
-            self.selected += 1;
-        } else {
-            self.selected = 0;
-        }
-    }
-
-    fn select(&mut self) {
-        self.chosen_action = Some(MENU_ITEMS[self.selected].action.clone());
-        self.should_quit = true;
-    }
-}
 
 // ─── Run Interactive Mode ─────────────────────────────────────────────────────
 
@@ -132,51 +80,27 @@ pub fn run() -> Result<()> {
         return Ok(());
     }
 
-    let mut app = App::new();
-
-    // Setup terminal
-    enable_raw_mode()?;
-    io::stdout().execute(EnterAlternateScreen)?;
-    let backend = CrosstermBackend::new(io::stdout());
-    let mut terminal = Terminal::new(backend)?;
-
-    // Main loop
-    loop {
-        terminal.draw(|f| draw(f, &app))?;
-
-        if let Event::Key(key) = event::read()? {
-            if key.kind != KeyEventKind::Press {
-                continue;
-            }
-            match key.code {
-                KeyCode::Up | KeyCode::Char('k') => app.move_up(),
-                KeyCode::Down | KeyCode::Char('j') => app.move_down(),
-                KeyCode::Enter => app.select(),
-                KeyCode::Char('q') | KeyCode::Esc => {
-                    app.should_quit = true;
-                }
-                _ => {}
-            }
-        }
-
-        if app.should_quit {
-            break;
-        }
+    // Print banner and status (these stay in scrollback)
+    println!("{}", banner());
+    if is_initialized() {
+        println!("  {}", dim("Vault ready. Select an action:"));
+    } else {
+        println!("  {}", dim("Vault not initialized. Select Init to get started."));
     }
+    println!();
 
-    // Restore terminal
-    disable_raw_mode()?;
-    io::stdout().execute(LeaveAlternateScreen)?;
+    // Run inline menu
+    let selected = run_inline_menu()?;
 
     // Handle the chosen action
-    if let Some(ref action) = app.chosen_action {
+    if let Some(ref action) = selected {
+        println!(); // blank line before command output
         match action {
             Action::Init => {
                 crate::cli::init::run()?;
             }
             Action::Import => {
-                // Prompt user for folder path interactively
-                print!("\n  Enter folder path: ");
+                print!("  Enter folder path: ");
                 io::stdout().flush()?;
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)?;
@@ -186,13 +110,12 @@ pub fn run() -> Result<()> {
                     println!("  Usage: soma import <folder>");
                     println!("  Example: soma import ~/Documents/chatgpt-exports\n");
                 } else {
-                    // We need a runtime to run the async ingest
                     let rt = tokio::runtime::Handle::current();
                     rt.block_on(crate::cli::ingest::run(folder, false))?;
                 }
             }
             Action::Watch => {
-                print!("\n  Enter folder path to watch: ");
+                print!("  Enter folder path to watch: ");
                 io::stdout().flush()?;
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)?;
@@ -222,96 +145,144 @@ pub fn run() -> Result<()> {
     Ok(())
 }
 
-// ─── Draw ─────────────────────────────────────────────────────────────────────
+// ─── Inline Menu ──────────────────────────────────────────────────────────────
 
-fn draw(f: &mut Frame, app: &App) {
-    let area = f.area();
+fn run_inline_menu() -> Result<Option<Action>> {
+    let mut selected: usize = 0;
+    let menu_len = MENU_ITEMS.len();
 
-    // Center the menu vertically
-    let total_height = 12; // header + items + footer
-    let y_offset = if area.height > total_height as u16 {
-        (area.height - total_height as u16) / 3
-    } else {
-        0
-    };
+    // Print initial menu
+    print_menu(selected);
 
-    let chunks = Layout::vertical([
-        Constraint::Length(y_offset),
-        Constraint::Length(1), // blank
-        Constraint::Length(1), // title
-        Constraint::Length(1), // blank
-        Constraint::Length(1), // status
-        Constraint::Length(1), // blank
-        Constraint::Length(MENU_ITEMS.len() as u16),
-        Constraint::Length(1), // blank
-        Constraint::Length(1), // footer
-        Constraint::Min(0),
-    ])
-    .split(area);
+    // Enable raw mode for key input
+    terminal::enable_raw_mode()?;
 
-    // Title: "  Soma ✦ Your AI memory, unified."
-    let title = Line::from(vec![
-        Span::raw("  "),
-        Span::styled(
-            "Soma",
-            Style::default()
-                .fg(rat::PURPLE)
-                .add_modifier(Modifier::BOLD),
-        ),
-        Span::raw(" "),
-        Span::styled("✦", Style::default().fg(rat::AMBER)),
-        Span::raw(" "),
-        Span::styled("Your AI memory, unified.", Style::default().fg(rat::DIM)),
-    ]);
-    f.render_widget(Paragraph::new(title), chunks[2]);
-
-    // Status line
-    let status_text = if is_initialized() {
-        "  Vault ready. Select an action:"
-    } else {
-        "  Vault not initialized. Select Init to get started."
-    };
-    let status = Line::from(Span::styled(status_text, Style::default().fg(rat::DIM)));
-    f.render_widget(Paragraph::new(status), chunks[4]);
-
-    // Menu items
-    let menu_area = chunks[6];
-    for (i, item) in MENU_ITEMS.iter().enumerate() {
-        let is_selected = i == app.selected;
-        let item_area = Rect::new(menu_area.x, menu_area.y + i as u16, menu_area.width, 1);
-
-        let (prefix, label_style) = if is_selected {
-            (
-                "  ▶ ",
-                Style::default()
-                    .fg(rat::PURPLE)
-                    .add_modifier(Modifier::BOLD),
-            )
-        } else {
-            ("    ", Style::default().fg(ratatui::style::Color::White))
-        };
-
-        let mut spans = vec![
-            Span::styled(prefix, label_style),
-            Span::styled(format!("{} {}", item.icon, item.label), label_style),
-        ];
-
-        if !item.description.is_empty() {
-            spans.push(Span::styled(
-                format!("  {}", item.description),
-                Style::default().fg(rat::DIM),
-            ));
+    let result = loop {
+        if let Event::Key(key) = event::read()? {
+            if key.kind != KeyEventKind::Press {
+                continue;
+            }
+            match key.code {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    if selected > 0 {
+                        selected -= 1;
+                    } else {
+                        selected = menu_len - 1;
+                    }
+                    reprint_menu(selected, menu_len)?;
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if selected < menu_len - 1 {
+                        selected += 1;
+                    } else {
+                        selected = 0;
+                    }
+                    reprint_menu(selected, menu_len)?;
+                }
+                KeyCode::Enter => {
+                    break Some(MENU_ITEMS[selected].action.clone());
+                }
+                KeyCode::Char('q') | KeyCode::Esc => {
+                    break None;
+                }
+                _ => {}
+            }
         }
+    };
 
-        f.render_widget(Paragraph::new(Line::from(spans)), item_area);
+    // Restore terminal
+    terminal::disable_raw_mode()?;
+
+    // Move cursor past the menu and clear the menu lines
+    // (so the selected action's output appears cleanly)
+    let stdout = io::stdout();
+    let mut out = stdout.lock();
+    // Move to end of menu area
+    out.execute(cursor::MoveDown((menu_len - selected) as u16))?;
+    out.execute(Print("\n"))?;
+    out.flush()?;
+
+    Ok(result)
+}
+
+fn print_menu(selected: usize) {
+    for (i, item) in MENU_ITEMS.iter().enumerate() {
+        print_menu_item(i, item, i == selected);
+    }
+    // Footer
+    println!();
+    println!("  {}", dim("  up/down/jk navigate  enter select  q quit"));
+}
+
+fn print_menu_item(index: usize, item: &MenuItem, is_selected: bool) {
+    let num = format!("{}.", index + 1);
+    if is_selected {
+        let label = format!("  > {} {}", num, item.label);
+        if item.description.is_empty() {
+            println!("{}", bold_purple(&label));
+        } else {
+            println!(
+                "{}  {}",
+                bold_purple(&label),
+                dim(item.description)
+            );
+        }
+    } else {
+        let label = format!("    {} {}", num, item.label);
+        if item.description.is_empty() {
+            println!("{}", label);
+        } else {
+            println!(
+                "{}  {}",
+                label,
+                dim(item.description)
+            );
+        }
+    }
+}
+
+fn reprint_menu(selected: usize, menu_len: usize) -> Result<()> {
+    let stdout = io::stdout();
+    let mut out = stdout.lock();
+
+    // Move cursor up to the start of the menu (menu lines + 1 blank + 1 footer)
+    let lines_to_move = menu_len + 2;
+    out.execute(cursor::MoveUp(lines_to_move as u16))?;
+
+    // Clear and reprint each line
+    for (i, item) in MENU_ITEMS.iter().enumerate() {
+        out.execute(Clear(ClearType::CurrentLine))?;
+        // We need to print without the println adding \r\n in raw mode
+        // So we disable raw mode briefly... actually let's just write directly
+        let num = format!("{}.", i + 1);
+        if i == selected {
+            let label = format!("  > {} {}", num, item.label);
+            if item.description.is_empty() {
+                let line = bold_purple(&label);
+                out.execute(Print(format!("{}\r\n", line)))?;
+            } else {
+                let line = format!("{}  {}", bold_purple(&label), dim(item.description));
+                out.execute(Print(format!("{}\r\n", line)))?;
+            }
+        } else {
+            let label = format!("    {} {}", num, item.label);
+            if item.description.is_empty() {
+                out.execute(Print(format!("{}\r\n", label)))?;
+            } else {
+                let line = format!("{}  {}", label, dim(item.description));
+                out.execute(Print(format!("{}\r\n", line)))?;
+            }
+        }
     }
 
-    // Footer
-    let footer = Line::from(Span::styled(
-        "  ↑↓/jk navigate  ↵ select  q quit",
-        Style::default().fg(rat::DIM),
-    ));
-    f.render_widget(Paragraph::new(footer), chunks[8]);
+    // Blank line + footer
+    out.execute(Clear(ClearType::CurrentLine))?;
+    out.execute(Print("\r\n"))?;
+    out.execute(Clear(ClearType::CurrentLine))?;
+    out.execute(Print(format!("  {}\r\n", dim("  up/down/jk navigate  enter select  q quit"))))?;
+
+    out.flush()?;
+    Ok(())
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -322,7 +293,6 @@ fn atty_check() -> bool {
 }
 
 fn print_non_tty_help() {
-    use crate::ui::theme::{banner, cyan, dim};
     println!("{}", banner());
     println!("  Interactive mode requires a terminal (TTY).");
     println!("  Use a subcommand instead:\n");
