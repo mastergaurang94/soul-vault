@@ -27,6 +27,34 @@ pub fn run(
     let vault = read_vault_content()?;
 
     match export_format {
+        ExportFormat::Context => output_context(&vault, output, topic, &selected_sections)?,
+        ExportFormat::Json => output_json(&vault, output, topic, &selected_sections)?,
+        ExportFormat::Bundle => output_bundle(output, &selected_sections)?,
+    }
+
+    // Show CLI confirmation (skipped when called from TUI)
+    if let Some(path) = output {
+        use crate::ui::theme::*;
+        eprintln!("{}", check(&format!("Exported to {}", cyan(path))));
+    }
+
+    Ok(())
+}
+
+/// Silent export — used by TUI to avoid stderr output.
+pub fn run_quiet(
+    output: Option<&str>,
+    format: &str,
+    topic: Option<&str>,
+    sections: Option<&str>,
+) -> Result<()> {
+    assert_initialized()?;
+
+    let export_format = ExportFormat::parse(format)?;
+    let selected_sections: Vec<ExportSection> = parse_sections(sections)?;
+    let vault = read_vault_content()?;
+
+    match export_format {
         ExportFormat::Context => output_context(&vault, output, topic, &selected_sections),
         ExportFormat::Json => output_json(&vault, output, topic, &selected_sections),
         ExportFormat::Bundle => output_bundle(output, &selected_sections),

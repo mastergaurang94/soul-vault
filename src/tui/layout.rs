@@ -99,7 +99,7 @@ pub fn render_layout(area: Rect, buf: &mut Buffer, app: &App, pages: &PageSet) {
 
 fn render_header(area: Rect, buf: &mut Buffer) {
     let line = Line::from(Span::styled(
-        " Your AI memory, unified.",
+        " ✦ Your AI memory, unified.",
         Style::default().fg(rat::DIM),
     ));
     Paragraph::new(line).render(area, buf);

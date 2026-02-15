@@ -5,7 +5,6 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use crate::cli::export_types::{default_output_path, include, ExportFormat, ExportSection};
-use crate::ui::theme::*;
 use crate::vault::config::{identity_dir, memories_dir, people_dir, topics_dir};
 
 struct BundlePaths {
@@ -27,19 +26,6 @@ pub(crate) fn output_bundle(output_path: Option<&str>, sections: &[ExportSection
     };
 
     create_bundle_dir(&paths, &destination, sections)?;
-
-    eprintln!("{}", banner());
-    eprintln!(
-        "{}",
-        check(&format!(
-            "Bundle export created at {}",
-            cyan(&destination.display().to_string())
-        ))
-    );
-    eprintln!(
-        "{}",
-        dim("  Tip: zip this folder if you need a single archive.\n")
-    );
     Ok(())
 }
 

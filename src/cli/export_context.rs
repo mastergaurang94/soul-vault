@@ -5,7 +5,6 @@ use std::fs;
 
 use crate::cli::export_types::{include, ExportSection};
 use crate::types::{NamedContent, VaultContent};
-use crate::ui::theme::*;
 
 pub(crate) fn output_context(
     vault: &VaultContent,
@@ -16,16 +15,6 @@ pub(crate) fn output_context(
     let doc = build_context_document(vault, topic_filter, sections);
     if let Some(path) = output_path {
         fs::write(path, &doc)?;
-        eprintln!("{}", banner());
-        eprintln!("{}", check(&format!("Exported to {}", cyan(path))));
-        eprintln!(
-            "{}",
-            dim(&format!(
-                "  {} words, {} characters\n",
-                count_words(&doc),
-                doc.len()
-            ))
-        );
     } else {
         println!("{doc}");
     }
@@ -118,6 +107,7 @@ fn strip_frontmatter(content: &str) -> String {
     }
 }
 
+#[cfg(test)]
 fn count_words(text: &str) -> usize {
     text.split_whitespace().count()
 }

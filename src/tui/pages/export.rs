@@ -189,7 +189,7 @@ impl ExportPage {
     fn execute_export(&mut self) {
         let output_path = self.output_path();
         let sections = self.selected_sections_csv();
-        match crate::cli::export::run(Some(&output_path), self.format.arg(), None, Some(&sections))
+        match crate::cli::export::run_quiet(Some(&output_path), self.format.arg(), None, Some(&sections))
         {
             Ok(()) => {
                 let display = std::path::Path::new(&output_path)

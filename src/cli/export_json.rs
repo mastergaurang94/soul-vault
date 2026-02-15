@@ -6,7 +6,6 @@ use std::fs;
 use crate::cli::export_context::filtered_topics;
 use crate::cli::export_types::{include, ExportSection};
 use crate::types::VaultContent;
-use crate::ui::theme::*;
 
 pub(crate) fn output_json(
     vault: &VaultContent,
@@ -45,7 +44,6 @@ pub(crate) fn output_json(
     let json = serde_json::to_string_pretty(&doc)?;
     if let Some(path) = output_path {
         fs::write(path, &json)?;
-        eprintln!("{}", check(&format!("Exported JSON to {}", cyan(path))));
     } else {
         println!("{json}");
     }
