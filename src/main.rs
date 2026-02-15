@@ -20,11 +20,16 @@ use clap::{Parser, Subcommand};
 #[command(
     name = "soul",
     about = "Your AI memory, unified. Distills AI conversations into a structured local vault.",
-    version
+    version,
+    disable_version_flag = true,
 )]
 struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
+
+    /// Print version
+    #[arg(short = 'v', short_alias = 'V', long = "version", action = clap::ArgAction::Version)]
+    version: (),
 }
 
 #[derive(Subcommand)]
