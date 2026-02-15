@@ -1,4 +1,4 @@
-//! `soul pull` — auto-discover and import AI sessions from all providers.
+//! Provider auto-discovery import implementation for `soul import`.
 //!
 //! Discovers sessions from Claude Code, OpenClaw, and other providers,
 //! then runs them through the import pipeline.
@@ -17,7 +17,7 @@ use crate::vault::config::{assert_initialized, get_api_key, read_config, write_c
 use crate::vault::sources::{compute_file_hash, read_sources, write_sources, SourceEntry};
 use crate::vault::write::write_memories_to_vault;
 
-// ─── Pull Command ─────────────────────────────────────────────────────────────
+// ─── Provider Import ──────────────────────────────────────────────────────────
 
 pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()> {
     if cloud {
@@ -98,7 +98,7 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
         println!(
             "  {} {} {}",
             dim("Use"),
-            cyan("soul pull --force"),
+            cyan("soul import --force"),
             dim("to re-import everything.")
         );
         println!();
@@ -229,7 +229,10 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
             pb.finish_with_message(amber("Source tracking skipped"));
             eprintln!(
                 "{}",
-                amber(&format!("  ⚠ Could not update pull source tracking: {}", e))
+                amber(&format!(
+                    "  ⚠ Could not update provider import source tracking: {}",
+                    e
+                ))
             );
         }
     }
@@ -238,7 +241,10 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
     if let Err(e) = update_pull_config_timestamps(&discovered_providers) {
         eprintln!(
             "{}",
-            amber(&format!("  ⚠ Could not update pull sync timestamps: {}", e))
+            amber(&format!(
+                "  ⚠ Could not update provider import sync timestamps: {}",
+                e
+            ))
         );
     }
 
@@ -412,7 +418,11 @@ fn print_summary(
 ) {
     let total = merged.fact_count();
     println!("{}", line());
-    println!("  {} {}", amber(ICON_STAR), bold_gold("Pull complete"));
+    println!(
+        "  {} {}",
+        amber(ICON_STAR),
+        bold_gold("Provider import complete")
+    );
 
     println!(
         "  {} {} imported, {} skipped",

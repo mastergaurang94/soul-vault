@@ -9,7 +9,7 @@ src/
 ├── main.rs                    CLI entrypoint (clap), tokio runtime, command dispatch
 ├── auth/
 │   └── mod.rs                 OAuth credential storage + refresh lifecycle (`~/soul-vault/auth.yaml`)
-├── adapters/                  Provider session discovery/parsing for `soul pull`
+├── adapters/                  Provider session discovery/parsing for `soul import` (providers mode)
 │   ├── mod.rs                 `SessionAdapter`, `AdapterRegistry`, normalized conversation types
 │   ├── claude.rs              Claude Code adapter (`~/.claude/projects/**/*.jsonl`)
 │   ├── openclaw.rs            OpenClaw adapter (`~/.openclaw/agents/*/sessions/*.jsonl`)
@@ -18,8 +18,9 @@ src/
 ├── cli/                       Command handlers
 │   ├── mod.rs
 │   ├── init.rs                `soul init`
-│   ├── ingest.rs              `soul import <folder>` (hidden alias: `soul ingest`)
-│   ├── pull.rs                `soul pull [--force] [--cloud] [--provider ...]`
+│   ├── import.rs              `soul import [folder] [--force] [--cloud] [--provider ...]`
+│   ├── ingest.rs              Local folder import implementation (used by unified import + watch)
+│   ├── pull.rs                Provider discovery import implementation (used by unified import)
 │   ├── export.rs              `soul export --format context|json|bundle --sections ...`
 │   ├── status.rs              `soul status`
 │   ├── watch.rs               `soul watch [folder]`
@@ -46,9 +47,9 @@ src/
 │   └── pages/
 │       ├── mod.rs             `PageWidget` trait + `PageAction`
 │       ├── status.rs
-│       ├── pull.rs
 │       ├── import.rs
 │       ├── import_render.rs
+│       ├── import_provider_render.rs
 │       ├── browse.rs
 │       ├── export.rs
 │       ├── watch.rs
@@ -74,16 +75,15 @@ src/
 
 ## TUI Page Model
 
-The TUI currently has **9 pages** in this order:
+The TUI currently has **8 pages** in this order:
 1. Status
-2. Pull
-3. Import
-4. Browse
-5. Export
-6. Watch
-7. Login
-8. Logout
-9. Settings
+2. Import
+3. Browse
+4. Export
+5. Watch
+6. Login
+7. Logout
+8. Settings
 
 ## Dependency Direction
 

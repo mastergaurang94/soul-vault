@@ -7,6 +7,7 @@
 Soul Vault is a Rust CLI that converts AI conversations into a local markdown knowledge vault.
 Build: `cargo build --release`
 Test: `cargo test`
+CLI note: use unified `soul import` (providers mode with no folder, folder mode with a path).
 
 ## Map
 

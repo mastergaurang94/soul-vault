@@ -369,7 +369,7 @@ fn validate_auto_watch_prereqs(is_tty: bool, base_dirs: &[(String, PathBuf)]) ->
         anyhow::bail!(
             "Auto-watch requires a terminal.\n      \
              → Usage: soul watch <folder>\n      \
-             → Or run `soul pull` for one-time import of AI sessions."
+             → Or run `soul import` for one-time provider import."
         );
     }
 

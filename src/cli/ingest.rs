@@ -1,4 +1,4 @@
-//! `soul ingest <folder>` — file ingestion with source tracking and dedup.
+//! Local folder import implementation for `soul import <folder>`.
 
 use anyhow::Result;
 use indicatif::{ProgressBar, ProgressStyle};

@@ -5,18 +5,18 @@ Last updated: 2026-02-15
 ## ✅ Completed
 
 - [x] Current command set is live in `src/main.rs`:
-  - `init`, `import`, `pull`, `export`, `status`, `watch`, `reset`, `login`, `logout`
+  - `init`, `import`, `export`, `status`, `watch`, `reset`, `login`, `logout`
   - No-args launch (`soul`) opens the full-screen TUI
-- [x] TUI navigation currently has 9 pages:
-  - Status, Pull, Import, Browse, Export, Watch, Login, Logout, Settings
+- [x] TUI navigation currently has 8 pages:
+  - Status, Import, Browse, Export, Watch, Login, Logout, Settings
 - [x] Export overhaul landed:
   - `soul export --format context|json|bundle`
   - `soul export --sections identity,preferences,topics,people,memories`
   - smart default output paths and bundle directory export
-- [x] Pull/auth updates landed:
-  - local `soul pull` preflight API key validation
+- [x] Import/auth updates landed:
+  - providers mode (`soul import`) preflight API key validation
   - `soul login [provider]` / `soul logout [provider]`
-  - cloud pull scaffold via `soul pull --cloud [--provider ...]`
+  - cloud scaffold via `soul import --cloud [--provider ...]`
 - [x] Vault reset safety command landed:
   - `soul reset` with confirmation flow
   - `soul reset --force` for non-interactive use
@@ -43,7 +43,7 @@ Last updated: 2026-02-15
 
 ## 📋 Backlog
 
-- [ ] Cloud API conversation fetch implementation for `soul pull --cloud`
+- [ ] Cloud API conversation fetch implementation for `soul import --cloud`
 - [ ] `soul search` — full-text vault search
 - [ ] `soul diff` — show changes since last import
 - [ ] `SOUL_VAULT_VAULT_PATH` env var for multi-vault/test workflows

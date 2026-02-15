@@ -4,7 +4,7 @@ Last updated: 2026-02-15
 
 ## Overview
 
-Soul Vault uses a pluggable adapter registry for `soul pull` and auto-watch provider discovery.
+Soul Vault uses a pluggable adapter registry for `soul import` (providers mode) and auto-watch provider discovery.
 Each adapter discovers local session files and parses them into a normalized `Conversation`.
 
 ## Current Adapter Set
@@ -20,7 +20,7 @@ src/adapters/
 
 Notes:
 - There is no ChatGPT adapter in `src/adapters/` right now.
-- ChatGPT import support currently lives in the local extractor path (`soul import ...`), not `soul pull` adapters.
+- ChatGPT import support currently lives in the local extractor path (`soul import ...`), not adapter-based provider discovery.
 
 ## SessionAdapter Trait (Actual)
 
@@ -76,12 +76,12 @@ impl AdapterRegistry {
 
 Behavior:
 - `discover_all()` returns grouped results by adapter display name.
-- Adapter-level discovery errors are swallowed as empty results (`unwrap_or_default`) to keep pull resilient.
+- Adapter-level discovery errors are swallowed as empty results (`unwrap_or_default`) to keep provider import resilient.
 - `base_dirs()` is used by `soul watch` (no folder mode) to auto-watch provider roots.
 
 ## CLI Integration
 
-### `soul pull`
+### `soul import` (no folder)
 
 Default path (no `--cloud`):
 - Discovers sessions from Claude Code, OpenClaw, Gemini CLI, Codex.

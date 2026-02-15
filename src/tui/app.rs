@@ -7,7 +7,6 @@ use crate::vault::config::is_initialized;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Page {
     Status,
-    Pull,
     Import,
     Browse,
     Export,
@@ -20,7 +19,6 @@ pub enum Page {
 impl Page {
     pub const ALL: &[Page] = &[
         Page::Status,
-        Page::Pull,
         Page::Import,
         Page::Browse,
         Page::Export,
@@ -33,7 +31,6 @@ impl Page {
     pub fn label(self) -> &'static str {
         match self {
             Page::Status => "Status",
-            Page::Pull => "Pull",
             Page::Import => "Import",
             Page::Browse => "Browse",
             Page::Export => "Export",
@@ -47,7 +44,6 @@ impl Page {
     pub fn icon(self) -> &'static str {
         match self {
             Page::Status => "*",
-            Page::Pull => "v",
             Page::Import => "#",
             Page::Browse => ">",
             Page::Export => "^",
@@ -135,7 +131,6 @@ mod tests {
     #[test]
     fn test_page_labels() {
         assert_eq!(Page::Status.label(), "Status");
-        assert_eq!(Page::Pull.label(), "Pull");
         assert_eq!(Page::Import.label(), "Import");
         assert_eq!(Page::Browse.label(), "Browse");
         assert_eq!(Page::Export.label(), "Export");
@@ -167,7 +162,7 @@ mod tests {
     #[test]
     fn test_confirm_sidebar() {
         let mut app = App::new();
-        app.sidebar_selected = 3;
+        app.sidebar_selected = 2;
         app.confirm_sidebar();
         assert_eq!(app.current_page, Page::Browse);
         assert_eq!(app.focus, Focus::Content);
@@ -178,7 +173,6 @@ mod tests {
         let mut app = App::new();
         let expected = [
             Page::Status,
-            Page::Pull,
             Page::Import,
             Page::Browse,
             Page::Export,

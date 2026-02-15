@@ -86,7 +86,7 @@ fn render_content(area: Rect, buf: &mut Buffer, message: Option<&str>) {
         )),
         Line::from(""),
         Line::from(Span::styled(
-            "  Authenticate with a cloud provider to pull conversations via API.",
+            "  Authenticate with a cloud provider to import conversations via API.",
             Style::default(),
         )),
         Line::from(""),

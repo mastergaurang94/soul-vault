@@ -3,10 +3,10 @@
 pub mod browse;
 pub mod export;
 pub mod import;
+pub mod import_provider_render;
 pub mod import_render;
 pub mod login;
 pub mod logout;
-pub mod pull;
 pub mod settings;
 pub mod status;
 pub mod watch;
@@ -33,8 +33,8 @@ pub enum PageAction {
     StartWatch(String),
     /// Stop the active file watcher.
     StopWatch,
-    /// Start pulling AI sessions from all providers.
-    StartPull,
+    /// Start provider auto-discovery import.
+    StartProviderImport,
 }
 
 // ─── Page Trait ───────────────────────────────────────────────────────────────

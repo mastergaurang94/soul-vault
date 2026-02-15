@@ -42,9 +42,8 @@ Download prebuilt binaries from:
 soul
 ```
 
-The no-args TUI has 9 pages:
+The no-args TUI has 8 pages:
 - Status
-- Pull
 - Import
 - Browse
 - Export
@@ -59,26 +58,16 @@ The no-args TUI has 9 pages:
 
 Initializes the vault, provider config, and API key setup.
 
-#### `soul import <folder> [--force]`
+#### `soul import [folder] [--force] [--cloud] [--provider <claude|chatgpt|gemini>]`
 
-Imports local files recursively (`.md`, `.txt`, `.json`, `.jsonl`) into the vault.
-
-Flags:
-- `-f, --force`: re-import files even if source tracking says unchanged
-
-#### `soul pull [--force] [--cloud] [--provider <claude|chatgpt|gemini>]`
-
-Discovers provider sessions (Claude Code, OpenClaw, Gemini CLI, Codex) and imports them.
-
-Notes:
-- Local pull path performs a preflight Claude API key check and fails early if missing.
-- `--cloud` enables OAuth/cloud scaffold flow.
-- `--provider` applies to cloud mode (defaults to `claude`).
+Unified import command:
+- `soul import`: auto-discovers sessions from local AI apps (Claude Code, OpenClaw, Gemini CLI, Codex)
+- `soul import <folder>`: imports local files recursively (`.md`, `.txt`, `.json`, `.jsonl`)
 
 Flags:
-- `-f, --force`: re-import all discovered sessions
-- `--cloud`: use provider cloud mode instead of local session files
-- `--provider <claude|chatgpt|gemini>`
+- `-f, --force`: re-import files/sessions even if source tracking says unchanged
+- `--cloud`: use provider cloud mode instead of local session files (provider mode only)
+- `--provider <claude|chatgpt|gemini>`: cloud provider to use (provider mode only)
 
 #### `soul export [-o|--output <path>] [-f|--format <context|json|bundle>] [--topic <topic>] [--sections <csv>]`
 

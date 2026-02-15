@@ -21,14 +21,12 @@ use super::pages::export::ExportPage;
 use super::pages::import::ImportPage;
 use super::pages::login::LoginPage;
 use super::pages::logout::LogoutPage;
-use super::pages::pull::PullPage;
 use super::pages::settings::SettingsPage;
 use super::pages::status::StatusPage;
 use super::pages::watch::WatchPage;
 
 pub struct PageSet {
     pub status: StatusPage,
-    pub pull: PullPage,
     pub import: ImportPage,
     pub browse: BrowsePage,
     pub export: ExportPage,
@@ -42,7 +40,6 @@ impl PageSet {
     pub fn new() -> Self {
         Self {
             status: StatusPage::default(),
-            pull: PullPage::default(),
             import: ImportPage::default(),
             browse: BrowsePage::default(),
             export: ExportPage::default(),
@@ -56,7 +53,6 @@ impl PageSet {
     pub fn current(&self, page: Page) -> &dyn PageWidget {
         match page {
             Page::Status => &self.status,
-            Page::Pull => &self.pull,
             Page::Import => &self.import,
             Page::Browse => &self.browse,
             Page::Export => &self.export,
@@ -70,7 +66,6 @@ impl PageSet {
     pub fn current_mut(&mut self, page: Page) -> &mut dyn PageWidget {
         match page {
             Page::Status => &mut self.status,
-            Page::Pull => &mut self.pull,
             Page::Import => &mut self.import,
             Page::Browse => &mut self.browse,
             Page::Export => &mut self.export,
@@ -121,6 +116,7 @@ fn render_body(area: Rect, buf: &mut Buffer, app: &App, pages: &PageSet) {
 fn render_footer(area: Rect, buf: &mut Buffer, app: &App) {
     let hints = match app.focus {
         Focus::Sidebar => "  j/k navigate  enter select  tab content  q quit  ? help",
+        Focus::Content if app.current_page == Page::Import => "  esc back  tab switch mode  q quit",
         Focus::Content => "  esc back  tab sidebar  q quit",
     };
     let line = Line::from(Span::styled(hints, Style::default().fg(rat::DIM)));
@@ -136,8 +132,8 @@ pub fn print_non_tty_help() {
     println!("  Use a subcommand instead:\n");
     println!("    {}              Initialize vault", cyan("soul init"));
     println!(
-        "    {}              Pull sessions from AI providers",
-        cyan("soul pull")
+        "    {}              Import from AI providers",
+        cyan("soul import")
     );
     println!(
         "    {}      Login to cloud provider via OAuth",
@@ -147,7 +143,10 @@ pub fn print_non_tty_help() {
         "    {}     Logout and clear OAuth credentials",
         cyan("soul logout [provider]")
     );
-    println!("    {}  Import files", cyan("soul import <folder>"));
+    println!(
+        "    {}      Import files from a folder",
+        cyan("soul import <folder>")
+    );
     println!(
         "    {}   Watch folder for changes",
         cyan("soul watch <folder>")

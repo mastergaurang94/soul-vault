@@ -30,7 +30,6 @@ enum Action {
     Init,
     Status,
     Import,
-    Pull,
     Login,
     Logout,
     Export,
@@ -52,17 +51,12 @@ const MENU_ITEMS: &[MenuItem] = &[
     },
     MenuItem {
         label: "Import",
-        description: "Import local files & transcripts",
+        description: "Providers auto-discovery or local folder import",
         action: Action::Import,
     },
     MenuItem {
-        label: "Pull",
-        description: "Import local AI app sessions",
-        action: Action::Pull,
-    },
-    MenuItem {
         label: "Login",
-        description: "OAuth login for cloud pull",
+        description: "OAuth login for cloud import",
         action: Action::Login,
     },
     MenuItem {
@@ -124,23 +118,17 @@ pub fn run() -> Result<()> {
                 crate::cli::init::run()?;
             }
             Action::Import => {
-                print!("  Enter folder path: ");
+                print!("  Enter folder path (leave blank for providers mode): ");
                 io::stdout().flush()?;
                 let mut input = String::new();
                 io::stdin().read_line(&mut input)?;
                 let folder = input.trim();
-                if folder.is_empty() {
-                    println!("\n  No folder path provided.\n");
-                    println!("  Usage: soul import <folder>");
-                    println!("  Example: soul import ~/Documents/chatgpt-exports\n");
-                } else {
-                    let rt = tokio::runtime::Handle::current();
-                    rt.block_on(crate::cli::ingest::run(folder, false))?;
-                }
-            }
-            Action::Pull => {
                 let rt = tokio::runtime::Handle::current();
-                rt.block_on(crate::cli::pull::run(false, false, None))?;
+                if folder.is_empty() {
+                    rt.block_on(crate::cli::import::run(None, false, false, None))?;
+                } else {
+                    rt.block_on(crate::cli::import::run(Some(folder), false, false, None))?;
+                }
             }
             Action::Login => {
                 let rt = tokio::runtime::Handle::current();
@@ -327,7 +315,14 @@ fn print_non_tty_help() {
     println!("  Interactive mode requires a terminal (TTY).");
     println!("  Use a subcommand instead:\n");
     println!("    {}              Initialize vault", cyan("soul init"));
-    println!("    {}  Import files", cyan("soul import <folder>"));
+    println!(
+        "    {}          Import from AI providers",
+        cyan("soul import")
+    );
+    println!(
+        "    {}  Import files from a folder",
+        cyan("soul import <folder>")
+    );
     println!(
         "    {}   Watch folder for changes",
         cyan("soul watch <folder>")

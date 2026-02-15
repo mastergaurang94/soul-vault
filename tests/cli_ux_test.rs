@@ -115,7 +115,7 @@ fn help_import_subcommand() {
         .args(["help", "import"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Import and process local files"))
+        .stdout(predicate::str::contains("Import sessions from AI providers"))
         .stdout(predicate::str::contains("FOLDER"))
         .stdout(predicate::str::contains("--force"));
 }
@@ -126,7 +126,7 @@ fn import_dash_dash_help() {
         .args(["import", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Import and process local files"))
+        .stdout(predicate::str::contains("Import sessions from AI providers"))
         .stdout(predicate::str::contains("--force"));
 }
 
@@ -206,24 +206,36 @@ fn short_version_flag() {
 
 #[test]
 fn import_no_folder_arg_shows_usage() {
+    let tmp = tempdir().unwrap();
     soul()
+        .env("HOME", tmp.path().to_str().unwrap())
         .arg("import")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Missing folder path"))
-        .stderr(predicate::str::contains("Usage: soul import <folder>"))
-        .stderr(predicate::str::contains("Example:"));
+        .stderr(predicate::str::contains("Run `soul init`"))
+        .stderr(predicate::str::contains("Missing folder path").not())
+        .stderr(predicate::str::contains("Usage: soul import <folder>").not());
 }
 
 #[test]
 fn import_no_folder_arg_exits_1() {
-    soul().arg("import").assert().code(1);
+    let tmp = tempdir().unwrap();
+    soul()
+        .env("HOME", tmp.path().to_str().unwrap())
+        .arg("import")
+        .assert()
+        .code(1);
 }
 
 #[test]
 fn import_no_folder_no_panic() {
     // Must NOT contain panic traces
-    let output = soul().arg("import").output().expect("should run");
+    let tmp = tempdir().unwrap();
+    let output = soul()
+        .env("HOME", tmp.path().to_str().unwrap())
+        .arg("import")
+        .output()
+        .expect("should run");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
         !stderr.contains("thread 'main' panicked"),
@@ -315,35 +327,25 @@ fn import_force_flag_long() {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-// 3b. INGEST ALIAS
+// 3b. REMOVED COMMANDS
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]
-fn ingest_alias_no_folder_same_as_import() {
+fn ingest_command_is_rejected() {
     soul()
         .arg("ingest")
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("Missing folder path"));
+        .code(2)
+        .stderr(predicate::str::contains("unrecognized subcommand"));
 }
 
 #[test]
-fn ingest_alias_nonexistent_path() {
+fn pull_command_is_rejected() {
     soul()
-        .args(["ingest", "/nonexistent/path"])
+        .arg("pull")
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("Path not found"));
-}
-
-#[test]
-fn ingest_hidden_from_help() {
-    // The `ingest` command is hidden; `--help` should not show it
-    soul()
-        .arg("--help")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("ingest").not());
+        .code(2)
+        .stderr(predicate::str::contains("unrecognized subcommand"));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -689,7 +691,9 @@ fn import_error_contains_cross_icon() {
 
 #[test]
 fn import_no_args_error_contains_cross_icon() {
+    let tmp = tempdir().unwrap();
     soul()
+        .env("HOME", tmp.path().to_str().unwrap())
         .arg("import")
         .assert()
         .failure()
@@ -900,9 +904,6 @@ fn export_exits_zero() {
 
 #[test]
 fn import_exits_one_on_error() {
-    // Missing folder
-    soul().arg("import").assert().code(1);
-
     // Nonexistent path
     soul().args(["import", "/no/such/path"]).assert().code(1);
 }
@@ -1694,16 +1695,21 @@ fn watch_no_folder_error_shows_usage() {
 
 #[test]
 fn watch_and_import_no_args_errors_consistent() {
-    // Both import and watch should produce error format for missing folder/non-TTY
-    let import_out = soul().arg("import").output().expect("should run");
+    // Both import and watch should produce actionable, non-panic errors in test env.
+    let tmp = tempdir().unwrap();
+    let import_out = soul()
+        .env("HOME", tmp.path().to_str().unwrap())
+        .arg("import")
+        .output()
+        .expect("should run");
     let watch_out = soul().arg("watch").output().expect("should run");
 
     let import_stderr = strip_ansi(&String::from_utf8_lossy(&import_out.stderr));
     let watch_stderr = strip_ansi(&String::from_utf8_lossy(&watch_out.stderr));
 
-    // Import shows "Missing folder path", watch shows "Auto-watch requires a terminal"
+    // Import no-folder is now providers mode and should hit initialization guidance.
     assert!(
-        import_stderr.contains("Missing folder path"),
+        import_stderr.contains("Run `soul init`"),
         "Import error missing expected text. Got: {}",
         import_stderr
     );

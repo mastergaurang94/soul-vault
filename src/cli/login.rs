@@ -99,9 +99,9 @@ async fn login_claude() -> Result<()> {
         check("OAuth login successful. Credentials saved to ~/soul-vault/auth.yaml")
     );
     println!(
-        "  {} Use {} to test cloud pull scaffolding.\n",
+        "  {} Use {} to test cloud import scaffolding.\n",
         dim(ICON_DOT),
-        cyan("soul pull --cloud")
+        cyan("soul import --cloud")
     );
 
     Ok(())

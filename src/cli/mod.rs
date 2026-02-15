@@ -1,6 +1,7 @@
 //! CLI command handlers for Soul Vault.
 
 pub mod export;
+pub mod import;
 pub mod ingest;
 pub mod init;
 pub mod interactive;

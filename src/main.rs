@@ -32,25 +32,22 @@ enum Commands {
     /// Initialize your Soul Vault (first-time setup)
     Init,
 
-    /// Import and process local files into your vault
+    /// Import sessions from AI providers or process local files into your vault
     Import {
-        /// Path to folder containing files to import
+        /// Path to folder containing files to import (omit for provider auto-discovery)
         folder: Option<String>,
 
-        /// Force re-import of all files, ignoring source tracking
+        /// Force re-import, ignoring source tracking
         #[arg(short, long)]
         force: bool,
-    },
 
-    /// Import and process local files into your vault (alias for import)
-    #[command(hide = true)]
-    Ingest {
-        /// Path to folder containing files to import
-        folder: Option<String>,
+        /// Import from provider cloud APIs instead of local session files
+        #[arg(long)]
+        cloud: bool,
 
-        /// Force re-import of all files, ignoring source tracking
-        #[arg(short, long)]
-        force: bool,
+        /// Cloud provider to use: claude, chatgpt, gemini (default: claude)
+        #[arg(long)]
+        provider: Option<String>,
     },
 
     /// Watch a folder and auto-import on changes
@@ -80,21 +77,6 @@ enum Commands {
 
     /// Show vault summary and imported sources
     Status,
-
-    /// Pull AI sessions from all providers (Claude Code, OpenClaw, etc.)
-    Pull {
-        /// Force re-import of all sessions, ignoring source tracking
-        #[arg(short, long)]
-        force: bool,
-
-        /// Pull from provider cloud APIs instead of local session files
-        #[arg(long)]
-        cloud: bool,
-
-        /// Cloud provider to use: claude, chatgpt, gemini (default: claude)
-        #[arg(long)]
-        provider: Option<String>,
-    },
 
     /// Login to a cloud provider via OAuth (default: claude)
     Login {
@@ -128,26 +110,16 @@ async fn main() {
             tui::run()
         }
         Some(Commands::Init) => cli::init::run(),
-        Some(Commands::Import { folder, force }) | Some(Commands::Ingest { folder, force }) => {
-            match folder {
-                Some(f) => cli::ingest::run(&f, force).await,
-                None => {
-                    eprintln!("\n  {} Missing folder path.\n", ui::theme::red("✗"));
-                    eprintln!("  Usage: soul import <folder>\n");
-                    eprintln!("  Example: soul import ~/Documents/chatgpt-exports\n");
-                    std::process::exit(1);
-                }
-            }
-        }
+        Some(Commands::Import {
+            folder,
+            force,
+            cloud,
+            provider,
+        }) => cli::import::run(folder.as_deref(), force, cloud, provider.as_deref()).await,
         Some(Commands::Watch { folder }) => match folder {
             Some(f) => cli::watch::run(&f).await,
             None => cli::watch::run_auto().await,
         },
-        Some(Commands::Pull {
-            force,
-            cloud,
-            provider,
-        }) => cli::pull::run(force, cloud, provider.as_deref()).await,
         Some(Commands::Login { provider }) => cli::login::run(provider.as_deref()).await,
         Some(Commands::Logout { provider }) => cli::logout::run(provider.as_deref()),
         Some(Commands::Export {

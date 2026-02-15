@@ -16,10 +16,9 @@ use std::io::{self, IsTerminal};
 use std::time::Duration;
 use tokio::sync::mpsc;
 
-use self::app::{App, Focus};
+use self::app::{App, Focus, Page};
 use self::layout::PageSet;
 use self::pages::import::ImportPage;
-use self::pages::pull::PullPage;
 use self::pages::watch::WatchPage;
 use crate::core::pipeline::ImportProgress;
 use crate::tui::pages::watch::WatchEvent;
@@ -56,9 +55,9 @@ fn run_app(
 
     loop {
         // 1. Drain async channels (non-blocking)
-        drain_import_progress(&mut pages.import, &mut channels);
+        drain_folder_import_progress(&mut pages.import, &mut channels);
         drain_watch_events(&mut pages.watch, &mut channels);
-        drain_pull_progress(&mut pages.pull, &mut channels);
+        drain_provider_import_progress(&mut pages.import, &mut channels);
 
         // 2. Draw
         terminal.draw(|frame| {
@@ -96,7 +95,7 @@ struct Channels {
     pull_rx: Option<mpsc::Receiver<String>>,
 }
 
-fn drain_import_progress(import: &mut ImportPage, channels: &mut Channels) {
+fn drain_folder_import_progress(import: &mut ImportPage, channels: &mut Channels) {
     if let Some(rx) = &mut channels.import_rx {
         while let Ok(progress) = rx.try_recv() {
             let is_terminal = matches!(
@@ -105,7 +104,7 @@ fn drain_import_progress(import: &mut ImportPage, channels: &mut Channels) {
                     | ImportProgress::Error(_)
                     | ImportProgress::NothingToImport { .. }
             );
-            import.on_progress(progress);
+            import.on_folder_progress(progress);
             if is_terminal {
                 channels.import_rx = None;
                 break;
@@ -122,20 +121,20 @@ fn drain_watch_events(watch: &mut WatchPage, channels: &mut Channels) {
     }
 }
 
-fn drain_pull_progress(pull: &mut PullPage, channels: &mut Channels) {
+fn drain_provider_import_progress(import: &mut ImportPage, channels: &mut Channels) {
     if let Some(rx) = &mut channels.pull_rx {
         while let Ok(msg) = rx.try_recv() {
             if let Some(summary_str) = msg.strip_prefix("DONE:") {
                 let summary: Vec<String> = summary_str.split('\n').map(String::from).collect();
-                pull.on_done(summary);
+                import.on_provider_done(summary);
                 channels.pull_rx = None;
                 return;
             } else if let Some(error_str) = msg.strip_prefix("ERROR:") {
-                pull.on_error(error_str.to_string());
+                import.on_provider_error(error_str.to_string());
                 channels.pull_rx = None;
                 return;
             } else {
-                pull.on_progress(msg);
+                import.on_provider_progress(msg);
             }
         }
     }
@@ -159,7 +158,7 @@ fn handle_key(
             app.show_help = !app.show_help;
             return;
         }
-        KeyCode::Tab => {
+        KeyCode::Tab if !(app.focus == Focus::Content && app.current_page == Page::Import) => {
             app.toggle_focus();
             return;
         }
@@ -198,8 +197,8 @@ fn handle_key(
             stop_watch(&mut pages.watch, channels);
             app.focus = Focus::Sidebar;
         }
-        pages::PageAction::StartPull => {
-            start_pull(&mut pages.pull, channels);
+        pages::PageAction::StartProviderImport => {
+            start_provider_import(&mut pages.import, channels);
         }
         pages::PageAction::Consumed | pages::PageAction::Ignored => {}
     }
@@ -210,7 +209,7 @@ fn handle_key(
 fn start_import(folder: &str, import_page: &mut ImportPage, channels: &mut Channels) {
     let (tx, rx) = mpsc::channel(64);
     channels.import_rx = Some(rx);
-    import_page.on_progress(ImportProgress::Scanning);
+    import_page.on_folder_progress(ImportProgress::Scanning);
 
     let folder = folder.to_string();
     tokio::spawn(async move {
@@ -234,10 +233,10 @@ fn start_watch(folder: &str, watch_page: &mut WatchPage, channels: &mut Channels
     watcher::start_watcher(folder, event_tx, stop_rx);
 }
 
-fn start_pull(pull_page: &mut PullPage, channels: &mut Channels) {
+fn start_provider_import(import_page: &mut ImportPage, channels: &mut Channels) {
     let (tx, rx) = mpsc::channel(64);
     channels.pull_rx = Some(rx);
-    pull_page.on_progress("Discovering AI sessions...".to_string());
+    import_page.on_provider_progress("Discovering AI sessions...".to_string());
 
     tokio::spawn(async move {
         use crate::adapters::{conversation_to_text, AdapterRegistry};
