@@ -1,3 +1,4 @@
+//! Tests for codex module.
 use super::parser;
 use crate::adapters::Role;
 use std::fs;

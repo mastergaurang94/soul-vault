@@ -1,3 +1,4 @@
+//! Tests for types module.
 use super::{Confidence, ExtractedMemories, Provider, ProviderConfig, SoulVaultConfig};
 
 #[test]

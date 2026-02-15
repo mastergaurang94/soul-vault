@@ -1,3 +1,4 @@
+//! Session parsing for gemini adapter.
 use anyhow::{Context, Result};
 use chrono::{DateTime, Utc};
 use std::fs;

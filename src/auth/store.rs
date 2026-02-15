@@ -1,3 +1,4 @@
+//! Token storage and credential management.
 use anyhow::{Context, Result};
 use chrono::{Duration, Utc};
 use std::fs;

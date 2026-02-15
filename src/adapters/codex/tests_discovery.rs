@@ -1,3 +1,4 @@
+//! Tests for codex module.
 use super::{discovery, CodexAdapter};
 use crate::adapters::SessionAdapter;
 use std::fs;

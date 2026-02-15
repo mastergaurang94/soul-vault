@@ -1,3 +1,4 @@
+//! Tests for pages module.
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use super::export::ExportPage;

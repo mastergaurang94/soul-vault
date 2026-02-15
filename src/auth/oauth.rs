@@ -1,3 +1,4 @@
+//! OAuth flow helpers.
 use anyhow::{bail, Context, Result};
 use chrono::{Duration, Utc};
 use reqwest::Client;

@@ -1,3 +1,4 @@
+//! Tests for vault module.
 use std::fs;
 
 use crate::vault::chatgpt_parse::{

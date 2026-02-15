@@ -1,3 +1,4 @@
+//! Tests for claude module.
 use super::{discovery, parser, ClaudeAdapter};
 use crate::adapters::{Role, SessionAdapter};
 use std::fs;

@@ -1,3 +1,4 @@
+//! Tests for gemini module.
 use super::{discovery, parser, GeminiAdapter};
 use crate::adapters::{Role, SessionAdapter};
 use std::fs;

@@ -1,3 +1,4 @@
+//! Tests for openclaw module.
 use super::{discovery, parser, OpenClawAdapter};
 use crate::adapters::{Role, SessionAdapter};
 use std::fs;

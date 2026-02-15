@@ -1,3 +1,4 @@
+//! Tests for vault module.
 use chrono::Datelike;
 use std::fs;
 use std::io::Write;

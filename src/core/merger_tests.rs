@@ -1,3 +1,4 @@
+//! Tests for core module.
 use crate::core::merger::{chunk_text, merge_all_memories};
 use crate::core::merger_dedup::normalize;
 use crate::types::*;

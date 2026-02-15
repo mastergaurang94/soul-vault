@@ -1,3 +1,4 @@
+//! Type definitions for auth module.
 use crate::types::Provider;
 
 #[derive(Debug, Clone)]

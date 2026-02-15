@@ -1,3 +1,4 @@
+//! Provider discovery for codex adapter.
 use anyhow::{Context, Result};
 use std::fs;
 use std::path::{Path, PathBuf};

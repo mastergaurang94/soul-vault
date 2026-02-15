@@ -1,3 +1,4 @@
+//! Tests for vault module.
 use serde_json::Value;
 
 use crate::vault::chatgpt_parse::parse_conversation;
