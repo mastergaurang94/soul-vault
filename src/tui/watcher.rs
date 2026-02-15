@@ -187,10 +187,7 @@ fn handle_fs_events(
                 Ok(()) => {
                     let _ = event_tx.blocking_send(WatchEvent {
                         timestamp: now(),
-                        message: format!(
-                            "{} file(s) imported successfully",
-                            files_to_ingest.len()
-                        ),
+                        message: format!("{} file(s) imported successfully", files_to_ingest.len()),
                         kind: EventKind::Success,
                     });
                 }
@@ -220,10 +217,7 @@ fn handle_fs_events(
 }
 
 /// Run the import pipeline in a blocking context (inside the watcher thread).
-fn run_import_blocking(
-    base_path: &Path,
-    files: &[crate::types::FileInfo],
-) -> anyhow::Result<()> {
+fn run_import_blocking(base_path: &Path, files: &[crate::types::FileInfo]) -> anyhow::Result<()> {
     // Create a new tokio runtime for this blocking import
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(crate::cli::ingest::run_for_files(base_path, files))

@@ -81,7 +81,9 @@ fn no_args_non_tty_shows_help() {
     soul()
         .assert()
         .success()
-        .stdout(predicate::str::contains("Interactive mode requires a terminal"))
+        .stdout(predicate::str::contains(
+            "Interactive mode requires a terminal",
+        ))
         .stdout(predicate::str::contains("soul init"))
         .stdout(predicate::str::contains("soul import"))
         .stdout(predicate::str::contains("soul export"))
@@ -104,10 +106,7 @@ fn unknown_subcommand_shows_error() {
 
 #[test]
 fn unknown_subcommand_exits_nonzero() {
-    soul()
-        .arg("totallyinvalid")
-        .assert()
-        .code(2); // clap uses exit code 2 for parse errors
+    soul().arg("totallyinvalid").assert().code(2); // clap uses exit code 2 for parse errors
 }
 
 #[test]
@@ -218,22 +217,22 @@ fn import_no_folder_arg_shows_usage() {
 
 #[test]
 fn import_no_folder_arg_exits_1() {
-    soul()
-        .arg("import")
-        .assert()
-        .code(1);
+    soul().arg("import").assert().code(1);
 }
 
 #[test]
 fn import_no_folder_no_panic() {
     // Must NOT contain panic traces
-    let output = soul()
-        .arg("import")
-        .output()
-        .expect("should run");
+    let output = soul().arg("import").output().expect("should run");
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(!stderr.contains("thread 'main' panicked"), "Should not panic");
-    assert!(!stderr.contains("RUST_BACKTRACE"), "Should not suggest backtrace");
+    assert!(
+        !stderr.contains("thread 'main' panicked"),
+        "Should not panic"
+    );
+    assert!(
+        !stderr.contains("RUST_BACKTRACE"),
+        "Should not suggest backtrace"
+    );
 }
 
 #[test]
@@ -272,8 +271,10 @@ fn import_empty_folder_shows_no_files() {
         .args(["import", tmp.path().to_str().unwrap()])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("No files to process")
-            .or(predicate::str::contains("No supported files")));
+        .stderr(
+            predicate::str::contains("No files to process")
+                .or(predicate::str::contains("No supported files")),
+        );
 }
 
 #[test]
@@ -288,8 +289,10 @@ fn import_unsupported_file_types_only() {
         .args(["import", tmp.path().to_str().unwrap()])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("No files to process")
-            .or(predicate::str::contains("No supported files")));
+        .stderr(
+            predicate::str::contains("No files to process")
+                .or(predicate::str::contains("No supported files")),
+        );
 }
 
 #[test]
@@ -374,10 +377,17 @@ fn export_json_is_valid_json() {
         .args(["export", "--format", "json"])
         .output()
         .expect("should run");
-    assert!(output.status.success(), "export --format json should succeed");
+    assert!(
+        output.status.success(),
+        "export --format json should succeed"
+    );
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: Result<serde_json::Value, _> = serde_json::from_str(&stdout);
-    assert!(parsed.is_ok(), "JSON output should be valid JSON. Got: {}", &stdout[..stdout.len().min(200)]);
+    assert!(
+        parsed.is_ok(),
+        "JSON output should be valid JSON. Got: {}",
+        &stdout[..stdout.len().min(200)]
+    );
 }
 
 #[test]
@@ -389,11 +399,26 @@ fn export_json_has_expected_fields() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     let parsed: serde_json::Value = serde_json::from_str(&stdout).expect("valid JSON");
-    assert!(parsed.get("identity").is_some(), "JSON should have 'identity' field");
-    assert!(parsed.get("preferences").is_some(), "JSON should have 'preferences' field");
-    assert!(parsed.get("memories").is_some(), "JSON should have 'memories' field");
-    assert!(parsed.get("topics").is_some(), "JSON should have 'topics' field");
-    assert!(parsed.get("people").is_some(), "JSON should have 'people' field");
+    assert!(
+        parsed.get("identity").is_some(),
+        "JSON should have 'identity' field"
+    );
+    assert!(
+        parsed.get("preferences").is_some(),
+        "JSON should have 'preferences' field"
+    );
+    assert!(
+        parsed.get("memories").is_some(),
+        "JSON should have 'memories' field"
+    );
+    assert!(
+        parsed.get("topics").is_some(),
+        "JSON should have 'topics' field"
+    );
+    assert!(
+        parsed.get("people").is_some(),
+        "JSON should have 'people' field"
+    );
 }
 
 #[test]
@@ -408,7 +433,10 @@ fn export_to_file_creates_file() {
 
     assert!(output_path.exists(), "Export file should be created");
     let content = fs::read_to_string(&output_path).unwrap();
-    assert!(content.contains("Soul Vault Memory"), "File should contain vault header");
+    assert!(
+        content.contains("Soul Vault Memory"),
+        "File should contain vault header"
+    );
 }
 
 #[test]
@@ -420,8 +448,7 @@ fn export_to_file_shows_confirmation() {
         .args(["export", "-o", output_path.to_str().unwrap()])
         .assert()
         .success()
-        .stderr(predicate::str::contains("Exported to")
-            .or(predicate::str::contains("words")));
+        .stderr(predicate::str::contains("Exported to").or(predicate::str::contains("words")));
 }
 
 #[test]
@@ -430,7 +457,13 @@ fn export_json_to_file() {
     let output_path = tmp.path().join("export-test.json");
 
     soul()
-        .args(["export", "--format", "json", "-o", output_path.to_str().unwrap()])
+        .args([
+            "export",
+            "--format",
+            "json",
+            "-o",
+            output_path.to_str().unwrap(),
+        ])
         .assert()
         .success();
 
@@ -458,10 +491,19 @@ fn export_topic_filter_excludes_unmatched() {
         .output()
         .expect("should run");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(!stdout.contains("## Topics"), "Should not contain Topics section when filter matches nothing");
+    assert!(
+        !stdout.contains("## Topics"),
+        "Should not contain Topics section when filter matches nothing"
+    );
     // Also should not contain People or Recent Memories (topic filter skips those)
-    assert!(!stdout.contains("## People"), "Topic filter should skip People section");
-    assert!(!stdout.contains("## Recent Memories"), "Topic filter should skip Memories section");
+    assert!(
+        !stdout.contains("## People"),
+        "Topic filter should skip People section"
+    );
+    assert!(
+        !stdout.contains("## Recent Memories"),
+        "Topic filter should skip Memories section"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -472,12 +514,9 @@ fn export_topic_filter_excludes_unmatched() {
 
 #[test]
 fn status_shows_vault_overview() {
-    soul()
-        .arg("status")
-        .assert()
-        .success()
-        .stdout(predicate::str::contains("Vault Overview")
-            .or(predicate::str::contains("Soul Vault")));
+    soul().arg("status").assert().success().stdout(
+        predicate::str::contains("Vault Overview").or(predicate::str::contains("Soul Vault")),
+    );
 }
 
 #[test]
@@ -502,10 +541,7 @@ fn status_shows_providers() {
 
 #[test]
 fn status_box_drawing_is_consistent() {
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     // Count box-drawing characters — each box should have matching top/bottom
@@ -514,17 +550,26 @@ fn status_box_drawing_is_consistent() {
     let top_right = stdout.matches('┐').count();
     let bottom_right = stdout.matches('┘').count();
 
-    assert_eq!(top_left, bottom_left, "Mismatched box corners: ┌={} └={}", top_left, bottom_left);
-    assert_eq!(top_right, bottom_right, "Mismatched box corners: ┐={} ┘={}", top_right, bottom_right);
-    assert_eq!(top_left, top_right, "Mismatched box corners: ┌={} ┐={}", top_left, top_right);
+    assert_eq!(
+        top_left, bottom_left,
+        "Mismatched box corners: ┌={} └={}",
+        top_left, bottom_left
+    );
+    assert_eq!(
+        top_right, bottom_right,
+        "Mismatched box corners: ┐={} ┘={}",
+        top_right, bottom_right
+    );
+    assert_eq!(
+        top_left, top_right,
+        "Mismatched box corners: ┌={} ┐={}",
+        top_left, top_right
+    );
 }
 
 #[test]
 fn status_no_panic() {
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(!stderr.contains("panicked"), "Status should not panic");
 }
@@ -555,10 +600,7 @@ fn watch_no_folder_arg_errors() {
 
 #[test]
 fn watch_no_folder_exits_1() {
-    soul()
-        .arg("watch")
-        .assert()
-        .code(1);
+    soul().arg("watch").assert().code(1);
 }
 
 #[test]
@@ -578,7 +620,10 @@ fn watch_nonexistent_path_no_panic() {
         .output()
         .expect("should run");
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(!stderr.contains("panicked"), "Watch should not panic on bad path");
+    assert!(
+        !stderr.contains("panicked"),
+        "Watch should not panic on bad path"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -599,10 +644,7 @@ fn no_commands_produce_raw_panic() {
     ];
 
     for args in &test_cases {
-        let output = soul()
-            .args(args)
-            .output()
-            .expect("should run");
+        let output = soul().args(args).output().expect("should run");
         let stderr = String::from_utf8_lossy(&output.stderr);
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(
@@ -663,7 +705,11 @@ fn import_folder_with_mixed_files_finds_supported() {
     // This test verifies file discovery logic but will fail at LLM processing
     // (no API key in test env). We just check it gets past the scan phase.
     let tmp = tempdir().unwrap();
-    fs::write(tmp.path().join("notes.md"), "# My Notes\n\nSome content here").unwrap();
+    fs::write(
+        tmp.path().join("notes.md"),
+        "# My Notes\n\nSome content here",
+    )
+    .unwrap();
     fs::write(tmp.path().join("data.json"), r#"{"key": "value"}"#).unwrap();
     fs::write(tmp.path().join("photo.jpg"), "binary junk").unwrap();
 
@@ -680,7 +726,9 @@ fn import_folder_with_mixed_files_finds_supported() {
     // It should at least get past scanning (shows "Found X files")
     // May fail later at LLM processing, but that's expected
     assert!(
-        combined.contains("Found") || combined.contains("No API key") || combined.contains("API key"),
+        combined.contains("Found")
+            || combined.contains("No API key")
+            || combined.contains("API key"),
         "Should either find files or fail at API key stage. Got: {}",
         combined
     );
@@ -705,7 +753,9 @@ fn import_folder_with_nested_structure() {
 
     // Should find 2 files (root.md and nested.txt)
     assert!(
-        combined.contains("Found 2 files") || combined.contains("API key") || combined.contains("No API key"),
+        combined.contains("Found 2 files")
+            || combined.contains("API key")
+            || combined.contains("No API key"),
         "Should find 2 files or fail at API stage. Got: {}",
         combined
     );
@@ -730,8 +780,10 @@ fn import_folder_skips_hidden_dirs() {
 
     // Should find only 1 file (visible.md), not the hidden one
     assert!(
-        combined.contains("Found 1 files") || combined.contains("Found 1 file")
-            || combined.contains("API key") || combined.contains("No API key"),
+        combined.contains("Found 1 files")
+            || combined.contains("Found 1 file")
+            || combined.contains("API key")
+            || combined.contains("No API key"),
         "Should find 1 file (skip hidden). Got: {}",
         combined
     );
@@ -780,8 +832,14 @@ fn export_output_to_nonexistent_dir_fails_gracefully() {
 
     // Should fail but not panic
     let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(!stderr.contains("panicked"), "Should not panic writing to bad path");
-    assert!(!output.status.success(), "Should fail when output dir doesn't exist");
+    assert!(
+        !stderr.contains("panicked"),
+        "Should not panic writing to bad path"
+    );
+    assert!(
+        !output.status.success(),
+        "Should fail when output dir doesn't exist"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -795,8 +853,9 @@ fn double_dash_terminates_flags() {
         .args(["import", "--", "--help"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Path not found")
-            .or(predicate::str::contains("not found")));
+        .stderr(
+            predicate::str::contains("Path not found").or(predicate::str::contains("not found")),
+        );
 }
 
 #[test]
@@ -806,7 +865,13 @@ fn export_short_flags_work() {
 
     // -o for output, -f for format, -t for topic
     soul()
-        .args(["export", "-o", output_path.to_str().unwrap(), "-f", "markdown"])
+        .args([
+            "export",
+            "-o",
+            output_path.to_str().unwrap(),
+            "-f",
+            "markdown",
+        ])
         .assert()
         .success();
 
@@ -819,49 +884,39 @@ fn multiple_unknown_flags_rejected() {
         .args(["import", "--verbose", "--dry-run"])
         .assert()
         .failure()
-        .stderr(predicate::str::contains("unexpected argument")
-            .or(predicate::str::contains("error")));
+        .stderr(
+            predicate::str::contains("unexpected argument").or(predicate::str::contains("error")),
+        );
 }
 
 #[test]
 fn status_exits_zero() {
-    soul()
-        .arg("status")
-        .assert()
-        .success();
+    soul().arg("status").assert().success();
 }
 
 #[test]
 fn export_exits_zero() {
-    soul()
-        .arg("export")
-        .assert()
-        .success();
+    soul().arg("export").assert().success();
 }
 
 #[test]
 fn import_exits_one_on_error() {
     // Missing folder
-    soul()
-        .arg("import")
-        .assert()
-        .code(1);
+    soul().arg("import").assert().code(1);
 
     // Nonexistent path
-    soul()
-        .args(["import", "/no/such/path"])
-        .assert()
-        .code(1);
+    soul().args(["import", "/no/such/path"]).assert().code(1);
 }
 
 #[test]
 fn export_markdown_not_empty() {
-    let output = soul()
-        .arg("export")
-        .output()
-        .expect("should run");
+    let output = soul().arg("export").output().expect("should run");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.len() > 50, "Export should produce non-trivial output. Got {} bytes", stdout.len());
+    assert!(
+        stdout.len() > 50,
+        "Export should produce non-trivial output. Got {} bytes",
+        stdout.len()
+    );
 }
 
 #[test]
@@ -871,7 +926,11 @@ fn export_json_not_empty() {
         .output()
         .expect("should run");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(stdout.len() > 20, "JSON export should produce non-trivial output. Got {} bytes", stdout.len());
+    assert!(
+        stdout.len() > 20,
+        "JSON export should produce non-trivial output. Got {} bytes",
+        stdout.len()
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -895,7 +954,10 @@ fn import_folder_with_empty_files() {
 
     // Should either report "No content to process" or get past scan
     // The key is: no panic
-    assert!(!combined.contains("panicked"), "Should not panic on empty files");
+    assert!(
+        !combined.contains("panicked"),
+        "Should not panic on empty files"
+    );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1042,10 +1104,7 @@ fn extract_box_sections(output: &str) -> Vec<String> {
 
 #[test]
 fn status_vault_overview_box_alignment() {
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -1061,10 +1120,7 @@ fn status_vault_overview_box_alignment() {
 
 #[test]
 fn status_providers_box_alignment() {
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -1080,10 +1136,7 @@ fn status_providers_box_alignment() {
 
 #[test]
 fn status_all_boxes_aligned() {
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -1092,11 +1145,7 @@ fn status_all_boxes_aligned() {
         verify_box_alignment(section);
 
         // Additionally verify all boxes use the same width
-        let first_line = section
-            .lines()
-            .next()
-            .map(strip_ansi)
-            .unwrap_or_default();
+        let first_line = section.lines().next().map(strip_ansi).unwrap_or_default();
         let first_width = visible_width(first_line.trim_start());
         if i > 0 {
             let prev_first_line = sections[i - 1]
@@ -1116,10 +1165,7 @@ fn status_all_boxes_aligned() {
 
 #[test]
 fn status_top_bottom_borders_same_length() {
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -1157,14 +1203,18 @@ fn status_top_bottom_borders_same_length() {
 
 #[test]
 fn status_stat_rows_have_space_after_colon() {
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
-    let stat_labels = ["Memories:", "Topics:", "People:", "Vault size:", "Total files:", "Last activity:"];
+    let stat_labels = [
+        "Memories:",
+        "Topics:",
+        "People:",
+        "Vault size:",
+        "Total files:",
+        "Last activity:",
+    ];
 
     for label in &stat_labels {
         let stripped_output = strip_ansi(&stdout);
@@ -1188,16 +1238,20 @@ fn status_stat_rows_have_space_after_colon() {
 
 #[test]
 fn status_stat_values_aligned_at_same_column() {
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     let stripped = strip_ansi(&stdout);
 
     // Collect the column positions where stat values start
-    let stat_labels = ["Memories:", "Topics:", "People:", "Vault size:", "Total files:", "Last activity:"];
+    let stat_labels = [
+        "Memories:",
+        "Topics:",
+        "People:",
+        "Vault size:",
+        "Total files:",
+        "Last activity:",
+    ];
     let mut value_columns: Vec<(String, usize)> = Vec::new();
 
     for line in stripped.lines() {
@@ -1234,10 +1288,7 @@ fn status_stat_values_aligned_at_same_column() {
 
 #[test]
 fn status_provider_names_consistently_padded() {
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -1293,10 +1344,7 @@ fn status_ansi_codes_dont_inflate_box_width() {
     // The raw output (with ANSI codes) should have the same box structure
     // as the stripped output. If ANSI codes are used in width calculations,
     // the boxes will be misaligned.
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -1352,7 +1400,10 @@ fn strip_ansi_helper_works() {
     // Verify our strip_ansi function handles common cases
     assert_eq!(strip_ansi("hello"), "hello");
     assert_eq!(strip_ansi("\x1b[31mred\x1b[0m"), "red");
-    assert_eq!(strip_ansi("\x1b[1;38;2;245;166;35mbold gold\x1b[0m"), "bold gold");
+    assert_eq!(
+        strip_ansi("\x1b[1;38;2;245;166;35mbold gold\x1b[0m"),
+        "bold gold"
+    );
     assert_eq!(strip_ansi("no codes here"), "no codes here");
     assert_eq!(strip_ansi("│\x1b[1mtext\x1b[0m│"), "│text│");
 
@@ -1415,10 +1466,7 @@ fn status_no_emoji_in_box_headers() {
     // Emoji in box headers cause terminal width inconsistencies because
     // different terminals render emoji at different widths (1 or 2 cells).
     // The fix was to remove emoji from box headers entirely.
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -1446,10 +1494,7 @@ fn status_no_emoji_in_box_headers() {
 #[test]
 fn status_box_content_no_trailing_text_after_border() {
     // After the closing │, there should be nothing but optional whitespace
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -1478,10 +1523,7 @@ fn status_box_content_no_trailing_text_after_border() {
 #[test]
 fn status_border_lines_no_trailing_text() {
     // After ┐, ┘, ┤ there should be nothing
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -1510,10 +1552,7 @@ fn status_border_lines_no_trailing_text() {
 #[test]
 fn status_box_structure_complete() {
     // Each box should have exactly: top border, header, separator, content lines, bottom border
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -1567,10 +1606,7 @@ fn status_box_structure_complete() {
 #[test]
 fn status_consistent_indentation() {
     // All box lines should start with the same indentation (2 spaces)
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -1660,24 +1696,24 @@ fn watch_no_folder_error_shows_usage() {
 #[test]
 fn watch_and_import_no_args_errors_consistent() {
     // Both import and watch should produce error format for missing folder/non-TTY
-    let import_out = soul()
-        .arg("import")
-        .output()
-        .expect("should run");
-    let watch_out = soul()
-        .arg("watch")
-        .output()
-        .expect("should run");
+    let import_out = soul().arg("import").output().expect("should run");
+    let watch_out = soul().arg("watch").output().expect("should run");
 
     let import_stderr = strip_ansi(&String::from_utf8_lossy(&import_out.stderr));
     let watch_stderr = strip_ansi(&String::from_utf8_lossy(&watch_out.stderr));
 
     // Import shows "Missing folder path", watch shows "Auto-watch requires a terminal"
-    assert!(import_stderr.contains("Missing folder path"),
-        "Import error missing expected text. Got: {}", import_stderr);
-    assert!(watch_stderr.contains("Auto-watch requires a terminal")
-        || watch_stderr.contains("Usage: soul watch"),
-        "Watch error missing expected text. Got: {}", watch_stderr);
+    assert!(
+        import_stderr.contains("Missing folder path"),
+        "Import error missing expected text. Got: {}",
+        import_stderr
+    );
+    assert!(
+        watch_stderr.contains("Auto-watch requires a terminal")
+            || watch_stderr.contains("Usage: soul watch"),
+        "Watch error missing expected text. Got: {}",
+        watch_stderr
+    );
 
     // Both should contain ✗
     assert!(import_stderr.contains("✗"), "Import error missing ✗ icon");
@@ -1695,10 +1731,7 @@ fn watch_and_import_no_args_errors_consistent() {
 #[test]
 fn export_no_ingest_references() {
     // User-facing output should say "import" not "ingest"
-    let output = soul()
-        .arg("export")
-        .output()
-        .expect("should run");
+    let output = soul().arg("export").output().expect("should run");
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
 
@@ -1713,10 +1746,7 @@ fn export_no_ingest_references() {
 
 #[test]
 fn status_no_ingest_references() {
-    let output = soul()
-        .arg("status")
-        .output()
-        .expect("should run");
+    let output = soul().arg("status").output().expect("should run");
     assert!(output.status.success());
     let stdout = strip_ansi(&String::from_utf8_lossy(&output.stdout));
 
@@ -1733,10 +1763,7 @@ fn status_no_ingest_references() {
 #[test]
 fn help_no_ingest_references() {
     // Main help should not mention "ingest"
-    let output = soul()
-        .arg("--help")
-        .output()
-        .expect("should run");
+    let output = soul().arg("--help").output().expect("should run");
     let stdout = String::from_utf8_lossy(&output.stdout);
     let lower = stdout.to_lowercase();
 
@@ -1857,7 +1884,10 @@ fn reset_force_with_temp_vault_deletes_vault() {
         .stdout(predicate::str::contains("Vault reset"));
 
     // Verify vault is deleted
-    assert!(!vault_root.exists(), "Vault directory should be deleted after reset --force");
+    assert!(
+        !vault_root.exists(),
+        "Vault directory should be deleted after reset --force"
+    );
 }
 
 #[test]
@@ -1885,20 +1915,26 @@ fn reset_without_force_in_non_tty_fails() {
         .arg("reset")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("--force")
-            .or(predicate::str::contains("non-interactive")));
+        .stderr(
+            predicate::str::contains("--force").or(predicate::str::contains("non-interactive")),
+        );
 }
 
 #[test]
 fn reset_no_panic() {
-    let output = soul()
-        .arg("reset")
-        .output()
-        .expect("should run");
+    let output = soul().arg("reset").output().expect("should run");
     let stderr = String::from_utf8_lossy(&output.stderr);
     let stdout = String::from_utf8_lossy(&output.stdout);
-    assert!(!stderr.contains("panicked"), "Reset should not panic. Stderr: {}", stderr);
-    assert!(!stdout.contains("panicked"), "Reset should not panic. Stdout: {}", stdout);
+    assert!(
+        !stderr.contains("panicked"),
+        "Reset should not panic. Stderr: {}",
+        stderr
+    );
+    assert!(
+        !stdout.contains("panicked"),
+        "Reset should not panic. Stdout: {}",
+        stdout
+    );
 }
 
 #[test]

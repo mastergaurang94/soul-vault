@@ -1,9 +1,14 @@
 # Soul Vault — Project Status
 
-Last updated: 2026-02-14
+Last updated: 2026-02-15
 
 ## ✅ Completed
 
+- [x] Hardening pass (2026-02-15):
+  - Fixed `soul init` API key prompt logic to always include the selected processing provider, including Gemini-only setups
+  - Removed library-level `process::exit()` from `soul watch` auto-watch path; now returns actionable `Result` errors
+  - Added regression tests for both fixes in `src/cli/init.rs` and `src/cli/watch.rs`
+  - Updated docs to match current command set and architecture wording (`import`/`pull`/`reset`, full-screen TUI wording)
 - [x] Rust rewrite — full CLI with 7 commands (init, import, export, status, watch, reset, interactive TUI)
 - [x] 200 tests (84 unit + 104 CLI UX + 12 integration), zero clippy warnings
 - [x] Vault format: `~/soul-vault/` with structured markdown (identity/, preferences/, memories/, topics/, people/, sources/)

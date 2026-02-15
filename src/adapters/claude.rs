@@ -38,9 +38,7 @@ impl SessionAdapter for ClaudeAdapter {
                 continue;
             }
 
-            let project_name = decode_project_path(
-                &project_entry.file_name().to_string_lossy(),
-            );
+            let project_name = decode_project_path(&project_entry.file_name().to_string_lossy());
 
             for file_entry in fs::read_dir(&project_dir)? {
                 let file_entry = file_entry?;
@@ -90,10 +88,7 @@ fn is_session_file(path: &Path) -> bool {
     if ext != Some("jsonl") {
         return false;
     }
-    let name = path
-        .file_stem()
-        .and_then(|s| s.to_str())
-        .unwrap_or("");
+    let name = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
     // Filter out agent subtask files
     !name.starts_with("agent-")
 }
@@ -114,8 +109,8 @@ fn decode_project_path(dir_name: &str) -> String {
 // ─── Parsing ──────────────────────────────────────────────────────────────────
 
 fn parse_claude_session(path: &Path) -> Result<Conversation> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
 
     let session_id = path
         .file_stem()
@@ -169,10 +164,7 @@ fn parse_claude_session(path: &Path) -> Result<Conversation> {
             }
             "summary" => {
                 // Use summary as title if available
-                if let Some(summary) = val
-                    .get("summary")
-                    .and_then(|s| s.as_str())
-                {
+                if let Some(summary) = val.get("summary").and_then(|s| s.as_str()) {
                     title = Some(truncate(summary, 80));
                 }
             }

@@ -32,9 +32,7 @@ pub fn merge_all_memories(results: &[ExtractedMemories]) -> ExtractedMemories {
         relationships: deduplicate_by(merged.relationships, |f| {
             format!("{}:{}", f.person, f.content)
         }),
-        topics: deduplicate_by(merged.topics, |f| {
-            format!("{}:{}", f.topic, f.content)
-        }),
+        topics: deduplicate_by(merged.topics, |f| format!("{}:{}", f.topic, f.content)),
         emotional_context: deduplicate_by(merged.emotional_context, |f| f.content.clone()),
     }
 }

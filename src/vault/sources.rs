@@ -63,8 +63,8 @@ pub fn read_sources() -> Result<SourcesConfig> {
             sources: Vec::new(),
         });
     }
-    let raw = fs::read_to_string(&path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let raw =
+        fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
     let config: SourcesConfig =
         serde_json::from_str(&raw).with_context(|| "Failed to parse sources.json")?;
     Ok(config)
@@ -96,10 +96,7 @@ pub fn compute_file_hash(path: &Path) -> Result<String> {
 ///
 /// `base_path` is the absolute path to the ingested folder.
 /// `file_paths` is the list of absolute file paths discovered.
-pub fn classify_files(
-    base_path: &Path,
-    file_paths: &[PathBuf],
-) -> Result<IngestClassification> {
+pub fn classify_files(base_path: &Path, file_paths: &[PathBuf]) -> Result<IngestClassification> {
     let sources = read_sources()?;
     let base_str = base_path.to_string_lossy().to_string();
 
@@ -155,10 +152,7 @@ pub fn classify_files(
 /// `base_path` is the folder that was ingested.
 /// `ingested_files` is the list of file paths that were actually ingested.
 /// All files (including skipped ones) should have their hashes recorded.
-pub fn update_source_tracking(
-    base_path: &Path,
-    all_files: &[PathBuf],
-) -> Result<()> {
+pub fn update_source_tracking(base_path: &Path, all_files: &[PathBuf]) -> Result<()> {
     let mut sources = read_sources()?;
     let base_str = base_path.to_string_lossy().to_string();
 
@@ -452,7 +446,11 @@ mod tests {
             new_hashes.insert(rel, compute_file_hash(f).unwrap());
         }
 
-        let entry = sources.sources.iter_mut().find(|s| s.path == base_str).unwrap();
+        let entry = sources
+            .sources
+            .iter_mut()
+            .find(|s| s.path == base_str)
+            .unwrap();
         entry.files_ingested = all_files.len();
         entry.file_hashes = new_hashes;
 

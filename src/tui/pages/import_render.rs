@@ -59,9 +59,7 @@ pub fn render_phase(area: Rect, buf: &mut Buffer, message: &str) {
         Line::from(""),
         Line::from(Span::styled(
             format!("  * {}", message),
-            Style::default()
-                .fg(rat::GOLD)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
         )),
     ];
     Paragraph::new(lines).render(area, buf);
@@ -77,9 +75,7 @@ pub fn render_processing(area: Rect, buf: &mut Buffer, cur: usize, total: usize,
         Line::from(""),
         Line::from(Span::styled(
             "  Processing through Claude...",
-            Style::default()
-                .fg(rat::GOLD)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(vec![
@@ -176,10 +172,7 @@ pub fn render_error(area: Rect, buf: &mut Buffer, msg: &str) {
 
 fn stat_line<'a>(label: &'a str, value: &'a str) -> Line<'a> {
     Line::from(vec![
-        Span::styled(
-            format!("{:<20}", label),
-            Style::default().fg(rat::DIM),
-        ),
+        Span::styled(format!("{:<20}", label), Style::default().fg(rat::DIM)),
         Span::styled(
             value.to_string(),
             Style::default().add_modifier(Modifier::BOLD),

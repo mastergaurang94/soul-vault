@@ -7,11 +7,7 @@ use regex::Regex;
 
 /// Parses raw LLM text into validated ExtractedMemories.
 /// Handles markdown fencing, partial JSON, and gracefully degrades.
-pub fn parse_extraction_response(
-    text: &str,
-    source: &str,
-    date: &str,
-) -> ExtractedMemories {
+pub fn parse_extraction_response(text: &str, source: &str, date: &str) -> ExtractedMemories {
     let json_str = extract_json_from_response(text);
 
     match try_parse(&json_str, source, date) {
@@ -19,8 +15,7 @@ pub fn parse_extraction_response(
         Err(e) => {
             eprintln!(
                 "  [warn] Failed to parse LLM response for \"{}\": {}",
-                source,
-                e
+                source, e
             );
             ExtractedMemories::default()
         }
@@ -169,7 +164,8 @@ mod tests {
 
     #[test]
     fn test_parse_missing_categories() {
-        let json = r#"{"identity": [{"content": "Test", "category": "other", "confidence": "low"}]}"#;
+        let json =
+            r#"{"identity": [{"content": "Test", "category": "other", "confidence": "low"}]}"#;
         let m = parse_extraction_response(json, "test", "2026-02-14");
         assert_eq!(m.identity.len(), 1);
         assert!(m.preferences.is_empty());
@@ -183,11 +179,8 @@ mod tests {
 
     #[test]
     fn test_parse_garbled_response() {
-        let m = parse_extraction_response(
-            "Here is the extracted data: {invalid",
-            "test",
-            "2026-02-14",
-        );
+        let m =
+            parse_extraction_response("Here is the extracted data: {invalid", "test", "2026-02-14");
         assert!(m.is_empty());
     }
 

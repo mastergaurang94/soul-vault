@@ -60,13 +60,13 @@ mv soul-macos-arm64 ~/.local/bin/soul
 
 ## Usage
 
-### Interactive Menu
+### Full-Screen TUI
 
 ```bash
 soul
 ```
 
-Launches a beautiful TUI menu with arrow key / vim binding navigation.
+Launches the full-screen TUI app with sidebar navigation and page-based workflows.
 
 ### Initialize Vault
 
@@ -128,6 +128,24 @@ soul watch ~/Documents/ai-conversations/
 ```
 
 Watches a folder for changes and automatically imports new or modified files.
+
+### Pull Provider Sessions
+
+```bash
+soul pull
+```
+
+Discovers AI sessions from local provider directories (Claude Code, OpenClaw, Gemini CLI, Codex) and imports them into your vault.
+
+### Reset Vault
+
+```bash
+soul reset
+# or non-interactive
+soul reset --force
+```
+
+Deletes the vault and configuration so you can reinitialize from scratch.
 
 ## Vault Structure
 
@@ -226,12 +244,13 @@ git push origin v0.1.0
 src/
   main.rs              # Entry point, clap CLI
   cli/                 # Command implementations
-    interactive.rs     # Ratatui TUI menu
     init.rs            # Setup wizard
     ingest.rs          # File import pipeline
+    pull.rs            # Provider session import
     export.rs          # Vault export
     status.rs          # Vault summary
     watch.rs           # File watcher
+    reset.rs           # Vault reset with safety checks
   core/                # Business logic
     processor.rs       # Claude API calls via reqwest
     parser.rs          # JSON response parsing

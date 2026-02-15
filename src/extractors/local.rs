@@ -125,10 +125,7 @@ pub fn extract_file_content(file: &FileInfo) -> Result<String> {
 /// filename and peeking at the content structure.
 fn is_chatgpt_conversations_file(path: &Path) -> bool {
     // Quick filename check
-    let file_name = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .unwrap_or("");
+    let file_name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
     if file_name != "conversations.json" {
         return false;
     }
@@ -157,8 +154,8 @@ fn extract_jsonl(file_path: &Path) -> Result<String> {
     let lines: Vec<String> = content
         .lines()
         .filter(|line| !line.trim().is_empty())
-        .map(|line| {
-            match serde_json::from_str::<serde_json::Value>(line) {
+        .map(
+            |line| match serde_json::from_str::<serde_json::Value>(line) {
                 Ok(val) => {
                     if val.is_string() {
                         val.as_str().unwrap_or(line).to_string()
@@ -167,8 +164,8 @@ fn extract_jsonl(file_path: &Path) -> Result<String> {
                     }
                 }
                 Err(_) => line.to_string(),
-            }
-        })
+            },
+        )
         .collect();
     Ok(lines.join("\n"))
 }
@@ -236,9 +233,7 @@ fn format_conversation(item: &serde_json::Value) -> String {
     serde_json::to_string_pretty(item).unwrap_or_default()
 }
 
-fn extract_chatgpt_mapping(
-    mapping: &serde_json::Map<String, serde_json::Value>,
-) -> String {
+fn extract_chatgpt_mapping(mapping: &serde_json::Map<String, serde_json::Value>) -> String {
     let mut messages = Vec::new();
     for node in mapping.values() {
         let msg = match node.get("message") {
@@ -291,8 +286,8 @@ mod tests {
         let zip_path = tmp.path().join("archive.zip");
         let file = fs::File::create(&zip_path).unwrap();
         let mut zip_writer = zip::ZipWriter::new(file);
-        let options =
-            zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
         zip_writer.start_file("readme.txt", options).unwrap();
         zip_writer.write_all(b"hello").unwrap();
         zip_writer.finish().unwrap();
@@ -336,11 +331,7 @@ mod tests {
                 "root": {"id": "root", "parent": null, "children": [], "message": null}
             }
         }]);
-        fs::write(
-            tmp.path().join("conversations.json"),
-            conv_json.to_string(),
-        )
-        .unwrap();
+        fs::write(tmp.path().join("conversations.json"), conv_json.to_string()).unwrap();
         fs::write(tmp.path().join("chat.html"), "<html></html>").unwrap();
         fs::write(tmp.path().join("other.md"), "notes").unwrap();
 
@@ -497,14 +488,12 @@ mod tests {
         // Create the zip
         let file = fs::File::create(&zip_path).unwrap();
         let mut zip_writer = zip::ZipWriter::new(file);
-        let options =
-            zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
         zip_writer
             .start_file("conversations.json", options)
             .unwrap();
-        zip_writer
-            .write_all(json.to_string().as_bytes())
-            .unwrap();
+        zip_writer.write_all(json.to_string().as_bytes()).unwrap();
         zip_writer.finish().unwrap();
 
         let file_info = FileInfo {
@@ -525,8 +514,8 @@ mod tests {
 
         let file = fs::File::create(&zip_path).unwrap();
         let mut zip_writer = zip::ZipWriter::new(file);
-        let options =
-            zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        let options = zip::write::SimpleFileOptions::default()
+            .compression_method(zip::CompressionMethod::Stored);
         zip_writer.start_file("readme.txt", options).unwrap();
         zip_writer.write_all(b"not chatgpt").unwrap();
         zip_writer.finish().unwrap();

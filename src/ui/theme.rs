@@ -145,11 +145,7 @@ pub fn format_bytes(bytes: u64) -> String {
 #[allow(dead_code)]
 pub fn progress_bar(current: usize, total: usize) -> String {
     let w = 20;
-    let filled = if total > 0 {
-        (current * w) / total
-    } else {
-        0
-    };
+    let filled = if total > 0 { (current * w) / total } else { 0 };
     let pct = if total > 0 {
         (current * 100) / total
     } else {

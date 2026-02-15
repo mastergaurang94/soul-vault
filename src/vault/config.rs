@@ -83,10 +83,10 @@ pub fn read_config() -> Result<SoulVaultConfig> {
     if !path.exists() {
         return Err(SoulVaultError::NotInitialized.into());
     }
-    let raw = fs::read_to_string(&path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
-    let config: SoulVaultConfig = serde_json::from_str(&raw)
-        .with_context(|| "Failed to parse config.json")?;
+    let raw =
+        fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let config: SoulVaultConfig =
+        serde_json::from_str(&raw).with_context(|| "Failed to parse config.json")?;
     Ok(config)
 }
 
@@ -95,8 +95,7 @@ pub fn write_config(config: &SoulVaultConfig) -> Result<()> {
     let path = config_path();
     fs::create_dir_all(config_dir())?;
     let json = serde_json::to_string_pretty(config)?;
-    fs::write(&path, json)
-        .with_context(|| format!("Failed to write {}", path.display()))?;
+    fs::write(&path, json).with_context(|| format!("Failed to write {}", path.display()))?;
     Ok(())
 }
 
@@ -108,10 +107,10 @@ pub fn read_keys() -> Result<KeysConfig> {
     if !path.exists() {
         return Ok(KeysConfig::new());
     }
-    let raw = fs::read_to_string(&path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
-    let keys: KeysConfig = serde_json::from_str(&raw)
-        .with_context(|| "Failed to parse keys.json")?;
+    let raw =
+        fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let keys: KeysConfig =
+        serde_json::from_str(&raw).with_context(|| "Failed to parse keys.json")?;
     Ok(keys)
 }
 
@@ -120,8 +119,7 @@ pub fn write_keys(keys: &KeysConfig) -> Result<()> {
     let path = keys_path();
     fs::create_dir_all(config_dir())?;
     let json = serde_json::to_string_pretty(keys)?;
-    fs::write(&path, &json)
-        .with_context(|| format!("Failed to write {}", path.display()))?;
+    fs::write(&path, &json).with_context(|| format!("Failed to write {}", path.display()))?;
     // Set restrictive permissions
     let perms = fs::Permissions::from_mode(0o600);
     fs::set_permissions(&path, perms)?;

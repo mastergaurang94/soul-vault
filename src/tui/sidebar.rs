@@ -35,11 +35,7 @@ impl Widget for Sidebar<'_> {
             .borders(Borders::ALL)
             .border_style(Style::default().fg(border_color))
             .title(" Soul Vault ")
-            .title_style(
-                Style::default()
-                    .fg(rat::GOLD)
-                    .add_modifier(Modifier::BOLD),
-            );
+            .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD));
 
         let inner = block.inner(area);
         block.render(area, buf);
@@ -61,10 +57,7 @@ impl Widget for Sidebar<'_> {
         // Footer hint at bottom of sidebar
         let hint_y = inner.y + inner.height.saturating_sub(1);
         if hint_y > inner.y + Page::ALL.len() as u16 {
-            let hint = Line::from(Span::styled(
-                " j/k ent q",
-                Style::default().fg(rat::DIM),
-            ));
+            let hint = Line::from(Span::styled(" j/k ent q", Style::default().fg(rat::DIM)));
             let hint_area = Rect {
                 x: inner.x,
                 y: hint_y,
@@ -82,9 +75,7 @@ fn render_item(area: Rect, buf: &mut Buffer, page: Page, selected: bool) {
     let (prefix, style) = if selected {
         (
             " > ",
-            Style::default()
-                .fg(rat::GOLD)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
         )
     } else {
         ("   ", Style::default().fg(ratatui::style::Color::White))

@@ -26,7 +26,7 @@ Point it at any folder of transcripts, notes, or exports → it extracts structu
 ```
 src/
   main.rs           Entry point, clap CLI
-  cli/              Commands: init, import, export, status, watch, interactive
+  cli/              Commands: init, import, pull, export, status, watch, reset (+ legacy interactive)
   core/             Pipeline: processor → parser → merger + prompt template
   vault/            I/O: config, read, write, source tracking
   extractors/       File format handlers (local files, ChatGPT exports)

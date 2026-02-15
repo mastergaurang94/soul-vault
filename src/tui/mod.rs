@@ -126,8 +126,7 @@ fn drain_pull_progress(pull: &mut PullPage, channels: &mut Channels) {
     if let Some(rx) = &mut channels.pull_rx {
         while let Ok(msg) = rx.try_recv() {
             if let Some(summary_str) = msg.strip_prefix("DONE:") {
-                let summary: Vec<String> =
-                    summary_str.split('\n').map(String::from).collect();
+                let summary: Vec<String> = summary_str.split('\n').map(String::from).collect();
                 pull.on_done(summary);
                 channels.pull_rx = None;
                 return;
@@ -262,10 +261,7 @@ fn start_pull(pull_page: &mut PullPage, channels: &mut Channels) {
             return;
         }
 
-        let all_sessions: Vec<_> = discovered
-            .into_iter()
-            .flat_map(|(_, s)| s)
-            .collect();
+        let all_sessions: Vec<_> = discovered.into_iter().flat_map(|(_, s)| s).collect();
 
         // Parse sessions into chunks
         let mut all_chunks = Vec::new();
@@ -282,9 +278,7 @@ fn start_pull(pull_page: &mut PullPage, channels: &mut Channels) {
             }
         }
 
-        let _ = tx
-            .send(format!("Parsed {} chunks", all_chunks.len()))
-            .await;
+        let _ = tx.send(format!("Parsed {} chunks", all_chunks.len())).await;
 
         if all_chunks.is_empty() {
             let _ = tx

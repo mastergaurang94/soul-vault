@@ -7,7 +7,7 @@ use anyhow::Result;
 use notify_debouncer_mini::{new_debouncer, notify::RecursiveMode};
 use std::collections::HashSet;
 use std::io::IsTerminal;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::sync::mpsc;
 use std::time::Duration;
 
@@ -27,8 +27,8 @@ pub async fn run(folder_path: &str) -> Result<()> {
     println!("{}", banner());
     assert_initialized()?;
 
-    let abs_path = std::fs::canonicalize(folder_path)
-        .unwrap_or_else(|_| Path::new(folder_path).to_path_buf());
+    let abs_path =
+        std::fs::canonicalize(folder_path).unwrap_or_else(|_| Path::new(folder_path).to_path_buf());
     assert_path_exists(&abs_path)?;
 
     println!(
@@ -36,11 +36,7 @@ pub async fn run(folder_path: &str) -> Result<()> {
         cyan(&abs_path.display().to_string())
     );
     println!("{}", line());
-    println!(
-        "  {} {}",
-        dim("Press"),
-        bold_white("Ctrl+C to stop")
-    );
+    println!("  {} {}", dim("Press"), bold_white("Ctrl+C to stop"));
     println!();
 
     // Set up file watcher with debounce
@@ -127,11 +123,7 @@ pub async fn run(folder_path: &str) -> Result<()> {
                         }
 
                         for f in &files_to_ingest {
-                            let rel = f
-                                .path
-                                .strip_prefix(&abs_path)
-                                .unwrap_or(&f.path)
-                                .display();
+                            let rel = f.path.strip_prefix(&abs_path).unwrap_or(&f.path).display();
                             println!(
                                 "  {}   {} {}",
                                 dim(&" ".repeat(8)),
@@ -141,8 +133,7 @@ pub async fn run(folder_path: &str) -> Result<()> {
                         }
 
                         // Run import
-                        match crate::cli::ingest::run_for_files(&abs_path, &files_to_ingest).await
-                        {
+                        match crate::cli::ingest::run_for_files(&abs_path, &files_to_ingest).await {
                             Ok(()) => {
                                 println!(
                                     "  {}   {} imported, {} skipped",
@@ -181,11 +172,7 @@ pub async fn run(folder_path: &str) -> Result<()> {
                 println!();
             }
             Ok(Err(error)) => {
-                eprintln!(
-                    "  {} Watch error: {}",
-                    red(ICON_CROSS),
-                    error
-                );
+                eprintln!("  {} Watch error: {}", red(ICON_CROSS), error);
             }
             Err(e) => {
                 eprintln!("  {} Channel error: {}", red(ICON_CROSS), e);
@@ -201,33 +188,12 @@ pub async fn run(folder_path: &str) -> Result<()> {
 
 /// Watch all provider session directories automatically.
 pub async fn run_auto() -> Result<()> {
-    // Auto-watch requires a terminal (it blocks waiting for file changes)
-    if !std::io::stdin().is_terminal() {
-        eprintln!("\n  {} Auto-watch requires a terminal.\n", red("✗"));
-        eprintln!("  Usage: soul watch <folder>\n");
-        eprintln!("  Or run `soul pull` for one-time import of AI sessions.\n");
-        std::process::exit(1);
-    }
+    let registry = AdapterRegistry::new();
+    let base_dirs = registry.base_dirs();
+    validate_auto_watch_prereqs(std::io::stdin().is_terminal(), &base_dirs)?;
 
     println!("{}", banner());
     assert_initialized()?;
-
-    let registry = AdapterRegistry::new();
-    let base_dirs = registry.base_dirs();
-
-    if base_dirs.is_empty() {
-        eprintln!(
-            "\n  {} No provider directories found.\n",
-            red("✗")
-        );
-        eprintln!("  Looked for:");
-        eprintln!("    ~/.claude/projects/   (Claude Code)");
-        eprintln!("    ~/.openclaw/agents/   (OpenClaw)");
-        eprintln!("    ~/.gemini/tmp/        (Gemini CLI)");
-        eprintln!("    ~/.codex/sessions/    (Codex)");
-        eprintln!("\n  You can also specify a folder: soul watch <folder>\n");
-        std::process::exit(1);
-    }
 
     println!("  👁  Auto-watching AI provider directories\n");
     println!("{}", line());
@@ -241,11 +207,7 @@ pub async fn run_auto() -> Result<()> {
         );
     }
 
-    println!(
-        "\n  {} {}",
-        dim("Press"),
-        bold_white("Ctrl+C to stop")
-    );
+    println!("\n  {} {}", dim("Press"), bold_white("Ctrl+C to stop"));
     println!();
 
     // Set up file watcher on all provider directories
@@ -257,16 +219,15 @@ pub async fn run_auto() -> Result<()> {
             Ok(()) => {
                 println!(
                     "{}",
-                    check(&format!("Watching {} — {}", name, dim(&dir.display().to_string())))
+                    check(&format!(
+                        "Watching {} — {}",
+                        name,
+                        dim(&dir.display().to_string())
+                    ))
                 );
             }
             Err(e) => {
-                println!(
-                    "  {} Failed to watch {}: {}",
-                    red(ICON_CROSS),
-                    name,
-                    e
-                );
+                println!("  {} Failed to watch {}: {}", red(ICON_CROSS), name, e);
             }
         }
     }
@@ -383,12 +344,7 @@ pub async fn run_auto() -> Result<()> {
                             }
                         }
                         Err(e) => {
-                            println!(
-                                "  {}   {} {}",
-                                dim(&" ".repeat(8)),
-                                amber("⚠"),
-                                e
-                            );
+                            println!("  {}   {} {}", dim(&" ".repeat(8)), amber("⚠"), e);
                         }
                     }
                 }
@@ -406,4 +362,48 @@ pub async fn run_auto() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn validate_auto_watch_prereqs(is_tty: bool, base_dirs: &[(String, PathBuf)]) -> Result<()> {
+    if !is_tty {
+        anyhow::bail!(
+            "Auto-watch requires a terminal.\n      \
+             → Usage: soul watch <folder>\n      \
+             → Or run `soul pull` for one-time import of AI sessions."
+        );
+    }
+
+    if base_dirs.is_empty() {
+        anyhow::bail!(
+            "No provider directories found.\n      \
+             → Looked for: ~/.claude/projects/, ~/.openclaw/agents/, ~/.gemini/tmp/, ~/.codex/sessions/\n      \
+             → You can also specify a folder: soul watch <folder>"
+        );
+    }
+
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn validate_auto_watch_requires_tty() {
+        let dirs = vec![("Claude Code".to_string(), PathBuf::from("/tmp"))];
+        let err = validate_auto_watch_prereqs(false, &dirs).unwrap_err();
+        assert!(err.to_string().contains("Auto-watch requires a terminal"));
+    }
+
+    #[test]
+    fn validate_auto_watch_requires_provider_dirs() {
+        let err = validate_auto_watch_prereqs(true, &[]).unwrap_err();
+        assert!(err.to_string().contains("No provider directories found"));
+    }
+
+    #[test]
+    fn validate_auto_watch_ok_when_tty_and_dirs_present() {
+        let dirs = vec![("Codex".to_string(), PathBuf::from("/tmp"))];
+        assert!(validate_auto_watch_prereqs(true, &dirs).is_ok());
+    }
 }

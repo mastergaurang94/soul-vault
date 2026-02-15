@@ -202,13 +202,23 @@ fn render_form(area: Rect, buf: &mut Buffer, page: &ExportPage) {
 
     let mut lines = vec![
         Line::from(""),
-        field_line(active, ExportField::Format, "Format", page.format.label(), ""),
+        field_line(
+            active,
+            ExportField::Format,
+            "Format",
+            page.format.label(),
+            "",
+        ),
         Line::from(""),
         field_line(
             active,
             ExportField::TopicFilter,
             "Topic filter",
-            if page.topic_filter.is_empty() { "(none)" } else { &page.topic_filter },
+            if page.topic_filter.is_empty() {
+                "(none)"
+            } else {
+                &page.topic_filter
+            },
             cursor(ExportField::TopicFilter),
         ),
         Line::from(""),
@@ -216,7 +226,11 @@ fn render_form(area: Rect, buf: &mut Buffer, page: &ExportPage) {
             active,
             ExportField::OutputPath,
             "Output path",
-            if page.output_path.is_empty() { "(stdout)" } else { &page.output_path },
+            if page.output_path.is_empty() {
+                "(stdout)"
+            } else {
+                &page.output_path
+            },
             cursor(ExportField::OutputPath),
         ),
         Line::from(""),
@@ -226,9 +240,21 @@ fn render_form(area: Rect, buf: &mut Buffer, page: &ExportPage) {
     if let Ok(vault) = read_vault_content() {
         let wc: usize = vault.identity.split_whitespace().count()
             + vault.preferences.split_whitespace().count()
-            + vault.topics.iter().map(|t| t.content.split_whitespace().count()).sum::<usize>()
-            + vault.people.iter().map(|p| p.content.split_whitespace().count()).sum::<usize>()
-            + vault.memories.iter().map(|m| m.content.split_whitespace().count()).sum::<usize>();
+            + vault
+                .topics
+                .iter()
+                .map(|t| t.content.split_whitespace().count())
+                .sum::<usize>()
+            + vault
+                .people
+                .iter()
+                .map(|p| p.content.split_whitespace().count())
+                .sum::<usize>()
+            + vault
+                .memories
+                .iter()
+                .map(|m| m.content.split_whitespace().count())
+                .sum::<usize>();
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             format!("  ~{} words in vault", wc),
@@ -239,7 +265,10 @@ fn render_form(area: Rect, buf: &mut Buffer, page: &ExportPage) {
     if let Some((ok, msg)) = &page.result_msg {
         lines.push(Line::from(""));
         let color = if *ok { rat::EMERALD } else { rat::RED };
-        lines.push(Line::from(Span::styled(format!("  {}", msg), Style::default().fg(color))));
+        lines.push(Line::from(Span::styled(
+            format!("  {}", msg),
+            Style::default().fg(color),
+        )));
     }
 
     lines.push(Line::from(""));
@@ -268,7 +297,10 @@ fn field_line<'a>(
     if value.is_empty() {
         spans.push(Span::styled(label, style));
     } else {
-        spans.push(Span::styled(format!("{}: ", label), Style::default().fg(rat::DIM)));
+        spans.push(Span::styled(
+            format!("{}: ", label),
+            Style::default().fg(rat::DIM),
+        ));
         spans.push(Span::styled(value, style));
     }
     if !cursor.is_empty() {

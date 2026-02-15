@@ -89,18 +89,15 @@ fn openclaw_agents_dir() -> Result<PathBuf> {
 
 /// Checks if a file is a valid session (not deleted/backup).
 fn is_session_file(path: &Path) -> bool {
-    let name = path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("");
+    let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
     name.ends_with(".jsonl") && !name.contains(".deleted.")
 }
 
 // ─── Parsing ──────────────────────────────────────────────────────────────────
 
 fn parse_openclaw_session(path: &Path) -> Result<Conversation> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
 
     let session_id = path
         .file_stem()

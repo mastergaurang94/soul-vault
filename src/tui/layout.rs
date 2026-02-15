@@ -77,7 +77,7 @@ impl PageSet {
 pub fn render_layout(area: Rect, buf: &mut Buffer, app: &App, pages: &PageSet) {
     let vertical = Layout::vertical([
         Constraint::Length(1), // header
-        Constraint::Min(1),   // body
+        Constraint::Min(1),    // body
         Constraint::Length(1), // footer
     ])
     .split(area);
@@ -91,25 +91,21 @@ fn render_header(area: Rect, buf: &mut Buffer) {
     let line = Line::from(vec![
         Span::styled(
             " Soul Vault ",
-            Style::default()
-                .fg(rat::GOLD)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
         ),
         Span::styled("* ", Style::default().fg(rat::AMBER)),
-        Span::styled(
-            "Your AI memory, unified.",
-            Style::default().fg(rat::DIM),
-        ),
+        Span::styled("Your AI memory, unified.", Style::default().fg(rat::DIM)),
     ]);
     Paragraph::new(line).render(area, buf);
 }
 
 fn render_body(area: Rect, buf: &mut Buffer, app: &App, pages: &PageSet) {
-    let horizontal =
-        Layout::horizontal([Constraint::Length(20), Constraint::Min(1)]).split(area);
+    let horizontal = Layout::horizontal([Constraint::Length(20), Constraint::Min(1)]).split(area);
 
     Sidebar::new(app).render(horizontal[0], buf);
-    pages.current(app.current_page).render(horizontal[1], buf, app);
+    pages
+        .current(app.current_page)
+        .render(horizontal[1], buf, app);
 }
 
 fn render_footer(area: Rect, buf: &mut Buffer, app: &App) {
@@ -134,22 +130,27 @@ pub fn print_non_tty_help() {
         cyan("soul pull")
     );
     println!(
-        "    {}  Import files",
-        cyan("soul import <folder>")
+        "    {}      Login to cloud provider via OAuth",
+        cyan("soul login [provider]")
     );
+    println!(
+        "    {}     Logout and clear OAuth credentials",
+        cyan("soul logout [provider]")
+    );
+    println!("    {}  Import files", cyan("soul import <folder>"));
     println!(
         "    {}   Watch folder for changes",
         cyan("soul watch <folder>")
     );
-    println!("    {}            Export vault context", cyan("soul export"));
+    println!(
+        "    {}            Export vault context",
+        cyan("soul export")
+    );
     println!("    {}            Show vault summary", cyan("soul status"));
     println!(
         "    {}            Delete vault and start over",
         cyan("soul reset")
     );
-    println!(
-        "    {}            Show all commands",
-        dim("soul --help")
-    );
+    println!("    {}            Show all commands", dim("soul --help"));
     println!();
 }

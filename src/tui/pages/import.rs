@@ -28,7 +28,9 @@ pub enum ImportPhase {
     },
     Writing,
     Done(ImportResult),
-    NothingToImport { skipped_count: usize },
+    NothingToImport {
+        skipped_count: usize,
+    },
     Error(String),
 }
 
@@ -52,9 +54,7 @@ impl ImportPage {
     /// Called by the event loop when an ImportProgress message arrives.
     pub fn on_progress(&mut self, progress: ImportProgress) {
         self.phase = match progress {
-            ImportProgress::Scanning | ImportProgress::ScanComplete { .. } => {
-                ImportPhase::Scanning
-            }
+            ImportProgress::Scanning | ImportProgress::ScanComplete { .. } => ImportPhase::Scanning,
             ImportProgress::Classifying | ImportProgress::ClassifyComplete { .. } => {
                 ImportPhase::Classifying
             }
@@ -89,11 +89,7 @@ impl PageWidget for ImportPage {
             .borders(Borders::ALL)
             .border_style(Style::default().fg(rat::GOLD))
             .title(" Import ")
-            .title_style(
-                Style::default()
-                    .fg(rat::GOLD)
-                    .add_modifier(Modifier::BOLD),
-            );
+            .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD));
         let inner = block.inner(area);
         block.render(area, buf);
 
@@ -128,23 +124,23 @@ impl PageWidget for ImportPage {
             | ImportPhase::Classifying
             | ImportPhase::Processing { .. }
             | ImportPhase::Writing => PageAction::Consumed,
-            ImportPhase::Done(_)
-            | ImportPhase::NothingToImport { .. }
-            | ImportPhase::Error(_) => match key.code {
-                KeyCode::Enter | KeyCode::Char('r') => {
-                    self.phase = ImportPhase::Input;
-                    self.input.clear();
-                    self.cursor = 0;
-                    PageAction::Consumed
+            ImportPhase::Done(_) | ImportPhase::NothingToImport { .. } | ImportPhase::Error(_) => {
+                match key.code {
+                    KeyCode::Enter | KeyCode::Char('r') => {
+                        self.phase = ImportPhase::Input;
+                        self.input.clear();
+                        self.cursor = 0;
+                        PageAction::Consumed
+                    }
+                    KeyCode::Esc => {
+                        self.phase = ImportPhase::Input;
+                        self.input.clear();
+                        self.cursor = 0;
+                        PageAction::BackToSidebar
+                    }
+                    _ => PageAction::Ignored,
                 }
-                KeyCode::Esc => {
-                    self.phase = ImportPhase::Input;
-                    self.input.clear();
-                    self.cursor = 0;
-                    PageAction::BackToSidebar
-                }
-                _ => PageAction::Ignored,
-            },
+            }
         }
     }
 }

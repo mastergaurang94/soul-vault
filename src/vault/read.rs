@@ -5,9 +5,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::types::{NamedContent, ProviderStatus, VaultContent, VaultStats};
-use crate::vault::config::{
-    identity_dir, memories_dir, people_dir, read_config, topics_dir,
-};
+use crate::vault::config::{identity_dir, memories_dir, people_dir, read_config, topics_dir};
 
 // ─── Vault Stats ──────────────────────────────────────────────────────────────
 
@@ -77,11 +75,7 @@ fn count_md_files(dir: &Path) -> usize {
         .map(|entries| {
             entries
                 .filter_map(|e| e.ok())
-                .filter(|e| {
-                    e.path()
-                        .extension()
-                        .is_some_and(|ext| ext == "md")
-                })
+                .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
                 .count()
         })
         .unwrap_or(0)

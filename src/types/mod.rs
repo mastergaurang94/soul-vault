@@ -14,6 +14,22 @@ pub enum Provider {
     Gemini,
 }
 
+impl std::str::FromStr for Provider {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.trim().to_lowercase().as_str() {
+            "claude" => Ok(Provider::Claude),
+            "chatgpt" | "chat_gpt" | "chat-gpt" | "openai" => Ok(Provider::ChatGpt),
+            "gemini" | "google" => Ok(Provider::Gemini),
+            other => Err(format!(
+                "Unknown provider: {}. Use one of: claude, chatgpt, gemini.",
+                other
+            )),
+        }
+    }
+}
+
 impl std::fmt::Display for Provider {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -259,7 +275,9 @@ pub enum SoulVaultError {
     #[error("Soul Vault not initialized.\n      → Run `soul init` to create your vault.")]
     NotInitialized,
 
-    #[error("No API key found for {provider}.\n      → Run `soul init` to configure your API key.")]
+    #[error(
+        "No API key found for {provider}.\n      → Run `soul init` to configure your API key."
+    )]
     MissingApiKey { provider: String },
 
     #[error("Failed to parse LLM response: {reason}")]

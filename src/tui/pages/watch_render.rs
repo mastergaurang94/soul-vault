@@ -62,9 +62,7 @@ pub fn render_watching(area: Rect, buf: &mut Buffer, events: &[WatchEvent], scro
     let mut lines = vec![
         Line::from(Span::styled(
             "  Watching for changes (Esc to stop, j/k to scroll)",
-            Style::default()
-                .fg(rat::GOLD)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
     ];

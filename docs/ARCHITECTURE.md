@@ -20,9 +20,12 @@ src/
 ├── cli/                       Command implementations (thin wrappers orchestrating core + vault)
 │   ├── mod.rs                 Module declarations
 │   ├── init.rs                `soul init` — interactive setup wizard (providers, API keys, vault creation)
-│   ├── ingest.rs              `soul ingest <folder>` — scan → classify → chunk → LLM → merge → write pipeline
+│   ├── ingest.rs              `soul import <folder>` — scan → classify → chunk → LLM → merge → write pipeline
+│   ├── pull.rs                `soul pull` — discover provider sessions and import them
 │   ├── export.rs              `soul export` — reads vault, builds context document (markdown or JSON)
 │   ├── status.rs              `soul status` — vault summary (counts, providers, last sync)
+│   ├── watch.rs               `soul watch [folder]` — watch local/provider folders and auto-import changes
+│   ├── reset.rs               `soul reset` — destructive vault reset with safety checks
 │   └── interactive.rs         Legacy inline menu (replaced by tui/, kept for reference)
 ├── core/                      Business logic (no I/O, no UI)
 │   ├── mod.rs                 Module declarations
@@ -82,9 +85,9 @@ main.rs    ← depends on cli/, ui/
 | `VaultContent` | Full vault content for export |
 | `SoulVaultError` | Typed errors with actionable messages (thiserror) |
 
-## Ingest Pipeline
+## Import Pipeline
 
-The core data flow when you run `soul ingest <folder>`:
+The core data flow when you run `soul import <folder>`:
 
 ```
 1. SCAN           discover_files(folder)                     → Vec<FileInfo>

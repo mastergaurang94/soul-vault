@@ -69,11 +69,7 @@ impl PageWidget for PullPage {
             .borders(Borders::ALL)
             .border_style(Style::default().fg(rat::GOLD))
             .title(" Pull ")
-            .title_style(
-                Style::default()
-                    .fg(rat::GOLD)
-                    .add_modifier(Modifier::BOLD),
-            );
+            .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD));
         let inner = block.inner(area);
         block.render(area, buf);
 
@@ -124,15 +120,10 @@ fn render_ready(area: Rect, buf: &mut Buffer) {
         Line::from(""),
         Line::from(Span::styled(
             "  Pull AI sessions from all providers",
-            Style::default()
-                .fg(rat::GOLD)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
-        Line::from(Span::styled(
-            "  Discovers sessions from:",
-            Style::default(),
-        )),
+        Line::from(Span::styled("  Discovers sessions from:", Style::default())),
         Line::from(Span::styled(
             "    - Claude Code  (~/.claude/projects/)",
             Style::default().fg(rat::DIM),
@@ -165,9 +156,7 @@ fn render_running(area: Rect, buf: &mut Buffer, progress: &[String]) {
     let mut lines = vec![
         Line::from(Span::styled(
             "  Pulling sessions...",
-            Style::default()
-                .fg(rat::GOLD)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
     ];

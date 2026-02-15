@@ -3,6 +3,7 @@
 //! A CLI tool that distills AI conversations into a structured local vault.
 
 mod adapters;
+mod auth;
 mod cli;
 mod core;
 mod extractors;
@@ -81,6 +82,26 @@ enum Commands {
         /// Force re-import of all sessions, ignoring source tracking
         #[arg(short, long)]
         force: bool,
+
+        /// Pull from provider cloud APIs instead of local session files
+        #[arg(long)]
+        cloud: bool,
+
+        /// Cloud provider to use: claude, chatgpt, gemini (default: claude)
+        #[arg(long)]
+        provider: Option<String>,
+    },
+
+    /// Login to a cloud provider via OAuth (default: claude)
+    Login {
+        /// Provider to authenticate: claude, chatgpt, gemini
+        provider: Option<String>,
+    },
+
+    /// Logout and remove stored OAuth credentials
+    Logout {
+        /// Provider to logout from (omit to clear all saved credentials)
+        provider: Option<String>,
     },
 
     /// Reset vault — delete all data and return to pre-init state
@@ -118,7 +139,13 @@ async fn main() {
             Some(f) => cli::watch::run(&f).await,
             None => cli::watch::run_auto().await,
         },
-        Some(Commands::Pull { force }) => cli::pull::run(force).await,
+        Some(Commands::Pull {
+            force,
+            cloud,
+            provider,
+        }) => cli::pull::run(force, cloud, provider.as_deref()).await,
+        Some(Commands::Login { provider }) => cli::login::run(provider.as_deref()).await,
+        Some(Commands::Logout { provider }) => cli::logout::run(provider.as_deref()),
         Some(Commands::Export {
             output,
             format,

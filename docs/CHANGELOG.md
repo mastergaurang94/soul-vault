@@ -5,6 +5,20 @@ Agents: append entries here after completing work.
 
 ---
 
+## 2026-02-15 — Hardening & QA Pass
+
+### Reliability fixes
+- `src/cli/init.rs`: fixed API key collection flow so the selected processing provider is always included in the key prompt set (covers Gemini-only selections)
+- `src/cli/watch.rs`: replaced library-level `process::exit()` calls in auto-watch with actionable `anyhow::bail!()` errors returned to `main`
+
+### Regression tests
+- `src/cli/init.rs`: added tests for key-provider selection/dedup behavior
+- `src/cli/watch.rs`: added tests for auto-watch precondition validation (TTY + provider directory checks)
+
+### Documentation sync
+- Updated command-set wording in `README.md`, `AGENTS.md`, and `CLAUDE.md`
+- Updated pipeline/CLI descriptions in `docs/ARCHITECTURE.md` to reflect `import`, `pull`, `watch`, and `reset`
+
 ## 2026-02-14 — TUI Async Import & Live Watch
 
 ### Async import pipeline in TUI

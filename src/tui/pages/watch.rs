@@ -104,19 +104,15 @@ impl PageWidget for WatchPage {
             .borders(Borders::ALL)
             .border_style(Style::default().fg(rat::GOLD))
             .title(" Watch ")
-            .title_style(
-                Style::default()
-                    .fg(rat::GOLD)
-                    .add_modifier(Modifier::BOLD),
-            );
+            .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD));
         let inner = block.inner(area);
         block.render(area, buf);
 
         match &self.phase {
             WatchPhase::Input => watch_render::render_input(inner, buf, &self.input),
-            WatchPhase::Watching {
-                events, scroll, ..
-            } => watch_render::render_watching(inner, buf, events, *scroll),
+            WatchPhase::Watching { events, scroll, .. } => {
+                watch_render::render_watching(inner, buf, events, *scroll)
+            }
             WatchPhase::Error(msg) => watch_render::render_error(inner, buf, msg),
         }
     }

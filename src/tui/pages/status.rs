@@ -57,9 +57,7 @@ fn render_not_initialized(area: Rect, buf: &mut Buffer) {
         Line::from(""),
         Line::from(Span::styled(
             "  Vault not initialized",
-            Style::default()
-                .fg(rat::AMBER)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(rat::AMBER).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(Span::styled(
@@ -110,9 +108,7 @@ fn render_dashboard(area: Rect, buf: &mut Buffer, scroll: u16) {
     let mut lines: Vec<Line> = vec![
         Line::from(Span::styled(
             "  Vault Overview",
-            Style::default()
-                .fg(rat::GOLD)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         stat_line("  Memories", stats.memory_count.to_string()),
@@ -127,9 +123,7 @@ fn render_dashboard(area: Rect, buf: &mut Buffer, scroll: u16) {
     // ─── Providers ────────────────────────────────────────────────────
     lines.push(Line::from(Span::styled(
         "  Providers",
-        Style::default()
-            .fg(rat::GOLD)
-            .add_modifier(Modifier::BOLD),
+        Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::from(""));
 
@@ -164,9 +158,7 @@ fn render_dashboard(area: Rect, buf: &mut Buffer, scroll: u16) {
     // ─── Imported Sources ─────────────────────────────────────────────
     lines.push(Line::from(Span::styled(
         "  Imported Sources",
-        Style::default()
-            .fg(rat::GOLD)
-            .add_modifier(Modifier::BOLD),
+        Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::from(""));
 
@@ -201,11 +193,7 @@ fn render_dashboard(area: Rect, buf: &mut Buffer, scroll: u16) {
         .borders(Borders::ALL)
         .border_style(Style::default().fg(rat::GOLD))
         .title(" Status ")
-        .title_style(
-            Style::default()
-                .fg(rat::GOLD)
-                .add_modifier(Modifier::BOLD),
-        );
+        .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD));
 
     Paragraph::new(visible).block(block).render(area, buf);
 }

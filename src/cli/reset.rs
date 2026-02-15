@@ -54,11 +54,7 @@ fn count_md_files(dir: &Path) -> usize {
         .map(|entries| {
             entries
                 .filter_map(|e| e.ok())
-                .filter(|e| {
-                    e.path()
-                        .extension()
-                        .is_some_and(|ext| ext == "md")
-                })
+                .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
                 .count()
         })
         .unwrap_or(0)
@@ -71,7 +67,10 @@ pub fn run(force: bool) -> Result<()> {
 
     // Check if vault exists
     if !vault_root.exists() || !config::is_initialized() {
-        println!("\n  {} Nothing to reset — vault not initialized.\n", dim(ICON_DOT));
+        println!(
+            "\n  {} Nothing to reset — vault not initialized.\n",
+            dim(ICON_DOT)
+        );
         return Ok(());
     }
 

@@ -88,18 +88,15 @@ fn discover_recursive(dir: &Path, sessions: &mut Vec<SessionFile>) -> Result<()>
 
 /// Checks if a file is a Codex rollout session file.
 fn is_rollout_file(path: &Path) -> bool {
-    let name = path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("");
+    let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
     name.starts_with("rollout-") && name.ends_with(".jsonl")
 }
 
 // ─── Parsing ──────────────────────────────────────────────────────────────────
 
 fn parse_codex_session(path: &Path) -> Result<Conversation> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
 
     let session_id = path
         .file_stem()
@@ -130,7 +127,10 @@ fn parse_codex_session(path: &Path) -> Result<Conversation> {
                 // Extract metadata from session_meta payload
                 if let Some(payload) = val.get("payload") {
                     if cwd.is_none() {
-                        cwd = payload.get("cwd").and_then(|c| c.as_str()).map(String::from);
+                        cwd = payload
+                            .get("cwd")
+                            .and_then(|c| c.as_str())
+                            .map(String::from);
                     }
                     if created_at.is_none() {
                         created_at = payload
@@ -327,10 +327,7 @@ mod tests {
                 {"type": "output_text", "text": "actual answer"}
             ]
         });
-        assert_eq!(
-            extract_response_content(&payload).unwrap(),
-            "actual answer"
-        );
+        assert_eq!(extract_response_content(&payload).unwrap(), "actual answer");
     }
 
     #[test]
@@ -519,9 +516,7 @@ mod tests {
         assert!(!adapter.can_handle(Path::new(
             "/Users/test/.codex/sessions/2026/02/11/session-abc.jsonl"
         )));
-        assert!(!adapter.can_handle(Path::new(
-            "/Users/test/.claude/projects/-test/abc.jsonl"
-        )));
+        assert!(!adapter.can_handle(Path::new("/Users/test/.claude/projects/-test/abc.jsonl")));
         assert!(!adapter.can_handle(Path::new("/Users/test/readme.md")));
     }
 

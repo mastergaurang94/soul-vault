@@ -20,8 +20,8 @@ pub async fn run(folder_path: &str, force: bool) -> Result<()> {
     println!("{}", banner());
     assert_initialized()?;
 
-    let abs_path = std::fs::canonicalize(folder_path)
-        .unwrap_or_else(|_| Path::new(folder_path).to_path_buf());
+    let abs_path =
+        std::fs::canonicalize(folder_path).unwrap_or_else(|_| Path::new(folder_path).to_path_buf());
     assert_path_exists(&abs_path)?;
 
     println!(
@@ -189,16 +189,10 @@ fn classify_and_filter(
         status_parts.push(format!("{} new", bold_white(&new_count.to_string())));
     }
     if modified_count > 0 {
-        status_parts.push(format!(
-            "{} modified",
-            amber(&modified_count.to_string())
-        ));
+        status_parts.push(format!("{} modified", amber(&modified_count.to_string())));
     }
     if skipped_count > 0 {
-        status_parts.push(format!(
-            "{} unchanged",
-            dim(&skipped_count.to_string())
-        ));
+        status_parts.push(format!("{} unchanged", dim(&skipped_count.to_string())));
     }
 
     pb.finish_with_message(check(&status_parts.join(", ")));

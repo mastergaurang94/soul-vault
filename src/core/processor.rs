@@ -23,10 +23,9 @@ pub async fn process_chunk(
     client: &reqwest::Client,
     chunk: &ChunkInfo,
 ) -> Result<ExtractedMemories> {
-    let api_key = get_api_key("claude")?
-        .ok_or(SoulVaultError::MissingApiKey {
-            provider: "Claude".to_string(),
-        })?;
+    let api_key = get_api_key("claude")?.ok_or(SoulVaultError::MissingApiKey {
+        provider: "Claude".to_string(),
+    })?;
 
     let chunk_label = if chunk.total > 1 {
         format!(" (Part {} of {})", chunk.index + 1, chunk.total)
@@ -99,7 +98,11 @@ pub async fn process_chunk(
         .unwrap_or("");
 
     let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
-    Ok(parse_extraction_response(response_text, &chunk.source, &date))
+    Ok(parse_extraction_response(
+        response_text,
+        &chunk.source,
+        &date,
+    ))
 }
 
 #[cfg(test)]

@@ -36,7 +36,9 @@ pub enum ImportProgress {
         skipped_count: usize,
     },
     /// All files unchanged — nothing to do.
-    NothingToImport { skipped_count: usize },
+    NothingToImport {
+        skipped_count: usize,
+    },
     Processing {
         current: usize,
         total: usize,
@@ -70,14 +72,11 @@ pub async fn run_import(folder: String, tx: mpsc::Sender<ImportProgress>) {
     }
 }
 
-async fn run_import_inner(
-    folder: &str,
-    tx: &mpsc::Sender<ImportProgress>,
-) -> Result<()> {
+async fn run_import_inner(folder: &str, tx: &mpsc::Sender<ImportProgress>) -> Result<()> {
     assert_initialized()?;
 
-    let abs_path = std::fs::canonicalize(folder)
-        .unwrap_or_else(|_| Path::new(folder).to_path_buf());
+    let abs_path =
+        std::fs::canonicalize(folder).unwrap_or_else(|_| Path::new(folder).to_path_buf());
     assert_path_exists(&abs_path)?;
 
     // Phase 1: Scan
@@ -127,8 +126,7 @@ async fn run_import_inner(
     let all_chunks = read_and_chunk(&files_to_ingest)?;
 
     // Phase 4: Process through LLM
-    let (all_memories, errors) =
-        process_chunks_with_progress(&all_chunks, tx).await?;
+    let (all_memories, errors) = process_chunks_with_progress(&all_chunks, tx).await?;
 
     // Phase 5: Merge & Write
     tx.send(ImportProgress::Writing).await.ok();

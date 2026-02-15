@@ -188,16 +188,12 @@ fn render_tree(area: Rect, buf: &mut Buffer, entries: &[BrowseEntry], selected: 
             if i == selected {
                 Line::from(Span::styled(
                     text,
-                    Style::default()
-                        .fg(rat::GOLD)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
                 ))
             } else if entry.is_dir {
                 Line::from(Span::styled(
                     text,
-                    Style::default()
-                        .fg(rat::AMBER)
-                        .add_modifier(Modifier::BOLD),
+                    Style::default().fg(rat::AMBER).add_modifier(Modifier::BOLD),
                 ))
             } else {
                 Line::from(Span::styled(text, Style::default()))
@@ -209,11 +205,7 @@ fn render_tree(area: Rect, buf: &mut Buffer, entries: &[BrowseEntry], selected: 
         .borders(Borders::ALL)
         .border_style(Style::default().fg(rat::GOLD))
         .title(" Files ")
-        .title_style(
-            Style::default()
-                .fg(rat::GOLD)
-                .add_modifier(Modifier::BOLD),
-        );
+        .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD));
 
     Paragraph::new(lines).block(block).render(area, buf);
 }

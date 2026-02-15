@@ -101,10 +101,7 @@ pub fn run() -> Result<()> {
             let last = format_time_ago(&source.last_ingested);
             print_content_row(&format!("  {}", &display_path), Some(&cyan));
             print_content_row(
-                &format!(
-                    "    {} files, last: {}",
-                    source.files_ingested, &last
-                ),
+                &format!("    {} files, last: {}", source.files_ingested, &last),
                 Some(&dim),
             );
         }

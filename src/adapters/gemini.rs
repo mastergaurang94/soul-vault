@@ -90,18 +90,15 @@ fn gemini_tmp_dir() -> Result<PathBuf> {
 
 /// Checks if a file is a Gemini session file.
 fn is_session_file(path: &Path) -> bool {
-    let name = path
-        .file_name()
-        .and_then(|s| s.to_str())
-        .unwrap_or("");
+    let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
     name.starts_with("session-") && name.ends_with(".json")
 }
 
 // ─── Parsing ──────────────────────────────────────────────────────────────────
 
 fn parse_gemini_session(path: &Path) -> Result<Conversation> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read {}", path.display()))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read {}", path.display()))?;
 
     let val: serde_json::Value = serde_json::from_str(&content)
         .with_context(|| format!("Failed to parse JSON: {}", path.display()))?;
@@ -200,9 +197,7 @@ fn extract_content(val: &serde_json::Value) -> Option<String> {
     if let Some(arr) = content.as_array() {
         let texts: Vec<String> = arr
             .iter()
-            .filter_map(|block| {
-                block.get("text").and_then(|t| t.as_str()).map(String::from)
-            })
+            .filter_map(|block| block.get("text").and_then(|t| t.as_str()).map(String::from))
             .collect();
         if texts.is_empty() {
             return None;
@@ -230,7 +225,9 @@ mod tests {
 
     #[test]
     fn test_is_session_file() {
-        assert!(is_session_file(Path::new("session-2026-01-19T20-58-abc.json")));
+        assert!(is_session_file(Path::new(
+            "session-2026-01-19T20-58-abc.json"
+        )));
         assert!(!is_session_file(Path::new("settings.json")));
         assert!(!is_session_file(Path::new("session-abc.jsonl")));
         assert!(!is_session_file(Path::new("readme.md")));
@@ -428,12 +425,8 @@ mod tests {
         assert!(adapter.can_handle(Path::new(
             "/Users/test/.gemini/tmp/abc123/chats/session-2026-01-19.json"
         )));
-        assert!(!adapter.can_handle(Path::new(
-            "/Users/test/.gemini/settings.json"
-        )));
-        assert!(!adapter.can_handle(Path::new(
-            "/Users/test/.claude/projects/-test/abc.jsonl"
-        )));
+        assert!(!adapter.can_handle(Path::new("/Users/test/.gemini/settings.json")));
+        assert!(!adapter.can_handle(Path::new("/Users/test/.claude/projects/-test/abc.jsonl")));
         assert!(!adapter.can_handle(Path::new("/Users/test/readme.md")));
     }
 

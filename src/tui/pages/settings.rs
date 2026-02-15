@@ -53,9 +53,7 @@ fn render_not_init(area: Rect, buf: &mut Buffer) {
         Line::from(""),
         Line::from(Span::styled(
             "  Vault not initialized.",
-            Style::default()
-                .fg(rat::AMBER)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(rat::AMBER).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(Span::styled(
@@ -88,9 +86,7 @@ fn render_settings(area: Rect, buf: &mut Buffer, scroll: u16) {
     let mut lines: Vec<Line> = vec![
         Line::from(Span::styled(
             "  Configuration",
-            Style::default()
-                .fg(rat::GOLD)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         config_line("  Vault path", root.display().to_string()),
@@ -105,9 +101,7 @@ fn render_settings(area: Rect, buf: &mut Buffer, scroll: u16) {
     // ─── Providers ────────────────────────────────────────────────────
     lines.push(Line::from(Span::styled(
         "  Providers",
-        Style::default()
-            .fg(rat::GOLD)
-            .add_modifier(Modifier::BOLD),
+        Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::from(""));
 
@@ -131,6 +125,10 @@ fn render_settings(area: Rect, buf: &mut Buffer, scroll: u16) {
         Style::default().fg(rat::DIM),
     )));
     lines.push(Line::from(Span::styled(
+        "  OAuth cloud login: `soul login [provider]` and `soul logout [provider]`.",
+        Style::default().fg(rat::DIM),
+    )));
+    lines.push(Line::from(Span::styled(
         "  To reset everything, run `soul reset`.",
         Style::default().fg(rat::DIM),
     )));
@@ -141,11 +139,7 @@ fn render_settings(area: Rect, buf: &mut Buffer, scroll: u16) {
         .borders(Borders::ALL)
         .border_style(Style::default().fg(rat::GOLD))
         .title(" Settings ")
-        .title_style(
-            Style::default()
-                .fg(rat::GOLD)
-                .add_modifier(Modifier::BOLD),
-        );
+        .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD));
 
     Paragraph::new(visible).block(block).render(area, buf);
 }

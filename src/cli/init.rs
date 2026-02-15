@@ -61,11 +61,7 @@ pub fn run() -> Result<()> {
         if enabled {
             println!("{}", check(&format!("{} enabled", provider.display_name())));
         } else {
-            println!(
-                "    {} {} skipped",
-                dim(ICON_DOT),
-                provider.display_name()
-            );
+            println!("    {} {} skipped", dim(ICON_DOT), provider.display_name());
         }
     }
 
@@ -92,25 +88,20 @@ pub fn run() -> Result<()> {
     };
     println!(
         "{}",
-        check(&format!("Processing LLM: {}", processing_llm.display_name()))
+        check(&format!(
+            "Processing LLM: {}",
+            processing_llm.display_name()
+        ))
     );
 
     // Step 4: API Keys
-    let enabled_providers: Vec<&ProviderConfig> =
-        providers.iter().filter(|p| p.enabled).collect();
-    if !enabled_providers.is_empty() || processing_llm != Provider::Gemini {
+    let needed = providers_needing_keys(&providers, &processing_llm);
+    if !needed.is_empty() {
         println!("\n{}", gold("  API Keys:"));
         println!(
             "{}",
             dim("  Keys are stored locally in ~/soul-vault/.config/keys.json\n")
         );
-
-        let mut needed: Vec<Provider> = vec![processing_llm.clone()];
-        for p in &enabled_providers {
-            if !needed.contains(&p.name) {
-                needed.push(p.name.clone());
-            }
-        }
 
         for provider in &needed {
             let key_input = ask(&format!(
@@ -180,10 +171,71 @@ pub fn run() -> Result<()> {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+fn providers_needing_keys(
+    providers: &[ProviderConfig],
+    processing_llm: &Provider,
+) -> Vec<Provider> {
+    let mut needed = vec![processing_llm.clone()];
+    for provider in providers {
+        if provider.enabled && !needed.contains(&provider.name) {
+            needed.push(provider.name.clone());
+        }
+    }
+    needed
+}
+
 fn ask(prompt: &str) -> Result<String> {
     print!("{}", prompt);
     io::stdout().flush()?;
     let mut input = String::new();
     io::stdin().read_line(&mut input)?;
     Ok(input.trim().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn providers_needing_keys_includes_processing_llm_even_if_no_providers_enabled() {
+        let providers = vec![
+            ProviderConfig {
+                name: Provider::Claude,
+                enabled: false,
+                last_pull: None,
+            },
+            ProviderConfig {
+                name: Provider::ChatGpt,
+                enabled: false,
+                last_pull: None,
+            },
+            ProviderConfig {
+                name: Provider::Gemini,
+                enabled: false,
+                last_pull: None,
+            },
+        ];
+
+        let needed = providers_needing_keys(&providers, &Provider::Gemini);
+        assert_eq!(needed, vec![Provider::Gemini]);
+    }
+
+    #[test]
+    fn providers_needing_keys_deduplicates_processing_llm_when_enabled() {
+        let providers = vec![
+            ProviderConfig {
+                name: Provider::Claude,
+                enabled: true,
+                last_pull: None,
+            },
+            ProviderConfig {
+                name: Provider::Gemini,
+                enabled: true,
+                last_pull: None,
+            },
+        ];
+
+        let needed = providers_needing_keys(&providers, &Provider::Claude);
+        assert_eq!(needed, vec![Provider::Claude, Provider::Gemini]);
+    }
 }

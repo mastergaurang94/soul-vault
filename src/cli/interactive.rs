@@ -30,6 +30,9 @@ enum Action {
     Init,
     Status,
     Import,
+    Pull,
+    Login,
+    Logout,
     Export,
     Watch,
     Reset,
@@ -51,6 +54,21 @@ const MENU_ITEMS: &[MenuItem] = &[
         label: "Import",
         description: "Import local files & transcripts",
         action: Action::Import,
+    },
+    MenuItem {
+        label: "Pull",
+        description: "Import local AI app sessions",
+        action: Action::Pull,
+    },
+    MenuItem {
+        label: "Login",
+        description: "OAuth login for cloud pull",
+        action: Action::Login,
+    },
+    MenuItem {
+        label: "Logout",
+        description: "Clear saved OAuth credentials",
+        action: Action::Logout,
     },
     MenuItem {
         label: "Export",
@@ -88,7 +106,10 @@ pub fn run() -> Result<()> {
     if is_initialized() {
         println!("  {}", dim("Vault ready. Select an action:"));
     } else {
-        println!("  {}", dim("Vault not initialized. Select Init to get started."));
+        println!(
+            "  {}",
+            dim("Vault not initialized. Select Init to get started.")
+        );
     }
     println!();
 
@@ -116,6 +137,17 @@ pub fn run() -> Result<()> {
                     let rt = tokio::runtime::Handle::current();
                     rt.block_on(crate::cli::ingest::run(folder, false))?;
                 }
+            }
+            Action::Pull => {
+                let rt = tokio::runtime::Handle::current();
+                rt.block_on(crate::cli::pull::run(false, false, None))?;
+            }
+            Action::Login => {
+                let rt = tokio::runtime::Handle::current();
+                rt.block_on(crate::cli::login::run(None))?;
+            }
+            Action::Logout => {
+                crate::cli::logout::run(None)?;
             }
             Action::Watch => {
                 print!("  Enter folder path to watch: ");
@@ -224,22 +256,14 @@ fn print_menu_item(index: usize, item: &MenuItem, is_selected: bool) {
         if item.description.is_empty() {
             println!("{}", bold_gold(&label));
         } else {
-            println!(
-                "{}  {}",
-                bold_gold(&label),
-                dim(item.description)
-            );
+            println!("{}  {}", bold_gold(&label), dim(item.description));
         }
     } else {
         let label = format!("    {} {}", num, item.label);
         if item.description.is_empty() {
             println!("{}", label);
         } else {
-            println!(
-                "{}  {}",
-                label,
-                dim(item.description)
-            );
+            println!("{}  {}", label, dim(item.description));
         }
     }
 }
@@ -282,7 +306,10 @@ fn reprint_menu(selected: usize, menu_len: usize) -> Result<()> {
     out.execute(Clear(ClearType::CurrentLine))?;
     out.execute(Print("\r\n"))?;
     out.execute(Clear(ClearType::CurrentLine))?;
-    out.execute(Print(format!("  {}\r\n", dim("  up/down/jk navigate  enter select  q quit"))))?;
+    out.execute(Print(format!(
+        "  {}\r\n",
+        dim("  up/down/jk navigate  enter select  q quit")
+    )))?;
 
     out.flush()?;
     Ok(())
@@ -300,23 +327,28 @@ fn print_non_tty_help() {
     println!("  Interactive mode requires a terminal (TTY).");
     println!("  Use a subcommand instead:\n");
     println!("    {}              Initialize vault", cyan("soul init"));
-    println!(
-        "    {}  Import files",
-        cyan("soul import <folder>")
-    );
+    println!("    {}  Import files", cyan("soul import <folder>"));
     println!(
         "    {}   Watch folder for changes",
         cyan("soul watch <folder>")
     );
-    println!("    {}            Export vault context", cyan("soul export"));
+    println!(
+        "    {}      Login to cloud provider via OAuth",
+        cyan("soul login [provider]")
+    );
+    println!(
+        "    {}     Logout and clear OAuth credentials",
+        cyan("soul logout [provider]")
+    );
+    println!(
+        "    {}            Export vault context",
+        cyan("soul export")
+    );
     println!("    {}            Show vault summary", cyan("soul status"));
     println!(
         "    {}            Delete vault and start over",
         cyan("soul reset")
     );
-    println!(
-        "    {}            Show all commands",
-        dim("soul --help")
-    );
+    println!("    {}            Show all commands", dim("soul --help"));
     println!();
 }

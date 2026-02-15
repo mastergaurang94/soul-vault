@@ -8,19 +8,22 @@ use indicatif::{ProgressBar, ProgressStyle};
 use std::time::Duration;
 
 use crate::adapters::{conversation_to_text, AdapterRegistry, SessionFile};
+use crate::auth::{ensure_valid_credentials, is_logged_in};
 use crate::core::merger::{chunk_text, merge_all_memories};
 use crate::core::processor::process_chunk;
 use crate::types::ExtractedMemories;
 use crate::ui::theme::*;
 use crate::vault::config::assert_initialized;
-use crate::vault::sources::{
-    compute_file_hash, read_sources, write_sources, SourceEntry,
-};
+use crate::vault::sources::{compute_file_hash, read_sources, write_sources, SourceEntry};
 use crate::vault::write::write_memories_to_vault;
 
 // ─── Pull Command ─────────────────────────────────────────────────────────────
 
-pub async fn run(force: bool) -> Result<()> {
+pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()> {
+    if cloud {
+        return run_cloud(provider).await;
+    }
+
     println!("{}", banner());
     assert_initialized()?;
 
@@ -43,12 +46,7 @@ pub async fn run(force: bool) -> Result<()> {
                 bold_white(&count.to_string())
             );
         } else {
-            println!(
-                "  {} {}: {}",
-                dim(ICON_DOT),
-                name,
-                dim("no sessions found")
-            );
+            println!("  {} {}: {}", dim(ICON_DOT), name, dim("no sessions found"));
         }
     }
     println!();
@@ -230,6 +228,47 @@ pub async fn run(force: bool) -> Result<()> {
         &errors,
     );
 
+    Ok(())
+}
+
+async fn run_cloud(provider: Option<&str>) -> Result<()> {
+    println!("{}", banner());
+    assert_initialized()?;
+
+    let provider = match provider {
+        Some(raw) => raw
+            .parse::<crate::types::Provider>()
+            .map_err(anyhow::Error::msg)?,
+        None => crate::types::Provider::Claude,
+    };
+
+    if !is_logged_in(&provider)? {
+        anyhow::bail!(
+            "Not logged in to {} cloud.\n      → Run `soul login {}` and try again.",
+            provider.display_name(),
+            provider
+        );
+    }
+
+    let creds = ensure_valid_credentials(&provider).await?;
+    if creds.is_none() {
+        anyhow::bail!(
+            "No valid OAuth credentials for {}.\n      → Run `soul login {}` and try again.",
+            provider.display_name(),
+            provider
+        );
+    }
+
+    println!(
+        "  {} Authenticated with {} cloud.",
+        emerald(ICON_CHECK),
+        bold_white(provider.display_name())
+    );
+    println!(
+        "  {} Coming soon — use {} with your exported data.\n",
+        amber(ICON_STAR),
+        cyan("soul import")
+    );
     Ok(())
 }
 

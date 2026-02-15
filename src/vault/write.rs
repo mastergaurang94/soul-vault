@@ -10,10 +10,7 @@ use crate::vault::config::{identity_dir, memories_dir, people_dir, topics_dir};
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 /// Writes extracted memories to all vault locations. Returns what was written.
-pub fn write_memories_to_vault(
-    memories: &ExtractedMemories,
-    date: &str,
-) -> Result<WriteResult> {
+pub fn write_memories_to_vault(memories: &ExtractedMemories, date: &str) -> Result<WriteResult> {
     let mut topics_written = Vec::new();
     let mut people_written = Vec::new();
 
@@ -56,7 +53,11 @@ pub fn write_memories_to_vault(
     }
 
     if !memories.identity.is_empty() {
-        let confidence_strs: Vec<String> = memories.identity.iter().map(|f| f.confidence.to_string()).collect();
+        let confidence_strs: Vec<String> = memories
+            .identity
+            .iter()
+            .map(|f| f.confidence.to_string())
+            .collect();
         let facts: Vec<FactRef> = memories
             .identity
             .iter()
@@ -71,7 +72,11 @@ pub fn write_memories_to_vault(
     }
 
     if !memories.preferences.is_empty() {
-        let confidence_strs: Vec<String> = memories.preferences.iter().map(|f| f.confidence.to_string()).collect();
+        let confidence_strs: Vec<String> = memories
+            .preferences
+            .iter()
+            .map(|f| f.confidence.to_string())
+            .collect();
         let facts: Vec<FactRef> = memories
             .preferences
             .iter()
@@ -126,15 +131,27 @@ fn build_digest_sections(m: &ExtractedMemories) -> String {
     let mut sections = Vec::new();
 
     if !m.decisions.is_empty() {
-        let items: Vec<String> = m.decisions.iter().map(|d| format!("- {}", d.content)).collect();
+        let items: Vec<String> = m
+            .decisions
+            .iter()
+            .map(|d| format!("- {}", d.content))
+            .collect();
         sections.push(format!("## Decisions\n{}", items.join("\n")));
     }
     if !m.identity.is_empty() {
-        let items: Vec<String> = m.identity.iter().map(|i| format!("- {}", i.content)).collect();
+        let items: Vec<String> = m
+            .identity
+            .iter()
+            .map(|i| format!("- {}", i.content))
+            .collect();
         sections.push(format!("## Identity\n{}", items.join("\n")));
     }
     if !m.preferences.is_empty() {
-        let items: Vec<String> = m.preferences.iter().map(|p| format!("- {}", p.content)).collect();
+        let items: Vec<String> = m
+            .preferences
+            .iter()
+            .map(|p| format!("- {}", p.content))
+            .collect();
         sections.push(format!("## Preferences\n{}", items.join("\n")));
     }
     if !m.topics.is_empty() {
@@ -199,9 +216,7 @@ fn append_entry(
         } else {
             "topic"
         };
-        let role_field = role
-            .map(|r| format!("\nrole: {}", r))
-            .unwrap_or_default();
+        let role_field = role.map(|r| format!("\nrole: {}", r)).unwrap_or_default();
         let header = format!(
             "---\n{}: {}{}\nupdated: {}\n---\n\n# {}\n",
             kind, title, role_field, date, title

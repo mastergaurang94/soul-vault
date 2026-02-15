@@ -104,8 +104,8 @@ pub fn parse_chatgpt_zip(path: &Path) -> Result<Vec<ParsedConversation>> {
 
 /// Parses a `conversations.json` file from disk.
 pub fn parse_chatgpt_json(path: &Path) -> Result<Vec<ParsedConversation>> {
-    let content = fs::read_to_string(path)
-        .with_context(|| format!("Failed to read: {}", path.display()))?;
+    let content =
+        fs::read_to_string(path).with_context(|| format!("Failed to read: {}", path.display()))?;
     parse_conversations_json_str(&content)
 }
 
@@ -165,18 +165,12 @@ pub fn parse_conversation(value: &Value) -> Result<ParsedConversation> {
         .ok_or_else(|| anyhow::anyhow!("Missing or invalid mapping in conversation: {}", title))?;
 
     // Build a lookup of node_id -> node value
-    let nodes: HashMap<&str, &Value> = mapping
-        .iter()
-        .map(|(k, v)| (k.as_str(), v))
-        .collect();
+    let nodes: HashMap<&str, &Value> = mapping.iter().map(|(k, v)| (k.as_str(), v)).collect();
 
     // Find root node(s): nodes with null parent or no parent field
     let root_ids: Vec<&str> = mapping
         .iter()
-        .filter(|(_, node)| {
-            node.get("parent")
-                .is_none_or(|p| p.is_null())
-        })
+        .filter(|(_, node)| node.get("parent").is_none_or(|p| p.is_null()))
         .map(|(id, _)| id.as_str())
         .collect();
 
@@ -307,13 +301,21 @@ mod tests {
     use tempfile::TempDir;
 
     /// Node definition for test conversations: (id, parent, children, message).
-    type TestNode<'a> = (&'a str, Option<&'a str>, Vec<&'a str>, Option<(&'a str, &'a str)>);
+    type TestNode<'a> = (
+        &'a str,
+        Option<&'a str>,
+        Vec<&'a str>,
+        Option<(&'a str, &'a str)>,
+    );
 
     /// Helper: creates a minimal conversations.json value with the mapping tree.
     fn make_conversation_json(title: &str, nodes: Vec<TestNode<'_>>) -> Value {
         let mut mapping = serde_json::Map::new();
         for (id, parent, children, message) in nodes {
-            let children_val: Vec<Value> = children.iter().map(|c| Value::String(c.to_string())).collect();
+            let children_val: Vec<Value> = children
+                .iter()
+                .map(|c| Value::String(c.to_string()))
+                .collect();
             let parent_val = match parent {
                 Some(p) => Value::String(p.to_string()),
                 None => Value::Null,
@@ -352,12 +354,7 @@ mod tests {
             vec![
                 ("root", None, vec!["n1"], None),
                 ("n1", Some("root"), vec!["n2"], Some(("user", "Hello!"))),
-                (
-                    "n2",
-                    Some("n1"),
-                    vec![],
-                    Some(("assistant", "Hi there!")),
-                ),
+                ("n2", Some("n1"), vec![], Some(("assistant", "Hi there!"))),
             ],
         );
 
@@ -384,18 +381,8 @@ mod tests {
                     vec!["n1"],
                     Some(("system", "You are helpful")),
                 ),
-                (
-                    "n1",
-                    Some("sys"),
-                    vec!["n2"],
-                    Some(("user", "What's up?")),
-                ),
-                (
-                    "n2",
-                    Some("n1"),
-                    vec![],
-                    Some(("assistant", "Not much!")),
-                ),
+                ("n1", Some("sys"), vec!["n2"], Some(("user", "What's up?"))),
+                ("n2", Some("n1"), vec![], Some(("assistant", "Not much!"))),
             ],
         );
 
@@ -467,12 +454,8 @@ mod tests {
     #[test]
     fn test_parse_conversation_non_text_parts() {
         // Parts that are objects (images, etc.) should be filtered out
-        let mut conv_json = make_conversation_json(
-            "Mixed Parts",
-            vec![
-                ("root", None, vec!["n1"], None),
-            ],
-        );
+        let mut conv_json =
+            make_conversation_json("Mixed Parts", vec![("root", None, vec!["n1"], None)]);
 
         // Add a node with mixed parts (string + object)
         if let Some(mapping) = conv_json.get_mut("mapping").and_then(|m| m.as_object_mut()) {
@@ -508,10 +491,7 @@ mod tests {
 
     #[test]
     fn test_parse_empty_conversation() {
-        let conv_json = make_conversation_json(
-            "Empty",
-            vec![("root", None, vec![], None)],
-        );
+        let conv_json = make_conversation_json("Empty", vec![("root", None, vec![], None)]);
 
         let conv = parse_conversation(&conv_json).unwrap();
         assert_eq!(conv.title, "Empty");
@@ -664,14 +644,10 @@ mod tests {
         zip_writer
             .start_file("conversations.json", options)
             .unwrap();
-        zip_writer
-            .write_all(json.to_string().as_bytes())
-            .unwrap();
+        zip_writer.write_all(json.to_string().as_bytes()).unwrap();
         // Add a dummy file like ChatGPT exports include
         zip_writer.start_file("chat.html", options).unwrap();
-        zip_writer
-            .write_all(b"<html>not used</html>")
-            .unwrap();
+        zip_writer.write_all(b"<html>not used</html>").unwrap();
         zip_writer.finish().unwrap();
 
         let convs = parse_chatgpt_zip(&zip_path).unwrap();
