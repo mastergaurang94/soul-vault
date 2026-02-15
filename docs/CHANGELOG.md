@@ -5,6 +5,40 @@ Agents: append entries here after completing work.
 
 ---
 
+## 2026-02-15 — Documentation Sync for Current Codebase State
+
+### Docs refreshed against implementation
+- Updated `README.md` command documentation to match clap definitions in `src/main.rs`
+  - Covers all commands: `init`, `import`, `pull`, `export`, `status`, `watch`, `reset`, `login`, `logout`
+  - Documents export flags: `--format context|json|bundle` and `--sections`
+  - Calls out local `soul pull` preflight API key validation
+  - Adds `soul login` / `soul logout` usage and provider defaults
+  - Updates TUI section to list all 9 pages: Status, Pull, Import, Browse, Export, Watch, Login, Logout, Settings
+  - Replaced placeholder repo URLs with `mastergaurang94/soul-vault`
+- Rewrote `docs/ARCHITECTURE.md` to include current modules and wiring:
+  - Added `src/auth/mod.rs`
+  - Added `src/adapters/` map (`claude`, `openclaw`, `gemini`, `codex`, `mod`)
+  - Added TUI login/logout page modules in the page map
+  - Updated dependency direction to include auth/adapters/tui relationships
+- Updated `docs/ADAPTERS_SPEC.md` to reflect actual trait and registry API in code
+- Cleaned `docs/STATUS.md` to remove stale in-progress items and align current command/page state
+- Audited `docs/CHANGELOG.md` ordering and duplicate headings (chronological order preserved; no duplicate headings)
+
+## 2026-02-15 — Hardening: unwrap/panic-path cleanup
+
+### Robustness updates
+- Replaced non-test `unwrap()` calls in progress-style creation with safe fallbacks:
+  - `src/cli/pull.rs`
+  - `src/cli/ingest.rs`
+- Hardened regex utilities to avoid panic paths by gracefully degrading when regex construction fails:
+  - `src/core/parser.rs`
+  - `src/cli/export.rs`
+- Removed a non-test `expect()` panic path in vault root resolution:
+  - `src/vault/config.rs`
+
+### Validation notes
+- Kept API key/config/auth paths on `anyhow::Result` flows with existing actionable errors for missing files and invalid config/keys content.
+
 ## 2026-02-15 — TUI Login/Logout Pages + Copy Clarity
 
 ### New TUI pages

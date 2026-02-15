@@ -1,40 +1,33 @@
-# Adapters & Provider Integration — Design Spec
+# Adapters & Provider Integration — Current Spec
 
 ## Overview
 
-Soul Vault needs to import AI conversations from multiple sources. Inspired by
-OneContext's adapter/registry pattern, we build a pluggable system where each
-AI provider gets its own adapter that handles discovery, reading, and parsing.
+Soul Vault uses a pluggable adapter registry for `soul pull` and auto-watch provider discovery.
+Each adapter discovers local session files and parses them into a normalized `Conversation`.
 
-## Architecture
+## Current Adapter Set
 
-```
+```text
 src/adapters/
-├── mod.rs          # AdapterRegistry + SessionAdapter trait
-├── claude.rs       # Claude Code: reads ~/.claude/projects/**/*.jsonl
-├── chatgpt.rs      # ChatGPT: reads conversations.json from data export
-├── codex.rs        # OpenAI Codex: reads ~/.codex/sessions/**/*.jsonl
-├── gemini.rs       # Gemini: reads session files (format TBD)
-└── openclaw.rs     # OpenClaw: reads ~/.openclaw/agents/*/sessions/*.jsonl
+├── mod.rs          # SessionAdapter trait, normalized types, AdapterRegistry
+├── claude.rs       # ~/.claude/projects/**/*.jsonl
+├── openclaw.rs     # ~/.openclaw/agents/*/sessions/*.jsonl
+├── gemini.rs       # ~/.gemini/tmp/*/chats/session-*.json
+└── codex.rs        # ~/.codex/sessions/**/rollout-*.jsonl
 ```
 
-## SessionAdapter Trait
+Notes:
+- There is no ChatGPT adapter in `src/adapters/` right now.
+- ChatGPT import support currently lives in the local extractor path (`soul import ...`), not `soul pull` adapters.
+
+## SessionAdapter Trait (Actual)
 
 ```rust
 pub trait SessionAdapter: Send + Sync {
-    /// Unique name: "claude", "chatgpt", "codex", "gemini", "openclaw"
     fn name(&self) -> &str;
-    
-    /// Human-readable display name
     fn display_name(&self) -> &str;
-    
-    /// Auto-discover session files on disk (returns paths)
     fn discover_sessions(&self) -> Result<Vec<SessionFile>>;
-    
-    /// Parse a session file into normalized conversations
-    fn parse_session(&self, path: &Path) -> Result<Vec<Conversation>>;
-    
-    /// Check if a file belongs to this adapter
+    fn parse_session(&self, path: &Path) -> Result<Conversation>;
     fn can_handle(&self, path: &Path) -> bool;
 }
 ```
@@ -58,13 +51,13 @@ pub struct Conversation {
 }
 
 pub struct Message {
-    pub role: Role, // User, Assistant, System, Tool
+    pub role: Role, // User | Assistant | System | Tool
     pub content: String,
     pub timestamp: Option<DateTime<Utc>>,
 }
 ```
 
-## Registry
+## AdapterRegistry API (Actual)
 
 ```rust
 pub struct AdapterRegistry {
@@ -72,78 +65,49 @@ pub struct AdapterRegistry {
 }
 
 impl AdapterRegistry {
-    pub fn new() -> Self { /* register all built-in adapters */ }
-    pub fn discover_all(&self) -> Result<Vec<SessionFile>> { /* merge all */ }
-    pub fn auto_detect(&self, path: &Path) -> Option<&dyn SessionAdapter> { /* try each */ }
+    pub fn new() -> Self;
+    pub fn discover_all(&self) -> Vec<(String, Vec<SessionFile>)>;
+    pub fn auto_detect(&self, path: &Path) -> Option<&dyn SessionAdapter>;
+    pub fn base_dirs(&self) -> Vec<(String, PathBuf)>;
 }
 ```
 
+Behavior:
+- `discover_all()` returns grouped results by adapter display name.
+- Adapter-level discovery errors are swallowed as empty results (`unwrap_or_default`) to keep pull resilient.
+- `base_dirs()` is used by `soul watch` (no folder mode) to auto-watch provider roots.
+
 ## CLI Integration
 
-### `soul pull` (new command)
-Auto-discovers sessions from all providers on disk:
-```
-$ soul pull
-Discovering sessions...
-  Claude Code: 47 sessions found
-  OpenClaw: 12 sessions found
-  ChatGPT: (no local sessions — use `soul import` with export folder)
+### `soul pull`
 
-Processing 59 sessions...
-[████████░░] 42/59  Processing claude session abc123...
-```
+Default path (no `--cloud`):
+- Discovers sessions from Claude Code, OpenClaw, Gemini CLI, Codex.
+- Runs preflight API key validation for Claude before discovery.
+- Parses provider sessions via adapters, normalizes to text, then runs the memory extraction pipeline.
 
-### `soul import <path>` (enhanced)
-Existing command, now smarter:
-- Auto-detects if path is a ChatGPT export zip/folder
-- Auto-detects if path contains Claude/Codex/OpenClaw sessions  
-- Falls back to generic file import for raw .md/.txt files
+### `soul watch` (no folder argument)
 
-### `soul watch` (enhanced)  
-Now watches provider session directories automatically:
-```
-$ soul watch
-Watching:
-  ~/.claude/projects/     (Claude Code)
-  ~/.openclaw/agents/     (OpenClaw)
-  ~/Downloads/            (ChatGPT exports)
+Auto mode uses `AdapterRegistry::base_dirs()` and watches detected provider roots.
 
-[17:04:32] New session detected: ~/.claude/projects/-Users-gaurang-myproject/abc123.jsonl
-[17:04:33] Importing 3 new turns...
-```
-
-## Provider Details
+## Provider Parsing Notes
 
 ### Claude Code
-- Location: `~/.claude/projects/<encoded-path>/*.jsonl`
-- Format: JSONL, each line is a message event
-- Key fields: `type`, `role`, `content`, `cwd`
-- Skip: `agent-*.jsonl` (subtask files)
-
-### ChatGPT Export
-- Location: User downloads zip from Settings → Data Controls → Export
-- Format: `conversations.json` — array of conversation objects with `mapping` tree
-- Each node has `message.author.role` and `message.content.parts`
-- Also includes `chat.html` (we ignore this, use JSON)
+- Root: `~/.claude/projects/`
+- Session files: `*.jsonl` (excluding `agent-*.jsonl`)
+- Parses message/event lines; attempts title from summary or first user message
 
 ### OpenClaw
-- Location: `~/.openclaw/agents/*/sessions/*.jsonl`
-- Format: JSONL with message objects
-- Key fields: `role`, `content`, `model`
+- Root: `~/.openclaw/agents/*/sessions/`
+- Session files: `*.jsonl` (excluding deleted/backup variants)
+- Parses `session` and `message` records with role/content extraction
 
-### Codex (OpenAI)
-- Location: `~/.codex/sessions/YYYY/MM/DD/rollout-*.jsonl`
-- Format: JSONL with `session_meta` header, then message events
+### Gemini CLI
+- Root: `~/.gemini/tmp/<projectHash>/chats/`
+- Session files: `session-*.json`
+- Parses `messages[]` entries (`user`, `gemini`, `system`)
 
-### Gemini
-- TBD — need to research session storage format
-
-## Non-Technical User Path
-
-For users who aren't technical (Lumen UI target):
-1. Go to ChatGPT → Settings → Export Data
-2. Download the zip
-3. Open Soul Vault (or Lumen) → Import → Select the downloaded zip
-4. Soul Vault auto-detects it's a ChatGPT export, parses conversations.json, distills memories
-
-The CLI equivalent: `soul import ~/Downloads/chatgpt-export.zip`
+### Codex
+- Root: `~/.codex/sessions/`
+- Session files: `rollout-*.jsonl`
+- Parses `session_meta`, `event_msg.user_message`, and `response_item` assistant content
