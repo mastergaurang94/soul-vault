@@ -81,14 +81,18 @@ fn render_item(area: Rect, buf: &mut Buffer, index: usize, page: Page, selected:
         ("   ", Style::default().fg(ratatui::style::Color::White))
     };
 
-    let line = Line::from(vec![
+    let mut spans = vec![
         Span::styled(prefix, style),
         Span::styled(format!("{index}"), style),
         Span::styled(" ", style),
-        Span::styled(page.icon(), style),
-        Span::styled(" ", style),
-        Span::styled(page.label(), style),
-    ]);
+    ];
+    let icon = page.icon();
+    if !icon.is_empty() {
+        spans.push(Span::styled(icon, style));
+        spans.push(Span::styled(" ", style));
+    }
+    spans.push(Span::styled(page.label(), style));
+    let line = Line::from(spans);
 
     Paragraph::new(line).render(area, buf);
 }

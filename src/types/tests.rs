@@ -33,7 +33,7 @@ fn test_config_serde() {
         providers: vec![ProviderConfig {
             name: Provider::Claude,
             enabled: true,
-            last_pull: None,
+            last_import: None,
         }],
         processing_llm: Provider::Claude,
         vault_path: "/home/user/soul-vault".to_string(),

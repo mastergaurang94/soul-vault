@@ -34,7 +34,7 @@ fn test_config_serde_roundtrip() {
         providers: vec![ProviderConfig {
             name: Provider::Claude,
             enabled: true,
-            last_pull: None,
+            last_import: None,
         }],
         processing_llm: Provider::Claude,
         vault_path: "/tmp/soul-vault".to_string(),

@@ -91,10 +91,10 @@ pub fn render_dashboard(area: Rect, buf: &mut Buffer, scroll: u16) {
             ("-", rat::DIM)
         };
         let status_text = if p.connected {
-            p.last_pull
+            p.last_import
                 .as_deref()
                 .map(|lp| format!("last: {}", format_time_ago(lp)))
-                .unwrap_or_else(|| "no pulls yet".into())
+                .unwrap_or_else(|| "no imports yet".into())
         } else {
             "not connected".into()
         };

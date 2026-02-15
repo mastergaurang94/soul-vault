@@ -56,7 +56,7 @@ pub fn run() -> Result<()> {
         providers.push(ProviderConfig {
             name: provider.clone(),
             enabled,
-            last_pull: None,
+            last_import: None,
         });
         if enabled {
             println!("{}", check(&format!("{} enabled", provider.display_name())));
@@ -202,17 +202,17 @@ mod tests {
             ProviderConfig {
                 name: Provider::Claude,
                 enabled: false,
-                last_pull: None,
+                last_import: None,
             },
             ProviderConfig {
                 name: Provider::ChatGpt,
                 enabled: false,
-                last_pull: None,
+                last_import: None,
             },
             ProviderConfig {
                 name: Provider::Gemini,
                 enabled: false,
-                last_pull: None,
+                last_import: None,
             },
         ];
 
@@ -226,12 +226,12 @@ mod tests {
             ProviderConfig {
                 name: Provider::Claude,
                 enabled: true,
-                last_pull: None,
+                last_import: None,
             },
             ProviderConfig {
                 name: Provider::Gemini,
                 enabled: true,
-                last_pull: None,
+                last_import: None,
             },
         ];
 

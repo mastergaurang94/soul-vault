@@ -23,7 +23,7 @@ pub fn get_vault_stats() -> Result<VaultStats> {
         .map(|p| ProviderStatus {
             name: p.name.clone(),
             connected: p.enabled,
-            last_pull: p.last_pull.clone(),
+            last_import: p.last_import.clone(),
         })
         .collect();
 

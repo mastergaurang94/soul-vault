@@ -86,7 +86,7 @@ pub(crate) fn update_pull_config_timestamps(discovered_providers: &[Provider]) -
     config.last_sync = Some(now.clone());
     for provider in &mut config.providers {
         if discovered_providers.contains(&provider.name) {
-            provider.last_pull = Some(now.clone());
+            provider.last_import = Some(now.clone());
         }
     }
 

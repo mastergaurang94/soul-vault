@@ -43,14 +43,14 @@ impl Page {
 
     pub fn icon(self) -> &'static str {
         match self {
-            Page::Status => "*",
-            Page::Import => "#",
-            Page::Browse => ">",
-            Page::Export => "^",
-            Page::Watch => "@",
-            Page::Login => ">",
-            Page::Logout => "<",
-            Page::Settings => "~",
+            Page::Status => "",
+            Page::Import => "",
+            Page::Browse => "",
+            Page::Export => "",
+            Page::Watch => "",
+            Page::Login => "",
+            Page::Logout => "",
+            Page::Settings => "",
         }
     }
 }

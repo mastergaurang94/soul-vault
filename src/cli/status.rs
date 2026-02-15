@@ -63,16 +63,16 @@ pub fn run() -> Result<()> {
     for p in &stats.providers {
         let name = p.name.display_name();
         let (icon, status_text) = if p.connected {
-            let pull_info = match &p.last_pull {
+            let import_info = match &p.last_import {
                 Some(lp) => format!("last: {}", format_time_ago(lp)),
-                None => "no pulls yet".to_string(),
+                None => "no imports yet".to_string(),
             };
-            (emerald(ICON_CHECK), pull_info)
+            (emerald(ICON_CHECK), import_info)
         } else {
             (dim(ICON_DOT), "not connected".to_string())
         };
 
-        // Build the visible content: "  ✓ Claude         no pulls yet"
+        // Build the visible content: "  ✓ Claude         no imports yet"
         // icon(1) + space(1) + name(padded to 14) + status
         let visible_content = format!("  {} {:<14}{}", "X", name, &status_text);
         let vis_len = visible_content.len(); // no ANSI here, plain measurement

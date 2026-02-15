@@ -17,7 +17,7 @@ pub struct VaultStats {
 pub struct ProviderStatus {
     pub name: Provider,
     pub connected: bool,
-    pub last_pull: Option<String>,
+    pub last_import: Option<String>,
 }
 
 #[derive(Debug, Serialize)]

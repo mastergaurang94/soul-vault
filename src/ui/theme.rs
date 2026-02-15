@@ -107,18 +107,18 @@ pub fn label(key: &str, value: &str) -> String {
 }
 
 #[allow(dead_code)]
-pub fn provider_line(name: &str, connected: bool, last_pull: Option<&str>) -> String {
+pub fn provider_line(name: &str, connected: bool, last_import: Option<&str>) -> String {
     let icon = if connected {
         emerald(ICON_CHECK)
     } else {
         dim(ICON_DOT)
     };
     let status = if connected {
-        let pull_info = match last_pull {
+        let import_info = match last_import {
             Some(lp) => format!(" (last pull: {})", lp),
             None => String::new(),
         };
-        dim(&format!("connected{}", pull_info))
+        dim(&format!("connected{}", import_info))
     } else {
         dim("not connected")
     };

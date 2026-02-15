@@ -20,8 +20,8 @@ pub struct SoulVaultConfig {
 pub struct ProviderConfig {
     pub name: Provider,
     pub enabled: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_pull: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", alias = "last_pull")]
+    pub last_import: Option<String>,
 }
 
 /// API keys stored as provider_name -> key.
