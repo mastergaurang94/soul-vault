@@ -2,6 +2,8 @@
 
 pub mod browse;
 pub mod export;
+pub mod export_render;
+pub mod export_state;
 pub mod import;
 pub mod import_provider_render;
 pub mod import_render;
@@ -9,8 +11,12 @@ pub mod login;
 pub mod logout;
 pub mod settings;
 pub mod status;
+pub mod status_render;
 pub mod watch;
 pub mod watch_render;
+
+#[cfg(test)]
+mod export_tests;
 
 use crossterm::event::KeyEvent;
 use ratatui::{buffer::Buffer, layout::Rect};

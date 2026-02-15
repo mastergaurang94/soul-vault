@@ -115,7 +115,9 @@ fn help_import_subcommand() {
         .args(["help", "import"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Import sessions from AI providers"))
+        .stdout(predicate::str::contains(
+            "Import sessions from AI providers",
+        ))
         .stdout(predicate::str::contains("FOLDER"))
         .stdout(predicate::str::contains("--force"));
 }
@@ -126,7 +128,9 @@ fn import_dash_dash_help() {
         .args(["import", "--help"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Import sessions from AI providers"))
+        .stdout(predicate::str::contains(
+            "Import sessions from AI providers",
+        ))
         .stdout(predicate::str::contains("--force"));
 }
 
