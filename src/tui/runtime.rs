@@ -80,6 +80,14 @@ fn handle_key(
     pages: &mut PageSet,
     channels: &mut Channels,
 ) {
+    // Ctrl+C always quits, regardless of focus
+    if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
+        && key.code == KeyCode::Char('c')
+    {
+        app.should_quit = true;
+        return;
+    }
+
     match key.code {
         KeyCode::Char('q') if app.focus == Focus::Sidebar => {
             app.should_quit = true;
