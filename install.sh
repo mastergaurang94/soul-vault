@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-REPO="user/soul-vault"
+REPO="mastergaurang94/soul-vault"
 BINARY_NAME="soul"
 DEFAULT_INSTALL_DIR="$HOME/.local/bin"
 INSTALL_DIR="${SOUL_VAULT_INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"

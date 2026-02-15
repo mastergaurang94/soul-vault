@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Your AI memory, unified. Distills AI conversations into a structured local vault."
 license = "MIT"
-repository = "https://github.com/user/soul-vault"
+repository = "https://github.com/mastergaurang94/soul-vault"
 keywords = ["ai", "memory", "cli", "vault"]
 categories = ["command-line-utilities"]
 
