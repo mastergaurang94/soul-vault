@@ -5,6 +5,27 @@ Agents: append entries here after completing work.
 
 ---
 
+## 2026-02-15 — Quality Grading + Lint Infrastructure
+
+### New quality enforcement scripts
+- Added `scripts/lint-architecture.sh`
+  - Parses `use crate::...` imports and validates dependency direction against `docs/ARCHITECTURE.md`
+  - Reports actionable file:line remediation guidance
+- Added `scripts/lint-file-size.sh`
+  - Enforces default 200-line file limit with `--limit N` override
+  - Reports oversized files with split-by-concern guidance
+- Added `scripts/lint-unwrap.sh`
+  - Flags non-test `.unwrap()` usage in `src/`
+  - Flags `process::exit` outside `src/main.rs`
+- Added `scripts/lint-all.sh`
+  - Runs all custom lints, `cargo clippy --all-targets -- -D warnings`, and `cargo fmt -- --check`
+  - Produces an aggregated pass/fail report
+
+### Documentation updates
+- Added `docs/QUALITY.md` with module letter grades (A/B/C/D), grading methodology, and current lint baseline.
+- Updated `docs/DESIGN_PRINCIPLES.md` with an **Automated Enforcement** section that points to lint scripts and actionable lint output standards.
+- Updated `docs/STATUS.md` to reflect quality infrastructure as completed work.
+
 ## 2026-02-15 — Documentation Sync for Current Codebase State
 
 ### Docs refreshed against implementation

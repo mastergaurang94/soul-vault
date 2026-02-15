@@ -22,6 +22,7 @@ Last updated: 2026-02-15
   - `soul reset --force` for non-interactive use
 - [x] Source tracking + dedup is active via `sources.json`
 - [x] Distribution scaffolding is in place (`install.sh`, CI/release workflows, Homebrew formula scaffold)
+- [x] Quality/linting infrastructure is in place (`scripts/lint-architecture.sh`, `scripts/lint-file-size.sh`, `scripts/lint-unwrap.sh`, `scripts/lint-all.sh`)
 
 ## 🔨 In Progress
 
