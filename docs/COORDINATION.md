@@ -1,4 +1,6 @@
 # Soul Vault — Multi-Agent Coordination
+Last updated: 2026-02-15
+
 
 ## Before Starting Work
 

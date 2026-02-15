@@ -22,6 +22,10 @@ Last updated: 2026-02-15
   - `soul reset --force` for non-interactive use
 - [x] Source tracking + dedup is active via `sources.json`
 - [x] Distribution scaffolding is in place (`install.sh`, CI/release workflows, Homebrew formula scaffold)
+- [x] Agent-first documentation upgrade landed:
+  - `AGENTS.md`/`CLAUDE.md` rewritten as progressive-disclosure TOC docs
+  - Added `docs/GOLDEN_PRINCIPLES.md`, `docs/EXECUTION_PLAN_TEMPLATE.md`, `docs/plans/README.md`
+  - Added `scripts/lint-docs.sh` doc gardening checks
 
 ## 🔨 In Progress
 

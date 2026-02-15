@@ -1,9 +1,35 @@
 # Changelog
+Last updated: 2026-02-15
+
 
 All notable changes to Soul Vault will be documented in this file.
 Agents: append entries here after completing work.
 
 ---
+
+## 2026-02-15 — Knowledge Base Enhancement for Agent-First Development
+
+### Documentation and planning system
+- Reworked `AGENTS.md` into a compact table-of-contents entry point with progressive disclosure
+- Kept `CLAUDE.md` byte-identical to `AGENTS.md`
+- Added `docs/GOLDEN_PRINCIPLES.md` with concrete, verifiable repository rules
+- Added `docs/EXECUTION_PLAN_TEMPLATE.md` for complex multi-session execution
+- Added `docs/plans/README.md` and `docs/plans/completed/` workflow conventions
+- Added `Last updated: 2026-02-15` freshness markers to docs missing them
+
+### Doc gardening automation
+- Added `scripts/lint-docs.sh` to check:
+  - top-level `//!` module docs for all `src/**/*.rs`
+  - `Last updated` markers for all docs markdown files
+  - broken internal markdown links under `docs/`
+  - `AGENTS.md` coverage of stable docs markdown files
+- Script currently reports one failing group in existing codebase:
+  - Missing top-level `//!` module docs in:
+    - `src/cli/mod.rs`
+    - `src/core/mod.rs`
+    - `src/extractors/mod.rs`
+    - `src/ui/mod.rs`
+    - `src/vault/mod.rs`
 
 ## 2026-02-15 — Documentation Sync for Current Codebase State
 
