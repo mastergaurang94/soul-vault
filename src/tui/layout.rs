@@ -21,6 +21,7 @@ use super::pages::export::ExportPage;
 use super::pages::import::ImportPage;
 use super::pages::login::LoginPage;
 use super::pages::logout::LogoutPage;
+use super::pages::reset::ResetPage;
 use super::pages::settings::SettingsPage;
 use super::pages::status::StatusPage;
 use super::pages::watch::WatchPage;
@@ -33,6 +34,7 @@ pub struct PageSet {
     pub watch: WatchPage,
     pub login: LoginPage,
     pub logout: LogoutPage,
+    pub reset: ResetPage,
     pub settings: SettingsPage,
 }
 
@@ -46,6 +48,7 @@ impl PageSet {
             watch: WatchPage::default(),
             login: LoginPage::default(),
             logout: LogoutPage::default(),
+            reset: ResetPage::default(),
             settings: SettingsPage::default(),
         }
     }
@@ -59,6 +62,7 @@ impl PageSet {
             Page::Watch => &self.watch,
             Page::Login => &self.login,
             Page::Logout => &self.logout,
+            Page::Reset => &self.reset,
             Page::Settings => &self.settings,
         }
     }
@@ -72,6 +76,7 @@ impl PageSet {
             Page::Watch => &mut self.watch,
             Page::Login => &mut self.login,
             Page::Logout => &mut self.logout,
+            Page::Reset => &mut self.reset,
             Page::Settings => &mut self.settings,
         }
     }

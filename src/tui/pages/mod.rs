@@ -9,6 +9,7 @@ pub mod import_provider_render;
 pub mod import_render;
 pub mod login;
 pub mod logout;
+pub mod reset;
 pub mod settings;
 pub mod status;
 pub mod status_render;

@@ -140,14 +140,7 @@ pub fn run(force: bool) -> Result<()> {
         }
     }
 
-    // Perform deletion
-    fs::remove_dir_all(&vault_root).map_err(|e| {
-        anyhow::anyhow!(
-            "Failed to delete vault at {}: {}\n      → Check file permissions.",
-            vault_root.display(),
-            e
-        )
-    })?;
+    delete_vault()?;
 
     println!(
         "\n{}\n",
@@ -157,84 +150,29 @@ pub fn run(force: bool) -> Result<()> {
     Ok(())
 }
 
-// ─── Tests ────────────────────────────────────────────────────────────────────
+/// Delete the vault directory. Used by both CLI and TUI reset flows.
+pub fn delete_vault() -> Result<()> {
+    let vault_root = config::vault_root();
+
+    if !is_safe_to_delete(&vault_root) {
+        bail!(
+            "Refusing to delete path: {}\n      \
+             → Path failed safety validation.",
+            vault_root.display()
+        );
+    }
+
+    fs::remove_dir_all(&vault_root).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to delete vault at {}: {}\n      → Check file permissions.",
+            vault_root.display(),
+            e
+        )
+    })?;
+
+    Ok(())
+}
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::PathBuf;
-
-    #[test]
-    fn test_safe_to_delete_valid_soul_vault_path() {
-        let home = dirs::home_dir().unwrap();
-        let path = home.join("soul-vault");
-        assert!(is_safe_to_delete(&path));
-    }
-
-    #[test]
-    fn test_safe_to_delete_nested_soul_vault_path() {
-        let home = dirs::home_dir().unwrap();
-        let path = home.join("projects").join("soul-vault");
-        assert!(is_safe_to_delete(&path));
-    }
-
-    #[test]
-    fn test_reject_root() {
-        assert!(!is_safe_to_delete(Path::new("/")));
-    }
-
-    #[test]
-    fn test_reject_home_dir() {
-        let home = dirs::home_dir().unwrap();
-        assert!(!is_safe_to_delete(&home));
-    }
-
-    #[test]
-    fn test_reject_tilde() {
-        assert!(!is_safe_to_delete(Path::new("~")));
-    }
-
-    #[test]
-    fn test_reject_path_without_soul_vault() {
-        let home = dirs::home_dir().unwrap();
-        let path = home.join("Documents");
-        assert!(!is_safe_to_delete(&path));
-    }
-
-    #[test]
-    fn test_reject_path_outside_home() {
-        assert!(!is_safe_to_delete(Path::new("/tmp/soul-vault")));
-    }
-
-    #[test]
-    fn test_reject_etc_path_with_soul_vault() {
-        assert!(!is_safe_to_delete(Path::new("/etc/soul-vault")));
-    }
-
-    #[test]
-    fn test_count_md_files_nonexistent() {
-        assert_eq!(count_md_files(Path::new("/nonexistent/path")), 0);
-    }
-
-    #[test]
-    fn test_count_md_files_empty_dir() {
-        let tmp = tempfile::tempdir().unwrap();
-        assert_eq!(count_md_files(tmp.path()), 0);
-    }
-
-    #[test]
-    fn test_count_md_files_with_files() {
-        let tmp = tempfile::tempdir().unwrap();
-        fs::write(tmp.path().join("one.md"), "# One").unwrap();
-        fs::write(tmp.path().join("two.md"), "# Two").unwrap();
-        fs::write(tmp.path().join("three.txt"), "Not markdown").unwrap();
-        assert_eq!(count_md_files(tmp.path()), 2);
-    }
-
-    #[test]
-    fn test_safe_to_delete_rejects_slash_soul_vault_outside_home() {
-        // /soul-vault is outside home directory
-        let path = PathBuf::from("/soul-vault");
-        assert!(!is_safe_to_delete(&path));
-    }
-}
+#[path = "reset_tests.rs"]
+mod tests;

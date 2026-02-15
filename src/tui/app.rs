@@ -13,6 +13,7 @@ pub enum Page {
     Watch,
     Login,
     Logout,
+    Reset,
     Settings,
 }
 
@@ -25,6 +26,7 @@ impl Page {
         Page::Watch,
         Page::Login,
         Page::Logout,
+        Page::Reset,
         Page::Settings,
     ];
 
@@ -37,6 +39,7 @@ impl Page {
             Page::Watch => "Watch",
             Page::Login => "Login",
             Page::Logout => "Logout",
+            Page::Reset => "Reset",
             Page::Settings => "Settings",
         }
     }
@@ -50,6 +53,7 @@ impl Page {
             Page::Watch => "",
             Page::Login => "",
             Page::Logout => "",
+            Page::Reset => "",
             Page::Settings => "",
         }
     }
@@ -137,6 +141,7 @@ mod tests {
         assert_eq!(Page::Watch.label(), "Watch");
         assert_eq!(Page::Login.label(), "Login");
         assert_eq!(Page::Logout.label(), "Logout");
+        assert_eq!(Page::Reset.label(), "Reset");
         assert_eq!(Page::Settings.label(), "Settings");
     }
 
@@ -179,6 +184,7 @@ mod tests {
             Page::Watch,
             Page::Login,
             Page::Logout,
+            Page::Reset,
             Page::Settings,
         ];
 
