@@ -42,19 +42,29 @@ Last updated: 2026-02-15
 
 13. **Zero clippy warnings.** Run `cargo clippy --all-targets` and fix everything.
 
+## Automated Enforcement
+
+14. **Run quality gates before shipping.** Soul Vault enforces architecture and style with repository scripts:
+   - `scripts/lint-architecture.sh` — validates module dependency direction from `docs/ARCHITECTURE.md`
+   - `scripts/lint-file-size.sh` — enforces the ~200-line file-size rule (supports `--limit`)
+   - `scripts/lint-unwrap.sh` — blocks non-test `.unwrap()` and `process::exit` outside `main.rs`
+   - `scripts/lint-all.sh` — runs all custom lints plus `cargo clippy --all-targets -- -D warnings` and `cargo fmt -- --check`
+
+15. **Lint errors must be actionable.** Every failing check should explain exactly what to change and where.
+
 ## Naming & Style
 
-14. **`rustfmt.toml` is law.** Edition 2021, max_width 100. Run `cargo fmt` before committing.
+16. **`rustfmt.toml` is law.** Edition 2021, max_width 100. Run `cargo fmt` before committing.
 
-15. **ASCII slugs for filenames.** Topic and people names are slugified to ASCII (`slugify()` in `vault/write.rs`) — no Unicode in vault filenames.
+17. **ASCII slugs for filenames.** Topic and people names are slugified to ASCII (`slugify()` in `vault/write.rs`) — no Unicode in vault filenames.
 
-16. **Section separators.** Use `// ─── Section Name ───` comments to organize code within files. Keeps large files scannable.
+18. **Section separators.** Use `// ─── Section Name ───` comments to organize code within files. Keeps large files scannable.
 
 ## Dependencies
 
-17. **Minimal dependency surface.** Every crate in `Cargo.toml` earns its place. `reqwest` uses `rustls-tls` (no OpenSSL). Features are explicitly selected.
+19. **Minimal dependency surface.** Every crate in `Cargo.toml` earns its place. `reqwest` uses `rustls-tls` (no OpenSSL). Features are explicitly selected.
 
-18. **Release profile is optimized.** LTO, single codegen unit, stripped — produces a ~4.3 MB binary.
+20. **Release profile is optimized.** LTO, single codegen unit, stripped — produces a ~4.3 MB binary.
 
 ## Inspired By
 

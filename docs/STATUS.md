@@ -26,6 +26,7 @@ Last updated: 2026-02-15
   - `AGENTS.md`/`CLAUDE.md` rewritten as progressive-disclosure TOC docs
   - Added `docs/GOLDEN_PRINCIPLES.md`, `docs/EXECUTION_PLAN_TEMPLATE.md`, `docs/plans/README.md`
   - Added `scripts/lint-docs.sh` doc gardening checks
+- [x] Quality/linting infrastructure is in place (`scripts/lint-architecture.sh`, `scripts/lint-file-size.sh`, `scripts/lint-unwrap.sh`, `scripts/lint-all.sh`)
 
 ## 🔨 In Progress
 
