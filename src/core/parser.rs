@@ -88,9 +88,10 @@ fn extract_json_from_response(text: &str) -> String {
     let trimmed = text.trim();
 
     // Try to extract from ```json ... ``` or ``` ... ```
-    let re = Regex::new(r"```(?:json)?\s*\n?([\s\S]*?)\n?```").unwrap();
-    if let Some(caps) = re.captures(trimmed) {
-        return caps[1].trim().to_string();
+    if let Ok(re) = Regex::new(r"```(?:json)?\s*\n?([\s\S]*?)\n?```") {
+        if let Some(caps) = re.captures(trimmed) {
+            return caps[1].trim().to_string();
+        }
     }
 
     trimmed.to_string()

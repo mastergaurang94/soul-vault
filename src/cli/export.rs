@@ -378,8 +378,11 @@ fn filtered_topics<'a>(
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 fn strip_frontmatter(content: &str) -> String {
-    let re = regex::Regex::new(r"^---[\s\S]*?---\s*\n?").unwrap();
-    re.replace(content, "").trim().to_string()
+    if let Ok(re) = regex::Regex::new(r"^---[\s\S]*?---\s*\n?") {
+        re.replace(content, "").trim().to_string()
+    } else {
+        content.trim().to_string()
+    }
 }
 
 fn count_words(text: &str) -> usize {

@@ -12,7 +12,7 @@ use crate::types::{KeysConfig, SoulVaultConfig, SoulVaultError};
 /// Returns the vault root directory: ~/soul-vault/
 pub fn vault_root() -> PathBuf {
     dirs::home_dir()
-        .expect("Could not determine home directory")
+        .unwrap_or_else(|| PathBuf::from("."))
         .join("soul-vault")
 }
 

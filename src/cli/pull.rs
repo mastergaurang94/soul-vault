@@ -160,13 +160,12 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
     let mut errors = Vec::new();
 
     let progress = ProgressBar::new(all_chunks.len() as u64);
-    progress.set_style(
-        ProgressStyle::with_template(
-            "  {spinner:.yellow} [{bar:20.yellow/dark_gray}] {pos}/{len} {elapsed_precise} {msg}",
-        )
-        .unwrap()
-        .progress_chars("█░░"),
-    );
+    let progress_style = ProgressStyle::with_template(
+        "  {spinner:.yellow} [{bar:20.yellow/dark_gray}] {pos}/{len} {elapsed_precise} {msg}",
+    )
+    .unwrap_or_else(|_| ProgressStyle::default_bar())
+    .progress_chars("█░░");
+    progress.set_style(progress_style);
 
     for (i, chunk) in all_chunks.iter().enumerate() {
         let label = if chunk.total > 1 {
@@ -224,11 +223,24 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
 
     // Phase 6: Update source tracking
     let pb = spinner("Updating source tracking...");
-    update_pull_tracking(&to_import)?;
-    pb.finish_with_message(check("Source tracking updated"));
+    match update_pull_tracking(&to_import) {
+        Ok(()) => pb.finish_with_message(check("Source tracking updated")),
+        Err(e) => {
+            pb.finish_with_message(amber("Source tracking skipped"));
+            eprintln!(
+                "{}",
+                amber(&format!("  ⚠ Could not update pull source tracking: {}", e))
+            );
+        }
+    }
 
     // Phase 7: Update config sync metadata
-    update_pull_config_timestamps(&discovered_providers)?;
+    if let Err(e) = update_pull_config_timestamps(&discovered_providers) {
+        eprintln!(
+            "{}",
+            amber(&format!("  ⚠ Could not update pull sync timestamps: {}", e))
+        );
+    }
 
     // Summary
     print_summary(
@@ -460,11 +472,10 @@ fn print_error_group(title: &str, errors: &[String]) {
 
 fn spinner(msg: &str) -> ProgressBar {
     let pb = ProgressBar::new_spinner();
-    pb.set_style(
-        ProgressStyle::with_template("  {spinner:.yellow} {msg}")
-            .unwrap()
-            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
-    );
+    let style = ProgressStyle::with_template("  {spinner:.yellow} {msg}")
+        .unwrap_or_else(|_| ProgressStyle::default_spinner())
+        .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]);
+    pb.set_style(style);
     pb.set_message(msg.to_string());
     pb.enable_steady_tick(Duration::from_millis(80));
     pb

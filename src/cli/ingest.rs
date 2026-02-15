@@ -77,8 +77,16 @@ pub async fn run(folder_path: &str, force: bool) -> Result<()> {
     // Phase 6: Update source tracking
     let pb = spinner("Updating source tracking...");
     let all_file_paths: Vec<PathBuf> = files.iter().map(|f| f.path.clone()).collect();
-    update_source_tracking(&abs_path, &all_file_paths)?;
-    pb.finish_with_message(check("Source tracking updated"));
+    match update_source_tracking(&abs_path, &all_file_paths) {
+        Ok(()) => pb.finish_with_message(check("Source tracking updated")),
+        Err(e) => {
+            pb.finish_with_message(amber("Source tracking skipped"));
+            eprintln!(
+                "{}",
+                amber(&format!("  ⚠ Could not update source tracking: {}", e))
+            );
+        }
+    }
 
     // Summary
     print_summary(
@@ -116,7 +124,12 @@ pub async fn run_for_files(base_path: &Path, files: &[FileInfo]) -> Result<()> {
 
     // Update source tracking
     let all_file_paths: Vec<PathBuf> = files.iter().map(|f| f.path.clone()).collect();
-    update_source_tracking(base_path, &all_file_paths)?;
+    if let Err(e) = update_source_tracking(base_path, &all_file_paths) {
+        eprintln!(
+            "{}",
+            amber(&format!("  ⚠ Could not update source tracking: {}", e))
+        );
+    }
 
     Ok(())
 }
@@ -138,6 +151,7 @@ fn scan_files(abs_path: &Path) -> Result<Vec<FileInfo>> {
         bold_white(&files.len().to_string()),
         format_bytes(total_size)
     )));
+    println!("  Found {} files", files.len());
 
     // File type breakdown
     let mut counts = std::collections::HashMap::new();
@@ -270,13 +284,12 @@ async fn process_all_chunks(
     let mut errors = Vec::new();
 
     let pb = ProgressBar::new(all_chunks.len() as u64);
-    pb.set_style(
-        ProgressStyle::with_template(
-            "  {spinner:.yellow} [{bar:20.yellow/dark_gray}] {pos}/{len} {msg}",
-        )
-        .unwrap()
-        .progress_chars("█░░"),
-    );
+    let style = ProgressStyle::with_template(
+        "  {spinner:.yellow} [{bar:20.yellow/dark_gray}] {pos}/{len} {msg}",
+    )
+    .unwrap_or_else(|_| ProgressStyle::default_bar())
+    .progress_chars("█░░");
+    pb.set_style(style);
 
     for (i, chunk) in all_chunks.iter().enumerate() {
         let label = if chunk.total > 1 {
@@ -398,11 +411,10 @@ fn print_summary(
 
 fn spinner(msg: &str) -> ProgressBar {
     let pb = ProgressBar::new_spinner();
-    pb.set_style(
-        ProgressStyle::with_template("  {spinner:.yellow} {msg}")
-            .unwrap()
-            .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
-    );
+    let style = ProgressStyle::with_template("  {spinner:.yellow} {msg}")
+        .unwrap_or_else(|_| ProgressStyle::default_spinner())
+        .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]);
+    pb.set_style(style);
     pb.set_message(msg.to_string());
     pb.enable_steady_tick(Duration::from_millis(80));
     pb
