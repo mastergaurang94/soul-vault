@@ -27,6 +27,11 @@ Last updated: 2026-02-15
   - Added `docs/GOLDEN_PRINCIPLES.md`, `docs/EXECUTION_PLAN_TEMPLATE.md`, `docs/plans/README.md`
   - Added `scripts/lint-docs.sh` doc gardening checks
 - [x] Quality/linting infrastructure is in place (`scripts/lint-architecture.sh`, `scripts/lint-file-size.sh`, `scripts/lint-unwrap.sh`, `scripts/lint-all.sh`)
+- [x] Video tooling for agent development is available:
+  - `scripts/record-tui.sh` for replayable terminal recordings
+  - `scripts/screenshot-tui.sh` for single-frame pane captures
+  - `scripts/extract-frames.sh` for interval JPG extraction from video
+  - `scripts/analyze-tui.sh` for time-series TUI snapshot analysis
 
 ## 🔨 In Progress
 
