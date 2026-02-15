@@ -14,6 +14,7 @@ Point it at any folder of transcripts, notes, or exports → it extracts structu
 3. **`docs/DESIGN_PRINCIPLES.md`** — Coding standards
 4. **`docs/CHANGELOG.md`** — What was built and when
 5. **`docs/COORDINATION.md`** — Multi-agent handoff protocol
+6. **`docs/VIDEO_TOOLING.md`** — TUI recording, snapshots, and frame-analysis workflow
 
 ## Workflow
 

@@ -22,6 +22,11 @@ Last updated: 2026-02-15
   - `soul reset --force` for non-interactive use
 - [x] Source tracking + dedup is active via `sources.json`
 - [x] Distribution scaffolding is in place (`install.sh`, CI/release workflows, Homebrew formula scaffold)
+- [x] Video tooling for agent development is available:
+  - `scripts/record-tui.sh` for replayable terminal recordings
+  - `scripts/screenshot-tui.sh` for single-frame pane captures
+  - `scripts/extract-frames.sh` for interval JPG extraction from video
+  - `scripts/analyze-tui.sh` for time-series TUI snapshot analysis
 
 ## 🔨 In Progress
 

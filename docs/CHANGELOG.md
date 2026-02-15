@@ -5,6 +5,31 @@ Agents: append entries here after completing work.
 
 ---
 
+## 2026-02-15 — Video Tooling for Agent Development Workflow
+
+### New script tooling
+- Added `scripts/record-tui.sh`:
+  - Launches command in detached `tmux`
+  - Records session output via `script` with timing metadata
+  - Supports `--duration`, `--out`, `--command`
+- Added `scripts/screenshot-tui.sh`:
+  - Launches command in `tmux`, waits for render, captures pane output
+  - Supports `--wait`, `--out`, `--format text|ansi`, `--command`
+- Added `scripts/extract-frames.sh`:
+  - Extracts numbered JPG frames from videos using `ffmpeg`
+  - Supports `--input`, `--interval`, `--out-dir`
+- Added `scripts/analyze-tui.sh`:
+  - Runs command in `tmux` and captures a time-series of pane snapshots
+  - Supports `--command`, `--captures`, `--interval`, `--keys`, `--out-dir`
+
+### Documentation updates
+- Added `docs/VIDEO_TOOLING.md` with usage guidance, workflows, and output interpretation
+- Updated `AGENTS.md` orientation to link `docs/VIDEO_TOOLING.md`
+
+### Validation
+- Verified all new scripts respond to `--help`
+- Attempted runtime `tmux` snapshot validation (`scripts/screenshot-tui.sh --command ls`) but current sandbox disallows socket creation; requires host-level run for end-to-end capture validation
+
 ## 2026-02-15 — Documentation Sync for Current Codebase State
 
 ### Docs refreshed against implementation
