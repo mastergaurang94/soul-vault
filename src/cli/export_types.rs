@@ -90,7 +90,9 @@ pub(crate) fn include(sections: &[ExportSection], section: ExportSection) -> boo
 
 pub(crate) fn default_output_path(format: ExportFormat) -> PathBuf {
     let date = chrono::Utc::now().format("%Y-%m-%d").to_string();
-    let base = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    let home = dirs::home_dir().unwrap_or_else(|| PathBuf::from("."));
+    let downloads = home.join("Downloads");
+    let base = if downloads.is_dir() { downloads } else { home };
     match format {
         ExportFormat::Context => base.join(format!("soul-vault-export-{date}.md")),
         ExportFormat::Json => base.join(format!("soul-vault-export-{date}.json")),
