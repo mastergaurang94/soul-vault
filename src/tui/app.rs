@@ -12,6 +12,8 @@ pub enum Page {
     Browse,
     Export,
     Watch,
+    Login,
+    Logout,
     Settings,
 }
 
@@ -23,6 +25,8 @@ impl Page {
         Page::Browse,
         Page::Export,
         Page::Watch,
+        Page::Login,
+        Page::Logout,
         Page::Settings,
     ];
 
@@ -34,6 +38,8 @@ impl Page {
             Page::Browse => "Browse",
             Page::Export => "Export",
             Page::Watch => "Watch",
+            Page::Login => "Login",
+            Page::Logout => "Logout",
             Page::Settings => "Settings",
         }
     }
@@ -46,6 +52,8 @@ impl Page {
             Page::Browse => ">",
             Page::Export => "^",
             Page::Watch => "@",
+            Page::Login => ">",
+            Page::Logout => "<",
             Page::Settings => "~",
         }
     }

@@ -119,8 +119,13 @@ fn render_ready(area: Rect, buf: &mut Buffer) {
     let lines = vec![
         Line::from(""),
         Line::from(Span::styled(
-            "  Pull AI sessions from all providers",
+            "  Pull — Auto-import from AI apps",
             Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  Automatically discovers and imports sessions from local AI applications.",
+            Style::default(),
         )),
         Line::from(""),
         Line::from(Span::styled("  Discovers sessions from:", Style::default())),

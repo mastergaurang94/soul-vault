@@ -32,6 +32,16 @@ pub fn render_input(area: Rect, buf: &mut Buffer, input: &str) {
     let lines = vec![
         Line::from(""),
         Line::from(Span::styled(
+            "  Import — Manual file & folder import",
+            Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  Import transcript files, ChatGPT exports, or any text files into your vault.",
+            Style::default(),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
             "  Enter folder path to import:",
             Style::default().add_modifier(Modifier::BOLD),
         )),

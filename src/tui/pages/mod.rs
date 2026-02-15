@@ -4,6 +4,8 @@ pub mod browse;
 pub mod export;
 pub mod import;
 pub mod import_render;
+pub mod login;
+pub mod logout;
 pub mod pull;
 pub mod settings;
 pub mod status;

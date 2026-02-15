@@ -4,6 +4,14 @@ Last updated: 2026-02-15
 
 ## ✅ Completed
 
+- [x] TUI login/logout pages + Pull/Import clarity pass (2026-02-15):
+  - Added two new full-screen TUI pages: Login and Logout (`src/tui/pages/login.rs`, `src/tui/pages/logout.rs`)
+  - Sidebar now has 9 pages total: Status, Pull, Import, Browse, Export, Watch, Login, Logout, Settings
+  - Updated TUI page shortcuts from `1-7` to `1-9`
+  - Login page shows Claude auth status via `auth::is_logged_in()` and "coming soon" markers for ChatGPT/Gemini
+  - Logout page checks Claude session state via `auth::is_logged_in()` and clears saved Claude credentials
+  - Clarified Pull page copy to position Pull as automatic app discovery/import
+  - Clarified Import page copy to position Import as manual file/folder import
 - [x] Pull/status bug fixes (2026-02-15):
   - Added local `soul pull` preflight API key validation before session discovery (`claude` key check)
   - Added post-pull config updates: `last_sync` and provider-level `last_pull` timestamps

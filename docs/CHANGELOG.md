@@ -5,6 +5,39 @@ Agents: append entries here after completing work.
 
 ---
 
+## 2026-02-15 — TUI Login/Logout Pages + Copy Clarity
+
+### New TUI pages
+- Added `src/tui/pages/login.rs` and `src/tui/pages/logout.rs`
+- Extended `Page` enum and page wiring to include `Login` and `Logout`
+- Sidebar now includes 9 pages in this order:
+  - Status, Pull, Import, Browse, Export, Watch, Login, Logout, Settings
+- Updated sidebar number shortcuts in `src/tui/mod.rs` from `1-7` to `1-9`
+
+### Login page behavior
+- Added "Login — Cloud Provider OAuth" page with:
+  - Claude login state from `auth::is_logged_in(&Provider::Claude)`
+  - ChatGPT/Gemini "coming soon" status rows
+  - Enter action message: "Starting OAuth login... Check your browser."
+- This page is intentionally UI-only for now (actual OAuth flow remains in `soul login`)
+
+### Logout page behavior
+- Added "Logout — Clear Credentials" page with session-aware messaging:
+  - Logged in: prompt to press Enter to logout Claude
+  - Not logged in: "No active sessions."
+- Enter on logged-in state now clears Claude credentials via `auth::remove_credentials`
+- Shows completion message: "Credentials cleared."
+
+### Pull vs Import clarity improvements
+- Pull page ready-state title changed to:
+  - `Pull — Auto-import from AI apps`
+- Added pull description:
+  - `Automatically discovers and imports sessions from local AI applications.`
+- Import page input-state title changed to:
+  - `Import — Manual file & folder import`
+- Added import description:
+  - `Import transcript files, ChatGPT exports, or any text files into your vault.`
+
 ## 2026-02-15 — Pull/Status Bug Fixes
 
 ### `soul pull` preflight API key check

@@ -163,7 +163,7 @@ fn handle_key(
             app.toggle_focus();
             return;
         }
-        KeyCode::Char(c @ '1'..='7') if app.focus == Focus::Sidebar => {
+        KeyCode::Char(c @ '1'..='9') if app.focus == Focus::Sidebar => {
             let idx = (c as usize) - ('1' as usize);
             app.select_page(idx);
             app.focus = Focus::Content;
