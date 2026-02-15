@@ -20,7 +20,7 @@ pub fn render_not_init(area: Rect, buf: &mut Buffer) {
         Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(rat::AMBER))
-            .title(" Watch "),
+            .title(" Watch — Live "),
     )
     .render(area, buf);
 }

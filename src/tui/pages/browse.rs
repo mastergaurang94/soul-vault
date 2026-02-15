@@ -171,7 +171,7 @@ fn render_empty(area: Rect, buf: &mut Buffer, initialized: bool) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(rat::GOLD))
-                .title(" Browse "),
+                .title(" Browse — Vault "),
         )
         .render(area, buf);
 }

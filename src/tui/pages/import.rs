@@ -88,7 +88,7 @@ impl PageWidget for ImportPage {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(rat::GOLD))
-            .title(" Import ")
+            .title(" Import — Manual ")
             .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD));
         let inner = block.inner(area);
         block.render(area, buf);

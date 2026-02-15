@@ -25,7 +25,7 @@ impl PageWidget for LoginPage {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(rat::GOLD))
-            .title(" Login ")
+            .title(" Login — OAuth ")
             .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD));
         let inner = block.inner(area);
         block.render(area, buf);
@@ -48,7 +48,12 @@ impl PageWidget for LoginPage {
     fn handle_key(&mut self, key: KeyEvent, _app: &mut App) -> PageAction {
         match key.code {
             KeyCode::Enter => {
-                self.message = Some("Starting OAuth login... Check your browser.".to_string());
+                let logged_in = is_logged_in(&Provider::Claude).unwrap_or(false);
+                self.message = Some(if logged_in {
+                    "Claude is already logged in.".to_string()
+                } else {
+                    "Starting OAuth login... Check your browser.".to_string()
+                });
                 PageAction::Consumed
             }
             KeyCode::Esc => {

@@ -156,6 +156,19 @@ impl PageWidget for ExportPage {
 }
 
 impl ExportPage {
+    fn selected_sections_count(&self) -> usize {
+        [
+            self.include_identity,
+            self.include_preferences,
+            self.include_topics,
+            self.include_people,
+            self.include_memories,
+        ]
+        .iter()
+        .filter(|enabled| **enabled)
+        .count()
+    }
+
     fn select_active(&mut self) {
         match self.active_field {
             ExportField::Format => self.format = self.format.next(),
@@ -168,13 +181,49 @@ impl ExportPage {
 
     fn toggle_active_section(&mut self) -> bool {
         match self.active_field {
-            ExportField::Identity => self.include_identity = !self.include_identity,
-            ExportField::Preferences => self.include_preferences = !self.include_preferences,
-            ExportField::Topics => self.include_topics = !self.include_topics,
-            ExportField::People => self.include_people = !self.include_people,
-            ExportField::Memories => self.include_memories = !self.include_memories,
+            ExportField::Identity => {
+                if self.include_identity && self.selected_sections_count() == 1 {
+                    self.result_msg =
+                        Some((false, "Select at least one section to export.".to_string()));
+                    return true;
+                }
+                self.include_identity = !self.include_identity;
+            }
+            ExportField::Preferences => {
+                if self.include_preferences && self.selected_sections_count() == 1 {
+                    self.result_msg =
+                        Some((false, "Select at least one section to export.".to_string()));
+                    return true;
+                }
+                self.include_preferences = !self.include_preferences;
+            }
+            ExportField::Topics => {
+                if self.include_topics && self.selected_sections_count() == 1 {
+                    self.result_msg =
+                        Some((false, "Select at least one section to export.".to_string()));
+                    return true;
+                }
+                self.include_topics = !self.include_topics;
+            }
+            ExportField::People => {
+                if self.include_people && self.selected_sections_count() == 1 {
+                    self.result_msg =
+                        Some((false, "Select at least one section to export.".to_string()));
+                    return true;
+                }
+                self.include_people = !self.include_people;
+            }
+            ExportField::Memories => {
+                if self.include_memories && self.selected_sections_count() == 1 {
+                    self.result_msg =
+                        Some((false, "Select at least one section to export.".to_string()));
+                    return true;
+                }
+                self.include_memories = !self.include_memories;
+            }
             _ => return false,
         }
+        self.result_msg = None;
         true
     }
 
@@ -264,7 +313,7 @@ fn render_not_init(area: Rect, buf: &mut Buffer) {
         Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(rat::AMBER))
-            .title(" Export "),
+            .title(" Export — Context "),
     )
     .render(area, buf);
 }
@@ -273,7 +322,7 @@ fn render_form(area: Rect, buf: &mut Buffer, page: &ExportPage) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(rat::GOLD))
-        .title(" Export ")
+        .title(" Export — Context ")
         .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD));
     let inner = block.inner(area);
     block.render(area, buf);
@@ -427,6 +476,22 @@ mod tests {
         page.active_field = ExportField::Identity;
         page.handle_key(key(KeyCode::Char(' ')), &mut app);
         assert!(!page.include_identity);
+    }
+
+    #[test]
+    fn tui_prevents_disabling_last_section() {
+        let mut page = ExportPage::default();
+        let mut app = App::new();
+
+        page.include_identity = true;
+        page.include_preferences = false;
+        page.include_topics = false;
+        page.include_people = false;
+        page.include_memories = false;
+        page.active_field = ExportField::Identity;
+
+        page.handle_key(key(KeyCode::Char(' ')), &mut app);
+        assert!(page.include_identity);
     }
 
     #[test]

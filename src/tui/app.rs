@@ -135,8 +135,14 @@ mod tests {
     #[test]
     fn test_page_labels() {
         assert_eq!(Page::Status.label(), "Status");
+        assert_eq!(Page::Pull.label(), "Pull");
         assert_eq!(Page::Import.label(), "Import");
         assert_eq!(Page::Browse.label(), "Browse");
+        assert_eq!(Page::Export.label(), "Export");
+        assert_eq!(Page::Watch.label(), "Watch");
+        assert_eq!(Page::Login.label(), "Login");
+        assert_eq!(Page::Logout.label(), "Logout");
+        assert_eq!(Page::Settings.label(), "Settings");
     }
 
     #[test]
@@ -165,6 +171,27 @@ mod tests {
         app.confirm_sidebar();
         assert_eq!(app.current_page, Page::Browse);
         assert_eq!(app.focus, Focus::Content);
+    }
+
+    #[test]
+    fn test_all_pages_reachable_by_index() {
+        let mut app = App::new();
+        let expected = [
+            Page::Status,
+            Page::Pull,
+            Page::Import,
+            Page::Browse,
+            Page::Export,
+            Page::Watch,
+            Page::Login,
+            Page::Logout,
+            Page::Settings,
+        ];
+
+        for (i, page) in expected.into_iter().enumerate() {
+            app.select_page(i);
+            assert_eq!(app.current_page, page);
+        }
     }
 
     #[test]

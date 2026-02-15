@@ -66,7 +66,7 @@ fn render_not_init(area: Rect, buf: &mut Buffer) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(rat::AMBER))
-                .title(" Settings "),
+                .title(" Settings — Config "),
         )
         .render(area, buf);
 }
@@ -138,7 +138,7 @@ fn render_settings(area: Rect, buf: &mut Buffer, scroll: u16) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(rat::GOLD))
-        .title(" Settings ")
+        .title(" Settings — Config ")
         .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD));
 
     Paragraph::new(visible).block(block).render(area, buf);

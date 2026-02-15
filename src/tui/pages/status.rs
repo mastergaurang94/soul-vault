@@ -74,7 +74,7 @@ fn render_not_initialized(area: Rect, buf: &mut Buffer) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(Style::default().fg(rat::AMBER))
-                .title(" Status ")
+                .title(" Status — Overview ")
                 .title_style(Style::default().fg(rat::AMBER)),
         )
         .render(area, buf);
@@ -192,7 +192,7 @@ fn render_dashboard(area: Rect, buf: &mut Buffer, scroll: u16) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(rat::GOLD))
-        .title(" Status ")
+        .title(" Status — Overview ")
         .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD));
 
     Paragraph::new(visible).block(block).render(area, buf);

@@ -25,7 +25,7 @@ impl PageWidget for LogoutPage {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(rat::GOLD))
-            .title(" Logout ")
+            .title(" Logout — Credentials ")
             .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD));
         let inner = block.inner(area);
         block.render(area, buf);
@@ -60,7 +60,10 @@ impl PageWidget for LogoutPage {
                 self.message = None;
                 PageAction::BackToSidebar
             }
-            KeyCode::Enter => PageAction::Consumed,
+            KeyCode::Enter => {
+                self.message = Some("No active Claude credentials to clear.".to_string());
+                PageAction::Consumed
+            }
             _ => PageAction::Ignored,
         }
     }

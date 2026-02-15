@@ -23,7 +23,7 @@ pub fn render_not_init(area: Rect, buf: &mut Buffer) {
         Block::default()
             .borders(Borders::ALL)
             .border_style(Style::default().fg(rat::AMBER))
-            .title(" Import "),
+            .title(" Import — Manual "),
     )
     .render(area, buf);
 }

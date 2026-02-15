@@ -51,7 +51,7 @@ impl Widget for Sidebar<'_> {
                 width: inner.width,
                 height: 1,
             };
-            render_item(item_area, buf, page, i == self.app.sidebar_selected);
+            render_item(item_area, buf, i + 1, page, i == self.app.sidebar_selected);
         }
 
         // Footer hint at bottom of sidebar
@@ -71,7 +71,7 @@ impl Widget for Sidebar<'_> {
 
 // ─── Item Rendering ───────────────────────────────────────────────────────────
 
-fn render_item(area: Rect, buf: &mut Buffer, page: Page, selected: bool) {
+fn render_item(area: Rect, buf: &mut Buffer, index: usize, page: Page, selected: bool) {
     let (prefix, style) = if selected {
         (
             " > ",
@@ -83,6 +83,8 @@ fn render_item(area: Rect, buf: &mut Buffer, page: Page, selected: bool) {
 
     let line = Line::from(vec![
         Span::styled(prefix, style),
+        Span::styled(format!("{index}"), style),
+        Span::styled(" ", style),
         Span::styled(page.icon(), style),
         Span::styled(" ", style),
         Span::styled(page.label(), style),
