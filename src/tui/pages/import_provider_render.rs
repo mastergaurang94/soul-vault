@@ -55,6 +55,34 @@ pub fn render_running(area: Rect, buf: &mut Buffer, progress: &[String]) {
     Paragraph::new(lines).render(area, buf);
 }
 
+pub fn render_processing(area: Rect, buf: &mut Buffer, current: usize, total: usize) {
+    let pct = if total > 0 { (current * 100) / total } else { 0 };
+    let bar_w = 20;
+    let filled = if total > 0 {
+        (current * bar_w) / total
+    } else {
+        0
+    };
+    let bar = format!("{}{}", "█".repeat(filled), "░".repeat(bar_w - filled));
+
+    let lines = vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "  Processing through Claude...",
+            Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(vec![
+            Span::styled(format!("  {bar}"), Style::default().fg(rat::GOLD)),
+            Span::styled(
+                format!(" {current}/{total} ({pct}%)"),
+                Style::default().fg(rat::DIM),
+            ),
+        ]),
+    ];
+    Paragraph::new(lines).render(area, buf);
+}
+
 pub fn render_done(area: Rect, buf: &mut Buffer, summary: &[String]) {
     let mut lines = vec![
         Line::from(""),

@@ -61,6 +61,12 @@ pub(super) fn drain_provider_import_progress(import: &mut ImportPage, channels: 
                 import.on_provider_error(error_str.to_string());
                 channels.pull_rx = None;
                 return;
+            } else if let Some(progress_str) = msg.strip_prefix("PROGRESS:") {
+                if let Some((cur, tot)) = progress_str.split_once('/') {
+                    let current = cur.parse().unwrap_or(0);
+                    let total = tot.parse().unwrap_or(0);
+                    import.on_provider_processing(current, total);
+                }
             } else {
                 import.on_provider_progress(msg);
             }
@@ -122,6 +128,51 @@ pub(super) fn start_provider_import(import_page: &mut ImportPage, channels: &mut
             return;
         }
 
+        // Validate API key upfront
+        let api_key = crate::vault::config::get_api_key("claude")
+            .ok()
+            .flatten()
+            .unwrap_or_default();
+        if api_key.trim().is_empty() {
+            let _ = tx
+                .send("ERROR:No API key configured. Run `soul init` to set up your Claude API key.".to_string())
+                .await;
+            return;
+        }
+
+        // Quick validation: try a minimal API call
+        let client = reqwest::Client::new();
+        let check = client
+            .post("https://api.anthropic.com/v1/messages")
+            .header("x-api-key", &api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .json(&serde_json::json!({
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 1,
+                "messages": [{"role": "user", "content": "hi"}]
+            }))
+            .send()
+            .await;
+
+        match check {
+            Ok(resp) if resp.status() == reqwest::StatusCode::UNAUTHORIZED => {
+                let _ = tx
+                    .send("ERROR:API key is invalid or expired. Run `soul init` to reconfigure.".to_string())
+                    .await;
+                return;
+            }
+            Err(e) => {
+                let _ = tx
+                    .send(format!("ERROR:Cannot reach Anthropic API: {e}"))
+                    .await;
+                return;
+            }
+            _ => {}
+        }
+
+        let _ = tx.send("API key verified ✓".to_string()).await;
+
         let all_sessions: Vec<_> = discovered.into_iter().flat_map(|(_, s)| s).collect();
         let mut all_chunks = Vec::new();
         for session in &all_sessions {
@@ -145,15 +196,26 @@ pub(super) fn start_provider_import(import_page: &mut ImportPage, channels: &mut
             return;
         }
 
-        let client = reqwest::Client::new();
         let mut all_memories = Vec::new();
+        let mut errors = 0usize;
         let chunk_count = all_chunks.len();
         for (i, chunk) in all_chunks.iter().enumerate() {
             let _ = tx
-                .send(format!("Processing {}/{}", i + 1, chunk_count))
+                .send(format!("PROGRESS:{}/{}", i + 1, chunk_count))
                 .await;
-            if let Ok(memories) = process_chunk(&client, chunk).await {
-                all_memories.push(memories);
+            match process_chunk(&client, chunk).await {
+                Ok(memories) => all_memories.push(memories),
+                Err(e) => {
+                    errors += 1;
+                    let msg = e.to_string();
+                    if msg.contains("API key") || msg.contains("401") {
+                        let _ = tx
+                            .send("ERROR:API key rejected during processing. Run `soul init`.".to_string())
+                            .await;
+                        return;
+                    }
+                    let _ = tx.send(format!("Warning: {}", msg)).await;
+                }
             }
         }
 
@@ -161,13 +223,16 @@ pub(super) fn start_provider_import(import_page: &mut ImportPage, channels: &mut
         let today = chrono::Utc::now().format("%Y-%m-%d").to_string();
         match write_memories_to_vault(&merged, &today) {
             Ok(result) => {
-                let summary = format!(
+                let mut summary = format!(
                     "DONE:{} sessions processed\n{} memories extracted\n{} topics\n{} people",
                     all_sessions.len(),
                     merged.fact_count(),
                     result.topics_written.len(),
                     result.people_written.len()
                 );
+                if errors > 0 {
+                    summary.push_str(&format!("\n{} chunks had errors", errors));
+                }
                 let _ = tx.send(summary).await;
             }
             Err(e) => {

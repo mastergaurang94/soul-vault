@@ -25,6 +25,7 @@ pub enum ImportMode {
 pub enum ProviderPhase {
     Ready,
     Running { progress: Vec<String> },
+    Processing { current: usize, total: usize },
     Done { summary: Vec<String> },
     Error(String),
 }
@@ -95,22 +96,18 @@ impl ImportPage {
     pub fn on_provider_progress(&mut self, msg: String) {
         match &mut self.provider_phase {
             ProviderPhase::Running { progress } => progress.push(msg),
-            _ => {
-                self.provider_phase = ProviderPhase::Running {
-                    progress: vec![msg],
-                }
-            }
+            _ => self.provider_phase = ProviderPhase::Running { progress: vec![msg] },
         }
     }
-
+    pub fn on_provider_processing(&mut self, current: usize, total: usize) {
+        self.provider_phase = ProviderPhase::Processing { current, total };
+    }
     pub fn on_provider_done(&mut self, summary: Vec<String>) {
         self.provider_phase = ProviderPhase::Done { summary };
     }
-
     pub fn on_provider_error(&mut self, msg: String) {
         self.provider_phase = ProviderPhase::Error(msg);
     }
-
     fn switch_mode(&mut self) {
         self.mode = match self.mode {
             ImportMode::Providers => ImportMode::Folder,
@@ -144,6 +141,9 @@ impl PageWidget for ImportPage {
                 ProviderPhase::Ready => import_provider_render::render_ready(inner, buf),
                 ProviderPhase::Running { progress } => {
                     import_provider_render::render_running(inner, buf, progress)
+                }
+                ProviderPhase::Processing { current, total } => {
+                    import_provider_render::render_processing(inner, buf, *current, *total)
                 }
                 ProviderPhase::Done { summary } => {
                     import_provider_render::render_done(inner, buf, summary)
@@ -200,7 +200,7 @@ fn handle_provider_key(key: KeyEvent, phase: &mut ProviderPhase) -> PageAction {
             KeyCode::Esc => PageAction::BackToSidebar,
             _ => PageAction::Ignored,
         },
-        ProviderPhase::Running { .. } => PageAction::Ignored,
+        ProviderPhase::Running { .. } | ProviderPhase::Processing { .. } => PageAction::Ignored,
         ProviderPhase::Done { .. } | ProviderPhase::Error(_) => match key.code {
             KeyCode::Enter | KeyCode::Char('r') => {
                 *phase = ProviderPhase::Ready;
