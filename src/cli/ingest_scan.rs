@@ -20,21 +20,24 @@ pub(crate) fn scan_files(abs_path: &Path) -> Result<Vec<FileInfo>> {
     }
 
     let total_size: u64 = files.iter().map(|f| f.size).sum();
-    pb.finish_with_message(check(&format!(
-        "Found {} files ({})",
-        bold_white(&files.len().to_string()),
-        format_bytes(total_size)
-    )));
-    println!("  Found {} files", files.len());
 
     let mut counts = std::collections::HashMap::new();
     for f in &files {
         *counts.entry(f.extension.clone()).or_insert(0usize) += 1;
     }
-    for (ext, count) in &counts {
-        println!("{}", dim(&format!("      {}: {} files", ext, count)));
-    }
-    println!();
+    let mut breakdown: Vec<String> = counts
+        .iter()
+        .map(|(ext, count)| format!("{count} {ext}"))
+        .collect();
+    breakdown.sort();
+    let detail = breakdown.join(", ");
+
+    pb.finish_with_message(check(&format!(
+        "Found {} files ({}) — {}",
+        bold_white(&files.len().to_string()),
+        format_bytes(total_size),
+        dim(&detail),
+    )));
 
     Ok(files)
 }
@@ -87,47 +90,45 @@ pub(crate) fn classify_and_filter(
 }
 
 pub(crate) fn read_and_chunk(files: &[FileInfo]) -> Result<Vec<ChunkInfo>> {
-    let pb = spinner("Reading and chunking files...");
+    use indicatif::{ProgressBar, ProgressStyle};
+
+    let pb = ProgressBar::new(files.len() as u64);
+    let style = ProgressStyle::with_template(
+        "  {spinner:.yellow} [{bar:20.yellow/dark_gray}] {pos}/{len} Reading files…",
+    )
+    .unwrap_or_else(|_| ProgressStyle::default_bar())
+    .progress_chars("█░░");
+    pb.set_style(style);
+
     let mut all_chunks = Vec::new();
     let mut read_errors = Vec::new();
 
-    for file in files {
+    for (i, file) in files.iter().enumerate() {
         match extract_file_content(file) {
             Ok(content) => {
                 if content.trim().is_empty() {
                     read_errors.push(format!("{}: empty file, skipped", file.path.display()));
-                    continue;
+                } else {
+                    all_chunks.extend(chunk_text(&content, &file.name));
                 }
-                all_chunks.extend(chunk_text(&content, &file.name));
             }
             Err(e) => {
                 read_errors.push(format!("{}: {}", file.path.display(), e));
             }
         }
+        pb.set_position((i + 1) as u64);
     }
 
-    pb.finish_with_message(check(&format!(
+    let mut msg = check(&format!(
         "Prepared {} chunks from {} files",
         bold_white(&all_chunks.len().to_string()),
         files.len()
-    )));
-
+    ));
     if !read_errors.is_empty() {
-        println!(
-            "{}",
-            amber(&format!("\n    ⚠ {} files had issues:", read_errors.len()))
-        );
-        for err in read_errors.iter().take(5) {
-            println!("{}", dim(&format!("      {}", err)));
-        }
-        if read_errors.len() > 5 {
-            println!(
-                "{}",
-                dim(&format!("      ... and {} more", read_errors.len() - 5))
-            );
-        }
-        println!();
+        msg.push_str(&format!(" ({})", amber(&format!("{} skipped", read_errors.len()))));
     }
+    pb.finish_and_clear();
+    println!("{msg}");
 
     if all_chunks.is_empty() {
         eprintln!("{}", cross("No content to process."));
