@@ -5,6 +5,32 @@ Agents: append entries here after completing work.
 
 ---
 
+## 2026-02-15 — Export CLI/TUI Refactor
+
+### CLI export formats and sections
+- `soul export` now supports `--format context|json|bundle` with `context` as default
+- Added `--sections` flag (`identity,preferences,topics,people,memories`) to control included export sections
+- Kept `--topic` support for topic-filtered context output
+- Added smart default export paths for file outputs:
+  - context: `~/soul-vault-export-YYYY-MM-DD.md`
+  - json: `~/soul-vault-export-YYYY-MM-DD.json`
+  - bundle: `~/soul-vault-export-YYYY-MM-DD/`
+- Added `bundle` mode that creates a directory containing raw vault markdown files for backup/migration (no new dependencies)
+
+### TUI Export page redesign
+- Removed raw text inputs for topic filter and output path
+- Added section checkbox toggles for Identity, Preferences, Topics, People, Memories
+- Kept Enter-to-cycle format selector and j/k navigation
+- Added smart output-path preview by format and selected-word-count preview
+- Export action now writes to a file path every time and reports the destination
+
+### Tests
+- Added section-filtered context export test coverage in `src/cli/export.rs`
+- Added bundle directory creation tests in `src/cli/export.rs`
+- Added TUI export navigation + section toggle tests in `src/tui/pages/export.rs`
+- Added smart default path generation tests in `src/tui/pages/export.rs`
+- Updated CLI UX export invalid-format regression test to match new validation behavior
+
 ## 2026-02-15 — Pull Output Polish
 
 ### `soul pull` UX tightening

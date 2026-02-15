@@ -4,6 +4,18 @@ Last updated: 2026-02-15
 
 ## ✅ Completed
 
+- [x] Export refactor: CLI + TUI redesign (2026-02-15):
+  - `soul export` now supports `--format context|json|bundle` (default: `context`)
+  - Added `--sections identity,preferences,topics,people,memories` (default all)
+  - Added bundle export mode that creates a portable directory copy of vault markdown files
+  - Added smart default export paths by format (`.md`, `.json`, or bundle folder)
+  - Redesigned TUI Export page:
+    - Removed topic/output text inputs
+    - Added section checkboxes with Enter/Space toggle
+    - Kept Enter-to-cycle format selector
+    - Added output-path preview + selected-word-count preview
+    - Export now always writes to file and shows destination
+  - Added regression tests for section-filtered context export, bundle creation, TUI navigation, and smart default paths
 - [x] `soul pull` CLI output polish (2026-02-15):
   - Reduced vertical noise across pull phases by tightening spacing and transition lines
   - Kept provider-by-provider discovery output intact

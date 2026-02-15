@@ -165,7 +165,7 @@ pub fn run() -> Result<()> {
                 }
             }
             Action::Export => {
-                crate::cli::export::run(None, "markdown", None)?;
+                crate::cli::export::run(None, "context", None, None)?;
             }
             Action::Status => {
                 crate::cli::status::run()?;

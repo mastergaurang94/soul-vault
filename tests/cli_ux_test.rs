@@ -794,14 +794,13 @@ fn import_folder_skips_hidden_dirs() {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 #[test]
-fn export_invalid_format_falls_through_to_markdown() {
-    // BUG/UX ISSUE: --format bogus silently defaults to markdown
-    // instead of showing an error. Documenting current behavior.
+fn export_invalid_format_shows_helpful_error() {
     soul()
         .args(["export", "--format", "bogus"])
         .assert()
-        .success()
-        .stdout(predicate::str::contains("# Soul Vault Memory"));
+        .failure()
+        .stderr(predicate::str::contains("Unsupported export format"))
+        .stderr(predicate::str::contains("context, json, bundle"));
 }
 
 #[test]

@@ -65,13 +65,17 @@ enum Commands {
         #[arg(short, long)]
         output: Option<String>,
 
-        /// Output format: markdown (default) or json
-        #[arg(short, long, default_value = "markdown")]
+        /// Output format: context (default), json, or bundle
+        #[arg(short, long, default_value = "context")]
         format: String,
 
         /// Filter by topic
         #[arg(short, long)]
         topic: Option<String>,
+
+        /// Sections to include: identity,preferences,topics,people,memories
+        #[arg(long)]
+        sections: Option<String>,
     },
 
     /// Show vault summary and imported sources
@@ -150,7 +154,13 @@ async fn main() {
             output,
             format,
             topic,
-        }) => cli::export::run(output.as_deref(), &format, topic.as_deref()),
+            sections,
+        }) => cli::export::run(
+            output.as_deref(),
+            &format,
+            topic.as_deref(),
+            sections.as_deref(),
+        ),
         Some(Commands::Status) => cli::status::run(),
         Some(Commands::Reset { force }) => cli::reset::run(force),
     };
