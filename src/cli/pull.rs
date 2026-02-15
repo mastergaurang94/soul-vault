@@ -27,7 +27,7 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
     println!("{}", banner());
     assert_initialized()?;
 
-    println!("  {} {}\n", ICON_BRAIN, gold("Discovering AI sessions..."));
+    println!("  {} {}", ICON_BRAIN, gold("Discovering AI sessions..."));
     println!("{}", line());
 
     // Phase 1: Discover
@@ -49,10 +49,8 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
             println!("  {} {}: {}", dim(ICON_DOT), name, dim("no sessions found"));
         }
     }
-    println!();
-
     if total_sessions == 0 {
-        println!("{}", dim("  No AI sessions found on this machine.\n"));
+        println!("{}", dim("  No AI sessions found on this machine."));
         println!(
             "  {} Supported: Claude Code, OpenClaw, Gemini CLI, Codex",
             dim(ICON_DOT)
@@ -68,7 +66,7 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
         .collect();
 
     let (to_import, skipped) = if force {
-        println!("{}", amber("  ⚠ Force mode: re-importing all sessions\n"));
+        println!("{}", amber("  ! Force mode: re-importing all sessions"));
         (all_sessions, 0)
     } else {
         filter_new_sessions(all_sessions)?
@@ -83,7 +81,7 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
             ))
         );
         println!(
-            "\n  {} {} {}",
+            "  {} {} {}",
             dim("Use"),
             cyan("soul pull --force"),
             dim("to re-import everything.")
@@ -93,7 +91,7 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
     }
 
     println!(
-        "  {} {} to import, {} already imported\n",
+        "  {} {} to import, {} already imported",
         ICON_FOLDER,
         bold_white(&to_import.len().to_string()),
         dim(&skipped.to_string())
@@ -133,20 +131,14 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
         to_import.len()
     )));
 
-    if !parse_errors.is_empty() && parse_errors.len() <= 5 {
-        for err in &parse_errors {
-            println!("    {}", dim(err));
-        }
-    }
-
     if all_chunks.is_empty() {
-        println!("\n{}", dim("  No meaningful content found in sessions."));
+        println!("{}", dim("  No meaningful content found in sessions."));
         println!();
         return Ok(());
     }
 
     // Phase 4: LLM Processing
-    println!("\n  {} {}\n", ICON_BRAIN, gold("Processing through LLM..."));
+    println!("  {} {}", ICON_BRAIN, gold("Processing through LLM..."));
 
     let client = reqwest::Client::new();
     let mut all_memories = Vec::new();
@@ -155,7 +147,7 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
     let progress = ProgressBar::new(all_chunks.len() as u64);
     progress.set_style(
         ProgressStyle::with_template(
-            "  {spinner:.yellow} [{bar:20.yellow/dark_gray}] {pos}/{len} {msg}",
+            "  {spinner:.yellow} [{bar:20.yellow/dark_gray}] {pos}/{len} {elapsed_precise} {msg}",
         )
         .unwrap()
         .progress_chars("█░░"),
@@ -168,7 +160,7 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
             chunk.source.clone()
         };
 
-        progress.set_message(dim(&format!("Processing {}", label)));
+        progress.set_message(cyan(&label));
 
         match process_chunk(&client, chunk).await {
             Ok(memories) => {
@@ -181,8 +173,13 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
                     anyhow::bail!("API key error. Run `soul init` to reconfigure.");
                 }
                 if msg.contains("Rate limited") || msg.contains("429") {
-                    progress.set_message(amber("Rate limited. Waiting 30s..."));
-                    tokio::time::sleep(Duration::from_secs(30)).await;
+                    for waited in 1..=30 {
+                        progress.set_message(amber(&format!(
+                            "Rate limited. Waiting {}/30s | {}",
+                            waited, label
+                        )));
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+                    }
                     if let Ok(memories) = process_chunk(&client, chunk).await {
                         all_memories.push(memories);
                         progress.set_position((i + 1) as u64);
@@ -197,13 +194,7 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
     }
 
     progress.finish_and_clear();
-    println!(
-        "{}",
-        check(&format!(
-            "Processed {} chunks",
-            bold_white(&all_chunks.len().to_string())
-        ))
-    );
+    println!("{}", check(&format!("Processed {} chunks", all_chunks.len())));
 
     // Phase 5: Merge & Write
     let merged = merge_all_memories(&all_memories);
@@ -225,6 +216,7 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
         &merged,
         &write_result.topics_written,
         &write_result.people_written,
+        &parse_errors,
         &errors,
     );
 
@@ -360,49 +352,61 @@ fn print_summary(
     merged: &ExtractedMemories,
     topics: &[String],
     people: &[String],
-    errors: &[String],
+    parse_errors: &[String],
+    processing_errors: &[String],
 ) {
     let total = merged.fact_count();
-    println!("\n{}", line());
-    println!("\n  {} {}\n", amber(ICON_STAR), bold_gold("Pull complete!"));
+    println!("{}", line());
+    println!("  {} {}", amber(ICON_STAR), bold_gold("Pull complete"));
 
     println!(
         "  {} {} imported, {} skipped",
-        dim(&format!("{:<18}", "Sessions")),
+        dim("Sessions"),
         bold_white(&imported.to_string()),
         dim(&skipped.to_string())
     );
     println!(
         "  {} {}",
-        dim(&format!("{:<18}", "Memories extracted")),
+        dim("Memories"),
         bold_white(&total.to_string())
     );
     println!(
         "  {} {}{}",
-        dim(&format!("{:<18}", "Topics found")),
+        dim("Topics"),
         bold_white(&topics.len().to_string()),
         summarize_list(topics)
     );
     println!(
         "  {} {}{}",
-        dim(&format!("{:<18}", "People found")),
+        dim("People"),
         bold_white(&people.len().to_string()),
         summarize_list(people)
     );
-    if !errors.is_empty() {
-        println!(
-            "  {} {}",
-            dim(&format!("{:<18}", "Errors")),
-            amber(&errors.len().to_string())
-        );
-    }
+
+    print_error_group("Parse errors", parse_errors);
+    print_error_group("Processing errors", processing_errors);
+
     println!(
-        "\n  {} {} {}",
+        "  {} {} {}",
         dim("Run"),
         cyan("soul status"),
         dim("to see your vault.")
     );
     println!();
+}
+
+fn print_error_group(title: &str, errors: &[String]) {
+    if errors.is_empty() {
+        return;
+    }
+
+    println!("  {} {}", amber("!"), amber(&format!("{} ({})", title, errors.len())));
+    for err in errors.iter().take(8) {
+        println!("    {} {}", dim("-"), dim(err));
+    }
+    if errors.len() > 8 {
+        println!("    {} {}", dim("-"), dim(&format!("+{} more", errors.len() - 8)));
+    }
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

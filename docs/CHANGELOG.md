@@ -5,6 +5,25 @@ Agents: append entries here after completing work.
 
 ---
 
+## 2026-02-15 — Pull Output Polish
+
+### `soul pull` UX tightening
+- Reduced excess blank lines and redundant spacing in local pull flow output (`src/cli/pull.rs`)
+- Kept Phase 1 provider discovery lines unchanged (per-provider session counts remain visible)
+- Kept spinner behavior for parse/write/source-tracking phases while tightening surrounding transitions
+
+### LLM progress improvements (Phase 4)
+- Progress bar template now includes elapsed time (`{elapsed_precise}`)
+- Message field continues to show current chunk source label
+- Preserved warm gold/amber + cyan accent styling in progress output
+
+### Rate limit feedback
+- On 429/rate-limit responses, progress message now shows a live wait count-up from `1/30s` to `30/30s` before retry
+
+### End-of-run reporting
+- Parse errors and processing errors are now shown together at the end in grouped sections
+- Final summary block is more compact (less padding and fewer blank separator lines)
+
 ## 2026-02-15 — OAuth Scaffolding for Cloud Pull
 
 ### New CLI commands

@@ -4,6 +4,13 @@ Last updated: 2026-02-15
 
 ## ✅ Completed
 
+- [x] `soul pull` CLI output polish (2026-02-15):
+  - Reduced vertical noise across pull phases by tightening spacing and transition lines
+  - Kept provider-by-provider discovery output intact
+  - Upgraded Phase 4 progress bar to include elapsed time while keeping chunk name in-message
+  - Added visible 30s rate-limit wait count-up (`1/30s` → `30/30s`) in the progress message
+  - Grouped parse and processing errors into compact end-of-run summaries (no interleaving during progress)
+  - Tightened final pull summary formatting with less padding/blank-line churn
 - [x] Hardening pass (2026-02-15):
   - Fixed `soul init` API key prompt logic to always include the selected processing provider, including Gemini-only setups
   - Removed library-level `process::exit()` from `soul watch` auto-watch path; now returns actionable `Result` errors
