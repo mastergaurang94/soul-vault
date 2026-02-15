@@ -33,7 +33,6 @@ pub fn get_vault_stats() -> Result<VaultStats> {
         people_count,
         last_sync: config.last_sync,
         providers,
-        vault_path: config.vault_path,
     })
 }
 

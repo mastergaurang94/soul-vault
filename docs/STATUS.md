@@ -4,6 +4,10 @@ Last updated: 2026-02-15
 
 ## ✅ Completed
 
+- [x] Pull/status bug fixes (2026-02-15):
+  - Added local `soul pull` preflight API key validation before session discovery (`claude` key check)
+  - Added post-pull config updates: `last_sync` and provider-level `last_pull` timestamps
+  - Fixed `soul status` header to show live `vault_root()` path instead of potentially stale `config.json` `vaultPath`
 - [x] Export refactor: CLI + TUI redesign (2026-02-15):
   - `soul export` now supports `--format context|json|bundle` (default: `context`)
   - Added `--sections identity,preferences,topics,people,memories` (default all)

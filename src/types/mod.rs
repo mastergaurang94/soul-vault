@@ -241,7 +241,6 @@ pub struct VaultStats {
     pub people_count: usize,
     pub last_sync: Option<String>,
     pub providers: Vec<ProviderStatus>,
-    pub vault_path: String,
 }
 
 #[derive(Debug)]

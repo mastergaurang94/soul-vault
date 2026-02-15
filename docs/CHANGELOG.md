@@ -5,6 +5,24 @@ Agents: append entries here after completing work.
 
 ---
 
+## 2026-02-15 — Pull/Status Bug Fixes
+
+### `soul pull` preflight API key check
+- Added an early local-pull guard in `src/cli/pull.rs` that checks `get_api_key("claude")` before Phase 1 discovery
+- If the key is missing or empty, command now fails immediately with:
+  - `No API key configured. Run \`soul init\` to set up your Claude API key.`
+- Cloud pull path remains unchanged
+
+### `config.json` sync metadata updates after successful pull
+- Added post-success config persistence in `src/cli/pull.rs`:
+  - `last_sync` now updates to current RFC 3339 timestamp
+  - Matching provider entries now update `last_pull` to the same timestamp when sessions were discovered
+- Uses existing `read_config()` / `write_config()` without adding dependencies
+
+### `soul status` vault path correctness
+- Updated `src/cli/status.rs` to display `vault_root()` instead of `stats.vault_path` from config
+- Prevents stale/typoed path display when `config.json` `vaultPath` drifts from actual runtime vault root
+
 ## 2026-02-15 — Export CLI/TUI Refactor
 
 ### CLI export formats and sections

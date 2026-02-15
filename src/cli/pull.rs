@@ -11,9 +11,9 @@ use crate::adapters::{conversation_to_text, AdapterRegistry, SessionFile};
 use crate::auth::{ensure_valid_credentials, is_logged_in};
 use crate::core::merger::{chunk_text, merge_all_memories};
 use crate::core::processor::process_chunk;
-use crate::types::ExtractedMemories;
+use crate::types::{ExtractedMemories, Provider};
 use crate::ui::theme::*;
-use crate::vault::config::assert_initialized;
+use crate::vault::config::{assert_initialized, get_api_key, read_config, write_config};
 use crate::vault::sources::{compute_file_hash, read_sources, write_sources, SourceEntry};
 use crate::vault::write::write_memories_to_vault;
 
@@ -26,6 +26,10 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
 
     println!("{}", banner());
     assert_initialized()?;
+    let api_key = get_api_key("claude")?;
+    if api_key.as_deref().map(str::trim).unwrap_or("").is_empty() {
+        anyhow::bail!("No API key configured. Run `soul init` to set up your Claude API key.");
+    }
 
     println!("  {} {}", ICON_BRAIN, gold("Discovering AI sessions..."));
     println!("{}", line());
@@ -58,6 +62,17 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
         println!();
         return Ok(());
     }
+    let mut discovered_providers: Vec<Provider> = discovered
+        .iter()
+        .filter_map(|(name, sessions)| {
+            if sessions.is_empty() {
+                return None;
+            }
+            provider_from_display_name(name)
+        })
+        .collect();
+    discovered_providers.sort_by_key(|p| p.to_string());
+    discovered_providers.dedup();
 
     // Phase 2: Filter (skip already-imported sessions)
     let all_sessions: Vec<SessionFile> = discovered
@@ -194,7 +209,10 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
     }
 
     progress.finish_and_clear();
-    println!("{}", check(&format!("Processed {} chunks", all_chunks.len())));
+    println!(
+        "{}",
+        check(&format!("Processed {} chunks", all_chunks.len()))
+    );
 
     // Phase 5: Merge & Write
     let merged = merge_all_memories(&all_memories);
@@ -208,6 +226,9 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
     let pb = spinner("Updating source tracking...");
     update_pull_tracking(&to_import)?;
     pb.finish_with_message(check("Source tracking updated"));
+
+    // Phase 7: Update config sync metadata
+    update_pull_config_timestamps(&discovered_providers)?;
 
     // Summary
     print_summary(
@@ -344,6 +365,28 @@ fn update_pull_tracking(sessions: &[SessionFile]) -> Result<()> {
     Ok(())
 }
 
+fn update_pull_config_timestamps(discovered_providers: &[Provider]) -> Result<()> {
+    let mut config = read_config()?;
+    let now = chrono::Utc::now().to_rfc3339();
+
+    config.last_sync = Some(now.clone());
+    for provider in &mut config.providers {
+        if discovered_providers.contains(&provider.name) {
+            provider.last_pull = Some(now.clone());
+        }
+    }
+
+    write_config(&config)
+}
+
+fn provider_from_display_name(name: &str) -> Option<Provider> {
+    match name {
+        "Claude Code" => Some(Provider::Claude),
+        "Gemini CLI" => Some(Provider::Gemini),
+        _ => None,
+    }
+}
+
 // ─── Summary ──────────────────────────────────────────────────────────────────
 
 fn print_summary(
@@ -365,11 +408,7 @@ fn print_summary(
         bold_white(&imported.to_string()),
         dim(&skipped.to_string())
     );
-    println!(
-        "  {} {}",
-        dim("Memories"),
-        bold_white(&total.to_string())
-    );
+    println!("  {} {}", dim("Memories"), bold_white(&total.to_string()));
     println!(
         "  {} {}{}",
         dim("Topics"),
@@ -400,12 +439,20 @@ fn print_error_group(title: &str, errors: &[String]) {
         return;
     }
 
-    println!("  {} {}", amber("!"), amber(&format!("{} ({})", title, errors.len())));
+    println!(
+        "  {} {}",
+        amber("!"),
+        amber(&format!("{} ({})", title, errors.len()))
+    );
     for err in errors.iter().take(8) {
         println!("    {} {}", dim("-"), dim(err));
     }
     if errors.len() > 8 {
-        println!("    {} {}", dim("-"), dim(&format!("+{} more", errors.len() - 8)));
+        println!(
+            "    {} {}",
+            dim("-"),
+            dim(&format!("+{} more", errors.len() - 8))
+        );
     }
 }
 

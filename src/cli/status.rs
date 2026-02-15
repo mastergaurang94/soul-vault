@@ -28,7 +28,7 @@ pub fn run() -> Result<()> {
         "  {} {} {}",
         bold_gold("Soul Vault"),
         amber(ICON_STAR),
-        dim(&stats.vault_path)
+        dim(&vault_root().display().to_string())
     );
     println!();
 
