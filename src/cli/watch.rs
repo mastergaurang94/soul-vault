@@ -12,9 +12,9 @@ use std::sync::mpsc;
 use std::time::Duration;
 
 use crate::adapters::AdapterRegistry;
-use crate::extractors::local::discover_files;
 use crate::ui::theme::*;
 use crate::vault::config::{assert_initialized, assert_path_exists};
+use crate::vault::local::discover_files;
 use crate::vault::sources::{classify_files, update_source_tracking};
 
 // ─── Supported Extensions ─────────────────────────────────────────────────────

@@ -5,8 +5,8 @@ use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
-use crate::extractors::chatgpt;
 use crate::types::FileInfo;
+use crate::vault::chatgpt;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 

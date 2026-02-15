@@ -32,6 +32,10 @@ Last updated: 2026-02-15
   - `scripts/screenshot-tui.sh` for single-frame pane captures
   - `scripts/extract-frames.sh` for interval JPG extraction from video
   - `scripts/analyze-tui.sh` for time-series TUI snapshot analysis
+- [x] Architecture boundary cleanup landed:
+  - moved local file discovery/content extraction helpers from `extractors/` to `vault/`
+  - updated `core/`, `tui/`, and CLI call sites to import from `vault::local`
+  - added missing top-level `//!` module docs in `cli/`, `core/`, `extractors/`, `ui/`, and `vault/`
 
 ## 🔨 In Progress
 

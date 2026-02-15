@@ -36,8 +36,7 @@ src/
 │   └── prompt.rs              Extraction prompt template
 ├── extractors/
 │   ├── mod.rs
-│   ├── local.rs               Local file discovery/content extraction
-│   └── chatgpt.rs             Placeholder for direct ChatGPT API extractor
+│   └──                        Reserved for provider-specific extractor boundaries
 ├── tui/                       Full-screen ratatui app (`soul` with no args)
 │   ├── mod.rs                 Event loop, key handling, async channel draining
 │   ├── app.rs                 App/page/focus state
@@ -65,6 +64,8 @@ src/
 │   └── widgets.rs             Reusable ratatui widget helpers
 └── vault/
     ├── mod.rs
+    ├── local.rs               Local file discovery/content extraction
+    ├── chatgpt.rs             ChatGPT export parsing/formatting helpers
     ├── config.rs              Vault paths/config/keys helpers
     ├── read.rs                Vault reads/stats/content assembly
     ├── write.rs               Markdown write/update routines
@@ -107,9 +108,9 @@ Rules:
 ## Import Pipeline (Local Files)
 
 `import` path data flow:
-1. Discover supported files (`extractors/local.rs`)
+1. Discover supported files (`vault/local.rs`)
 2. Classify new/modified/skipped via source hashes (`vault/sources.rs`)
-3. Extract content + chunk text (`extractors/local.rs`, `core/merger.rs`)
+3. Extract content + chunk text (`vault/local.rs`, `core/merger.rs`)
 4. Process each chunk via LLM (`core/processor.rs`, `core/parser.rs`)
 5. Merge deduplicated memories (`core/merger.rs`)
 6. Write markdown updates (`vault/write.rs`)

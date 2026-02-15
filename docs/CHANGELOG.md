@@ -7,6 +7,26 @@ Agents: append entries here after completing work.
 
 ---
 
+## 2026-02-15 — Architecture Boundary Fix + Module Docs
+
+### Dependency rule compliance
+- Moved local file ingestion helpers:
+  - `src/extractors/local.rs` → `src/vault/local.rs`
+  - `src/extractors/chatgpt.rs` → `src/vault/chatgpt.rs`
+- Rewired imports to the new boundary-safe location:
+  - `src/core/pipeline.rs` now imports from `crate::vault::local`
+  - `src/tui/watcher.rs` now imports from `crate::vault::local`
+  - CLI ingestion/watch paths now import from `crate::vault::local`
+- Updated `src/vault/mod.rs` to export `chatgpt` and `local` modules
+
+### Docs lint compliance
+- Added missing top-level module docs to:
+  - `src/cli/mod.rs`
+  - `src/core/mod.rs`
+  - `src/extractors/mod.rs`
+  - `src/ui/mod.rs`
+  - `src/vault/mod.rs`
+
 ## 2026-02-15 — Knowledge Base Enhancement for Agent-First Development
 
 ### Documentation and planning system

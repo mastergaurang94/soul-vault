@@ -7,10 +7,10 @@ use std::time::Duration;
 
 use crate::core::merger::{chunk_text, merge_all_memories};
 use crate::core::processor::process_chunk;
-use crate::extractors::local::{discover_files, extract_file_content};
 use crate::types::{ChunkInfo, ExtractedMemories, FileInfo};
 use crate::ui::theme::*;
 use crate::vault::config::{assert_initialized, assert_path_exists};
+use crate::vault::local::{discover_files, extract_file_content};
 use crate::vault::sources::{classify_files, update_source_tracking};
 use crate::vault::write::write_memories_to_vault;
 

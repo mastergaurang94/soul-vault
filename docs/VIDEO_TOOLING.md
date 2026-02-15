@@ -1,4 +1,5 @@
 # Video Tooling for Agent Development
+Last updated: 2026-02-15
 
 This project includes zero-dependency terminal capture tooling built on:
 - `tmux`

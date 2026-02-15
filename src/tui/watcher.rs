@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio::sync::mpsc;
 
-use crate::extractors::local::discover_files;
 use crate::tui::pages::watch::{EventKind, WatchEvent};
+use crate::vault::local::discover_files;
 use crate::vault::sources::{classify_files, update_source_tracking};
 
 const SUPPORTED_EXTENSIONS: &[&str] = &["md", "txt", "json", "jsonl"];

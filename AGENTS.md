@@ -20,6 +20,7 @@ Test: `cargo test`
 - `docs/CHANGELOG.md` — Chronological record of completed changes.
 - `docs/ADAPTERS_SPEC.md` — Provider adapter behavior and interfaces.
 - `docs/TUI_SPEC.md` — Full-screen TUI product specification.
+- `docs/QUALITY.md` — Module quality grading methodology and current lint baseline.
 1. **`docs/STATUS.md`** — What's done, in progress, planned. **Read this before starting any work.**
 2. **`docs/ARCHITECTURE.md`** — Module map, data flow, vault layout
 3. **`docs/DESIGN_PRINCIPLES.md`** — Coding standards

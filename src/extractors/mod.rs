@@ -1,2 +1,1 @@
-pub mod chatgpt;
-pub mod local;
+//! File format extractors for local files and ChatGPT exports.
