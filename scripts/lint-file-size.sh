@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-LIMIT=200
+LIMIT=250
 
 usage() {
   cat <<USAGE
