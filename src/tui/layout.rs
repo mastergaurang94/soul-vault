@@ -3,7 +3,7 @@
 use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Layout, Rect},
-    style::{Modifier, Style},
+    style::Style,
     text::{Line, Span},
     widgets::{Paragraph, Widget},
 };
@@ -98,14 +98,10 @@ pub fn render_layout(area: Rect, buf: &mut Buffer, app: &App, pages: &PageSet) {
 }
 
 fn render_header(area: Rect, buf: &mut Buffer) {
-    let line = Line::from(vec![
-        Span::styled(
-            " Soul Vault ",
-            Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
-        ),
-        Span::styled("* ", Style::default().fg(rat::AMBER)),
-        Span::styled("Your AI memory, unified.", Style::default().fg(rat::DIM)),
-    ]);
+    let line = Line::from(Span::styled(
+        " Your AI memory, unified.",
+        Style::default().fg(rat::DIM),
+    ));
     Paragraph::new(line).render(area, buf);
 }
 

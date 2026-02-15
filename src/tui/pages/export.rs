@@ -192,7 +192,11 @@ impl ExportPage {
         match crate::cli::export::run(Some(&output_path), self.format.arg(), None, Some(&sections))
         {
             Ok(()) => {
-                self.result_msg = Some((true, format!("Exported to {}", output_path)));
+                let display = std::path::Path::new(&output_path)
+                    .file_name()
+                    .map(|f| f.to_string_lossy().to_string())
+                    .unwrap_or(output_path.clone());
+                self.result_msg = Some((true, format!("✓ Exported → ~/Downloads/{display}")));
             }
             Err(e) => {
                 self.result_msg = Some((false, e.to_string()));

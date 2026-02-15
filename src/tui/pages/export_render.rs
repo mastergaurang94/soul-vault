@@ -31,10 +31,12 @@ pub fn render_form(area: Rect, buf: &mut Buffer, page: &ExportPage) {
     let block = Block::default()
         .borders(Borders::ALL)
         .border_style(Style::default().fg(rat::GOLD))
-        .title(" Export — Context ")
+        .title(" Export ")
         .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD));
     let inner = block.inner(area);
     block.render(area, buf);
+
+    let max_w = inner.width.saturating_sub(4) as usize;
 
     let mut lines = vec![
         Line::from(""),
@@ -49,74 +51,54 @@ pub fn render_form(area: Rect, buf: &mut Buffer, page: &ExportPage) {
             "  Sections",
             Style::default().fg(rat::DIM).add_modifier(Modifier::BOLD),
         )),
-        checkbox_line(
-            page.active_field,
-            ExportField::Identity,
-            "Identity",
-            page.include_identity,
-        ),
-        checkbox_line(
-            page.active_field,
-            ExportField::Preferences,
-            "Preferences",
-            page.include_preferences,
-        ),
-        checkbox_line(
-            page.active_field,
-            ExportField::Topics,
-            "Topics",
-            page.include_topics,
-        ),
-        checkbox_line(
-            page.active_field,
-            ExportField::People,
-            "People",
-            page.include_people,
-        ),
-        checkbox_line(
-            page.active_field,
-            ExportField::Memories,
-            "Memories",
-            page.include_memories,
-        ),
+        checkbox_line(page.active_field, ExportField::Identity, "Identity", page.include_identity),
+        checkbox_line(page.active_field, ExportField::Preferences, "Preferences", page.include_preferences),
+        checkbox_line(page.active_field, ExportField::Topics, "Topics", page.include_topics),
+        checkbox_line(page.active_field, ExportField::People, "People", page.include_people),
+        checkbox_line(page.active_field, ExportField::Memories, "Memories", page.include_memories),
         Line::from(""),
         Line::from(Span::styled(
-            format!("  Output: {}", page.output_path()),
+            truncate_line(&format!("  Output: {}", page.output_path()), max_w),
             Style::default().fg(rat::CYAN),
         )),
     ];
 
     if let Some(words) = selected_word_count(page) {
         lines.push(Line::from(Span::styled(
-            format!("  Preview: ~{} words selected", words),
+            format!("  ~{words} words selected"),
             Style::default().fg(rat::DIM),
         )));
     }
 
     lines.push(Line::from(""));
-    lines.push(field_line(
-        page.active_field,
-        ExportField::Execute,
-        "[ Export ]",
-        "",
-    ));
+    lines.push(field_line(page.active_field, ExportField::Execute, "[ Export ]", ""));
 
     if let Some((ok, msg)) = &page.result_msg {
         lines.push(Line::from(""));
         let color = if *ok { rat::EMERALD } else { rat::RED };
         lines.push(Line::from(Span::styled(
-            format!("  {}", msg),
+            truncate_line(&format!("  {msg}"), max_w),
             Style::default().fg(color),
         )));
     }
 
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        "  j/k navigate  Enter select/toggle  Space toggle section  Esc back",
+        "  j/k navigate · Enter/Space toggle · Esc back",
         Style::default().fg(rat::DIM),
     )));
 
     Paragraph::new(lines).render(inner, buf);
+}
+
+fn truncate_line(s: &str, max: usize) -> String {
+    if s.len() <= max {
+        s.to_string()
+    } else if max > 3 {
+        format!("{}…", &s[..max - 1])
+    } else {
+        s[..max].to_string()
+    }
 }
 
 fn checkbox_line(
