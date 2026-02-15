@@ -1,10 +1,12 @@
-//! Soma — Your AI memory, unified.
+//! Soul Vault — Your AI memory, unified.
 //!
 //! A CLI tool that distills AI conversations into a structured local vault.
 
+mod adapters;
 mod cli;
 mod core;
 mod extractors;
+mod tui;
 mod types;
 mod ui;
 mod vault;
@@ -15,7 +17,7 @@ use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
 #[command(
-    name = "soma",
+    name = "soul",
     about = "Your AI memory, unified. Distills AI conversations into a structured local vault.",
     version
 )]
@@ -26,7 +28,7 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Initialize your Soma vault (first-time setup)
+    /// Initialize your Soul Vault (first-time setup)
     Init,
 
     /// Import and process local files into your vault
@@ -74,6 +76,13 @@ enum Commands {
     /// Show vault summary and imported sources
     Status,
 
+    /// Pull AI sessions from all providers (Claude Code, OpenClaw, etc.)
+    Pull {
+        /// Force re-import of all sessions, ignoring source tracking
+        #[arg(short, long)]
+        force: bool,
+    },
+
     /// Reset vault — delete all data and return to pre-init state
     Reset {
         /// Skip confirmation prompt (for scripting/testing)
@@ -90,8 +99,8 @@ async fn main() {
 
     let result = match cli.command {
         None => {
-            // No subcommand → interactive menu
-            cli::interactive::run()
+            // No subcommand → full-screen TUI
+            tui::run()
         }
         Some(Commands::Init) => cli::init::run(),
         Some(Commands::Import { folder, force }) | Some(Commands::Ingest { folder, force }) => {
@@ -99,21 +108,17 @@ async fn main() {
                 Some(f) => cli::ingest::run(&f, force).await,
                 None => {
                     eprintln!("\n  {} Missing folder path.\n", ui::theme::red("✗"));
-                    eprintln!("  Usage: soma import <folder>\n");
-                    eprintln!("  Example: soma import ~/Documents/chatgpt-exports\n");
+                    eprintln!("  Usage: soul import <folder>\n");
+                    eprintln!("  Example: soul import ~/Documents/chatgpt-exports\n");
                     std::process::exit(1);
                 }
             }
         }
         Some(Commands::Watch { folder }) => match folder {
             Some(f) => cli::watch::run(&f).await,
-            None => {
-                eprintln!("\n  {} Missing folder path.\n", ui::theme::red("✗"));
-                eprintln!("  Usage: soma watch <folder>\n");
-                eprintln!("  Example: soma watch ~/Documents/chatgpt-exports\n");
-                std::process::exit(1);
-            }
+            None => cli::watch::run_auto().await,
         },
+        Some(Commands::Pull { force }) => cli::pull::run(force).await,
         Some(Commands::Export {
             output,
             format,

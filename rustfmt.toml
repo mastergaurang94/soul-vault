@@ -1,4 +1,4 @@
-# Soma — rustfmt configuration
+# Soul Vault — rustfmt configuration
 # Uses stable options only for broad compatibility.
 
 edition = "2021"

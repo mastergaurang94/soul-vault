@@ -1,6 +1,6 @@
-# Conversation about building Soma
+# Conversation about building Soul Vault
 
-**Human:** I'm building a CLI tool called Soma that unifies AI memory across providers. It stores everything in a local vault at ~/soma/ as structured markdown files.
+**Human:** I'm building a CLI tool called Soul Vault that unifies AI memory across providers. It stores everything in a local vault at ~/soul-vault/ as structured markdown files.
 
 **Assistant:** That sounds like a great project! A unified memory vault would help maintain context across different AI providers.
 
@@ -12,6 +12,6 @@
 
 **Assistant:** That's wonderful! Building tools that help you be more productive while also valuing family time is important.
 
-**Human:** I decided to build Soma in TypeScript with Ink for the TUI. I was inspired by Mole — a Mac cleanup tool that has a beautiful CLI interface. I want that same premium feeling.
+**Human:** I decided to build Soul Vault in TypeScript with Ink for the TUI. I was inspired by Mole — a Mac cleanup tool that has a beautiful CLI interface. I want that same premium feeling.
 
 **Assistant:** Great choice. Ink gives you React-like components for the terminal, and TypeScript will help with maintainability.

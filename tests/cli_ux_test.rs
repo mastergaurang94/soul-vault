@@ -1,17 +1,17 @@
-//! Comprehensive CLI UX / regression tests for Soma.
+//! Comprehensive CLI UX / regression tests for Soul Vault.
 //!
 //! These tests exercise every user-facing command and edge case,
 //! verifying error messages are helpful, output is correct, and
 //! no panics or ugly stack traces leak through.
 //!
 //! # Architecture note
-//! The vault path is hardcoded to `~/soma/` — there's no `SOMA_VAULT_PATH`
+//! The vault path is hardcoded to `~/soul-vault/` — there's no `SOUL_VAULT_PATH`
 //! env var or `--vault-path` flag. This means integration tests that need
 //! vault isolation CANNOT fully isolate from the real vault. Tests below
 //! are designed to be safe regardless: they test CLI arg parsing, error
 //! messages, and behaviors that don't mutate the vault.
 //!
-//! **FINDING: Soma should support `SOMA_VAULT_PATH` env var for testability
+//! **FINDING: Soul Vault should support `SOUL_VAULT_PATH` env var for testability
 //! and multi-vault workflows.**
 
 use assert_cmd::Command;
@@ -24,8 +24,8 @@ use unicode_width::UnicodeWidthStr;
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 #[allow(deprecated)]
-fn soma() -> Command {
-    Command::cargo_bin("soma").expect("binary should exist")
+fn soul() -> Command {
+    Command::cargo_bin("soul").expect("binary should exist")
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -34,7 +34,7 @@ fn soma() -> Command {
 
 #[test]
 fn help_flag_shows_all_commands() {
-    soma()
+    soul()
         .arg("--help")
         .assert()
         .success()
@@ -48,7 +48,7 @@ fn help_flag_shows_all_commands() {
 
 #[test]
 fn help_flag_shows_description() {
-    soma()
+    soul()
         .arg("--help")
         .assert()
         .success()
@@ -57,35 +57,35 @@ fn help_flag_shows_description() {
 
 #[test]
 fn version_flag_works() {
-    soma()
+    soul()
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::contains("soma"));
+        .stdout(predicate::str::contains("soul"));
 }
 
 #[test]
 fn version_flag_shows_semver() {
-    // Should show something like "soma 0.1.0"
-    soma()
+    // Should show something like "soul 0.1.0"
+    soul()
         .arg("--version")
         .assert()
         .success()
-        .stdout(predicate::str::is_match(r"soma \d+\.\d+\.\d+").unwrap());
+        .stdout(predicate::str::is_match(r"soul \d+\.\d+\.\d+").unwrap());
 }
 
 #[test]
 fn no_args_non_tty_shows_help() {
     // When stdin is not a TTY (which is always the case in tests/CI),
-    // soma should show a helpful message instead of crashing.
-    soma()
+    // soul should show a helpful message instead of crashing.
+    soul()
         .assert()
         .success()
         .stdout(predicate::str::contains("Interactive mode requires a terminal"))
-        .stdout(predicate::str::contains("soma init"))
-        .stdout(predicate::str::contains("soma import"))
-        .stdout(predicate::str::contains("soma export"))
-        .stdout(predicate::str::contains("soma status"));
+        .stdout(predicate::str::contains("soul init"))
+        .stdout(predicate::str::contains("soul import"))
+        .stdout(predicate::str::contains("soul export"))
+        .stdout(predicate::str::contains("soul status"));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -94,7 +94,7 @@ fn no_args_non_tty_shows_help() {
 
 #[test]
 fn unknown_subcommand_shows_error() {
-    soma()
+    soul()
         .arg("bogus")
         .assert()
         .failure()
@@ -104,7 +104,7 @@ fn unknown_subcommand_shows_error() {
 
 #[test]
 fn unknown_subcommand_exits_nonzero() {
-    soma()
+    soul()
         .arg("totallyinvalid")
         .assert()
         .code(2); // clap uses exit code 2 for parse errors
@@ -112,7 +112,7 @@ fn unknown_subcommand_exits_nonzero() {
 
 #[test]
 fn help_import_subcommand() {
-    soma()
+    soul()
         .args(["help", "import"])
         .assert()
         .success()
@@ -123,7 +123,7 @@ fn help_import_subcommand() {
 
 #[test]
 fn import_dash_dash_help() {
-    soma()
+    soul()
         .args(["import", "--help"])
         .assert()
         .success()
@@ -133,7 +133,7 @@ fn import_dash_dash_help() {
 
 #[test]
 fn help_export_subcommand() {
-    soma()
+    soul()
         .args(["help", "export"])
         .assert()
         .success()
@@ -145,7 +145,7 @@ fn help_export_subcommand() {
 
 #[test]
 fn export_dash_dash_help() {
-    soma()
+    soul()
         .args(["export", "--help"])
         .assert()
         .success()
@@ -156,7 +156,7 @@ fn export_dash_dash_help() {
 
 #[test]
 fn help_watch_subcommand() {
-    soma()
+    soul()
         .args(["help", "watch"])
         .assert()
         .success()
@@ -167,7 +167,7 @@ fn help_watch_subcommand() {
 
 #[test]
 fn help_status_subcommand() {
-    soma()
+    soul()
         .args(["help", "status"])
         .assert()
         .success()
@@ -176,7 +176,7 @@ fn help_status_subcommand() {
 
 #[test]
 fn help_init_subcommand() {
-    soma()
+    soul()
         .args(["help", "init"])
         .assert()
         .success()
@@ -185,7 +185,7 @@ fn help_init_subcommand() {
 
 #[test]
 fn short_help_flag() {
-    soma()
+    soul()
         .arg("-h")
         .assert()
         .success()
@@ -194,11 +194,11 @@ fn short_help_flag() {
 
 #[test]
 fn short_version_flag() {
-    soma()
+    soul()
         .arg("-V")
         .assert()
         .success()
-        .stdout(predicate::str::contains("soma"));
+        .stdout(predicate::str::contains("soul"));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -207,18 +207,18 @@ fn short_version_flag() {
 
 #[test]
 fn import_no_folder_arg_shows_usage() {
-    soma()
+    soul()
         .arg("import")
         .assert()
         .failure()
         .stderr(predicate::str::contains("Missing folder path"))
-        .stderr(predicate::str::contains("Usage: soma import <folder>"))
+        .stderr(predicate::str::contains("Usage: soul import <folder>"))
         .stderr(predicate::str::contains("Example:"));
 }
 
 #[test]
 fn import_no_folder_arg_exits_1() {
-    soma()
+    soul()
         .arg("import")
         .assert()
         .code(1);
@@ -227,7 +227,7 @@ fn import_no_folder_arg_exits_1() {
 #[test]
 fn import_no_folder_no_panic() {
     // Must NOT contain panic traces
-    let output = soma()
+    let output = soul()
         .arg("import")
         .output()
         .expect("should run");
@@ -238,7 +238,7 @@ fn import_no_folder_no_panic() {
 
 #[test]
 fn import_nonexistent_path_shows_helpful_error() {
-    soma()
+    soul()
         .args(["import", "/nonexistent/path/that/does/not/exist"])
         .assert()
         .failure()
@@ -248,7 +248,7 @@ fn import_nonexistent_path_shows_helpful_error() {
 
 #[test]
 fn import_nonexistent_path_exits_1() {
-    soma()
+    soul()
         .args(["import", "/nonexistent/path"])
         .assert()
         .code(1);
@@ -256,7 +256,7 @@ fn import_nonexistent_path_exits_1() {
 
 #[test]
 fn import_nonexistent_path_no_panic() {
-    let output = soma()
+    let output = soul()
         .args(["import", "/nonexistent/path/xyz"])
         .output()
         .expect("should run");
@@ -268,7 +268,7 @@ fn import_nonexistent_path_no_panic() {
 fn import_empty_folder_shows_no_files() {
     let tmp = tempdir().unwrap();
 
-    soma()
+    soul()
         .args(["import", tmp.path().to_str().unwrap()])
         .assert()
         .failure()
@@ -284,7 +284,7 @@ fn import_unsupported_file_types_only() {
     fs::write(tmp.path().join("spreadsheet.xlsx"), "fake xlsx").unwrap();
     fs::write(tmp.path().join("word.docx"), "fake docx").unwrap();
 
-    soma()
+    soul()
         .args(["import", tmp.path().to_str().unwrap()])
         .assert()
         .failure()
@@ -295,7 +295,7 @@ fn import_unsupported_file_types_only() {
 #[test]
 fn import_force_flag_short() {
     // -f should be accepted as --force
-    soma()
+    soul()
         .args(["import", "-f", "/nonexistent"])
         .assert()
         .failure()
@@ -304,7 +304,7 @@ fn import_force_flag_short() {
 
 #[test]
 fn import_force_flag_long() {
-    soma()
+    soul()
         .args(["import", "--force", "/nonexistent"])
         .assert()
         .failure()
@@ -317,7 +317,7 @@ fn import_force_flag_long() {
 
 #[test]
 fn ingest_alias_no_folder_same_as_import() {
-    soma()
+    soul()
         .arg("ingest")
         .assert()
         .failure()
@@ -326,7 +326,7 @@ fn ingest_alias_no_folder_same_as_import() {
 
 #[test]
 fn ingest_alias_nonexistent_path() {
-    soma()
+    soul()
         .args(["ingest", "/nonexistent/path"])
         .assert()
         .failure()
@@ -336,7 +336,7 @@ fn ingest_alias_nonexistent_path() {
 #[test]
 fn ingest_hidden_from_help() {
     // The `ingest` command is hidden; `--help` should not show it
-    soma()
+    soul()
         .arg("--help")
         .assert()
         .success()
@@ -347,21 +347,21 @@ fn ingest_hidden_from_help() {
 // 4. EXPORT COMMAND
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Note: These tests run against the REAL ~/soma/ vault since there's no
+// Note: These tests run against the REAL ~/soul-vault/ vault since there's no
 // isolation mechanism. They test behavior, not content.
 
 #[test]
 fn export_default_format_is_markdown() {
-    soma()
+    soul()
         .arg("export")
         .assert()
         .success()
-        .stdout(predicate::str::contains("# Soma Memory Vault"));
+        .stdout(predicate::str::contains("# Soul Vault Memory"));
 }
 
 #[test]
 fn export_markdown_has_generated_date() {
-    soma()
+    soul()
         .arg("export")
         .assert()
         .success()
@@ -370,7 +370,7 @@ fn export_markdown_has_generated_date() {
 
 #[test]
 fn export_json_is_valid_json() {
-    let output = soma()
+    let output = soul()
         .args(["export", "--format", "json"])
         .output()
         .expect("should run");
@@ -382,7 +382,7 @@ fn export_json_is_valid_json() {
 
 #[test]
 fn export_json_has_expected_fields() {
-    let output = soma()
+    let output = soul()
         .args(["export", "--format", "json"])
         .output()
         .expect("should run");
@@ -401,14 +401,14 @@ fn export_to_file_creates_file() {
     let tmp = tempdir().unwrap();
     let output_path = tmp.path().join("export-test.md");
 
-    soma()
+    soul()
         .args(["export", "-o", output_path.to_str().unwrap()])
         .assert()
         .success();
 
     assert!(output_path.exists(), "Export file should be created");
     let content = fs::read_to_string(&output_path).unwrap();
-    assert!(content.contains("Soma Memory Vault"), "File should contain vault header");
+    assert!(content.contains("Soul Vault Memory"), "File should contain vault header");
 }
 
 #[test]
@@ -416,7 +416,7 @@ fn export_to_file_shows_confirmation() {
     let tmp = tempdir().unwrap();
     let output_path = tmp.path().join("export-confirm.md");
 
-    soma()
+    soul()
         .args(["export", "-o", output_path.to_str().unwrap()])
         .assert()
         .success()
@@ -429,7 +429,7 @@ fn export_json_to_file() {
     let tmp = tempdir().unwrap();
     let output_path = tmp.path().join("export-test.json");
 
-    soma()
+    soul()
         .args(["export", "--format", "json", "-o", output_path.to_str().unwrap()])
         .assert()
         .success();
@@ -443,17 +443,17 @@ fn export_json_to_file() {
 fn export_topic_filter_nonexistent() {
     // Filtering by a topic that doesn't exist should still succeed
     // (with minimal output, no topics section)
-    soma()
+    soul()
         .args(["export", "--topic", "zzz_nonexistent_topic_zzz"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Soma Memory Vault"));
+        .stdout(predicate::str::contains("Soul Vault Memory"));
 }
 
 #[test]
 fn export_topic_filter_excludes_unmatched() {
     // With a very specific nonexistent topic, the Topics section should be absent
-    let output = soma()
+    let output = soul()
         .args(["export", "--topic", "zzz_definitely_not_a_topic_zzz"])
         .output()
         .expect("should run");
@@ -468,21 +468,21 @@ fn export_topic_filter_excludes_unmatched() {
 // 5. STATUS COMMAND
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Note: status reads from ~/soma/ — these tests verify structure, not values.
+// Note: status reads from ~/soul-vault/ — these tests verify structure, not values.
 
 #[test]
 fn status_shows_vault_overview() {
-    soma()
+    soul()
         .arg("status")
         .assert()
         .success()
         .stdout(predicate::str::contains("Vault Overview")
-            .or(predicate::str::contains("Soma Vault")));
+            .or(predicate::str::contains("Soul Vault")));
 }
 
 #[test]
 fn status_shows_memory_counts() {
-    soma()
+    soul()
         .arg("status")
         .assert()
         .success()
@@ -493,7 +493,7 @@ fn status_shows_memory_counts() {
 
 #[test]
 fn status_shows_providers() {
-    soma()
+    soul()
         .arg("status")
         .assert()
         .success()
@@ -502,7 +502,7 @@ fn status_shows_providers() {
 
 #[test]
 fn status_box_drawing_is_consistent() {
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -521,7 +521,7 @@ fn status_box_drawing_is_consistent() {
 
 #[test]
 fn status_no_panic() {
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -531,7 +531,7 @@ fn status_no_panic() {
 
 #[test]
 fn status_shows_vault_size() {
-    soma()
+    soul()
         .arg("status")
         .assert()
         .success()
@@ -544,18 +544,18 @@ fn status_shows_vault_size() {
 
 #[test]
 fn watch_no_folder_arg_errors() {
-    soma()
+    // No-args watch in non-TTY mode exits with helpful error
+    soul()
         .arg("watch")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Missing folder path"))
-        .stderr(predicate::str::contains("Usage: soma watch <folder>"))
-        .stderr(predicate::str::contains("Example:"));
+        .stderr(predicate::str::contains("Auto-watch requires a terminal"))
+        .stderr(predicate::str::contains("Usage: soul watch <folder>"));
 }
 
 #[test]
 fn watch_no_folder_exits_1() {
-    soma()
+    soul()
         .arg("watch")
         .assert()
         .code(1);
@@ -563,7 +563,7 @@ fn watch_no_folder_exits_1() {
 
 #[test]
 fn watch_nonexistent_path_shows_helpful_error() {
-    soma()
+    soul()
         .args(["watch", "/nonexistent/watch/path"])
         .assert()
         .failure()
@@ -573,7 +573,7 @@ fn watch_nonexistent_path_shows_helpful_error() {
 
 #[test]
 fn watch_nonexistent_path_no_panic() {
-    let output = soma()
+    let output = soul()
         .args(["watch", "/nonexistent/watch/path"])
         .output()
         .expect("should run");
@@ -599,7 +599,7 @@ fn no_commands_produce_raw_panic() {
     ];
 
     for args in &test_cases {
-        let output = soma()
+        let output = soul()
             .args(args)
             .output()
             .expect("should run");
@@ -607,13 +607,13 @@ fn no_commands_produce_raw_panic() {
         let stdout = String::from_utf8_lossy(&output.stdout);
         assert!(
             !stderr.contains("thread 'main' panicked"),
-            "Panic in `soma {}`: {}",
+            "Panic in `soul {}`: {}",
             args.join(" "),
             stderr
         );
         assert!(
             !stdout.contains("thread 'main' panicked"),
-            "Panic in stdout `soma {}`: {}",
+            "Panic in stdout `soul {}`: {}",
             args.join(" "),
             stdout
         );
@@ -623,7 +623,7 @@ fn no_commands_produce_raw_panic() {
 #[test]
 fn error_messages_contain_actionable_guidance() {
     // Import nonexistent path should tell user what to do
-    let output = soma()
+    let output = soul()
         .args(["import", "/nonexistent"])
         .output()
         .expect("should run");
@@ -638,7 +638,7 @@ fn error_messages_contain_actionable_guidance() {
 #[test]
 fn import_error_contains_cross_icon() {
     // Error output should use the ✗ icon for visual clarity
-    soma()
+    soul()
         .args(["import", "/nonexistent"])
         .assert()
         .failure()
@@ -647,7 +647,7 @@ fn import_error_contains_cross_icon() {
 
 #[test]
 fn import_no_args_error_contains_cross_icon() {
-    soma()
+    soul()
         .arg("import")
         .assert()
         .failure()
@@ -667,7 +667,7 @@ fn import_folder_with_mixed_files_finds_supported() {
     fs::write(tmp.path().join("data.json"), r#"{"key": "value"}"#).unwrap();
     fs::write(tmp.path().join("photo.jpg"), "binary junk").unwrap();
 
-    let output = soma()
+    let output = soul()
         .args(["import", tmp.path().to_str().unwrap()])
         .output()
         .expect("should run");
@@ -694,7 +694,7 @@ fn import_folder_with_nested_structure() {
     fs::write(tmp.path().join("root.md"), "# Root file").unwrap();
     fs::write(sub.join("nested.txt"), "Nested content").unwrap();
 
-    let output = soma()
+    let output = soul()
         .args(["import", tmp.path().to_str().unwrap()])
         .output()
         .expect("should run");
@@ -719,7 +719,7 @@ fn import_folder_skips_hidden_dirs() {
     fs::write(hidden.join("secret.md"), "# Secret").unwrap();
     fs::write(tmp.path().join("visible.md"), "# Visible").unwrap();
 
-    let output = soma()
+    let output = soul()
         .args(["import", tmp.path().to_str().unwrap()])
         .output()
         .expect("should run");
@@ -745,16 +745,16 @@ fn import_folder_skips_hidden_dirs() {
 fn export_invalid_format_falls_through_to_markdown() {
     // BUG/UX ISSUE: --format bogus silently defaults to markdown
     // instead of showing an error. Documenting current behavior.
-    soma()
+    soul()
         .args(["export", "--format", "bogus"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("# Soma Memory Vault"));
+        .stdout(predicate::str::contains("# Soul Vault Memory"));
 }
 
 #[test]
 fn export_format_json_flag() {
-    soma()
+    soul()
         .args(["export", "--format", "json"])
         .assert()
         .success()
@@ -763,17 +763,17 @@ fn export_format_json_flag() {
 
 #[test]
 fn export_format_markdown_explicit() {
-    soma()
+    soul()
         .args(["export", "--format", "markdown"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("# Soma Memory Vault"));
+        .stdout(predicate::str::contains("# Soul Vault Memory"));
 }
 
 #[test]
 fn export_output_to_nonexistent_dir_fails_gracefully() {
     // Writing to a path where parent dir doesn't exist
-    let output = soma()
+    let output = soul()
         .args(["export", "-o", "/nonexistent/dir/output.md"])
         .output()
         .expect("should run");
@@ -790,8 +790,8 @@ fn export_output_to_nonexistent_dir_fails_gracefully() {
 
 #[test]
 fn double_dash_terminates_flags() {
-    // `soma import -- --help` should treat --help as a folder path, not a flag
-    soma()
+    // `soul import -- --help` should treat --help as a folder path, not a flag
+    soul()
         .args(["import", "--", "--help"])
         .assert()
         .failure()
@@ -805,7 +805,7 @@ fn export_short_flags_work() {
     let output_path = tmp.path().join("short-flag.md");
 
     // -o for output, -f for format, -t for topic
-    soma()
+    soul()
         .args(["export", "-o", output_path.to_str().unwrap(), "-f", "markdown"])
         .assert()
         .success();
@@ -815,7 +815,7 @@ fn export_short_flags_work() {
 
 #[test]
 fn multiple_unknown_flags_rejected() {
-    soma()
+    soul()
         .args(["import", "--verbose", "--dry-run"])
         .assert()
         .failure()
@@ -825,7 +825,7 @@ fn multiple_unknown_flags_rejected() {
 
 #[test]
 fn status_exits_zero() {
-    soma()
+    soul()
         .arg("status")
         .assert()
         .success();
@@ -833,7 +833,7 @@ fn status_exits_zero() {
 
 #[test]
 fn export_exits_zero() {
-    soma()
+    soul()
         .arg("export")
         .assert()
         .success();
@@ -842,13 +842,13 @@ fn export_exits_zero() {
 #[test]
 fn import_exits_one_on_error() {
     // Missing folder
-    soma()
+    soul()
         .arg("import")
         .assert()
         .code(1);
 
     // Nonexistent path
-    soma()
+    soul()
         .args(["import", "/no/such/path"])
         .assert()
         .code(1);
@@ -856,7 +856,7 @@ fn import_exits_one_on_error() {
 
 #[test]
 fn export_markdown_not_empty() {
-    let output = soma()
+    let output = soul()
         .arg("export")
         .output()
         .expect("should run");
@@ -866,7 +866,7 @@ fn export_markdown_not_empty() {
 
 #[test]
 fn export_json_not_empty() {
-    let output = soma()
+    let output = soul()
         .args(["export", "--format", "json"])
         .output()
         .expect("should run");
@@ -884,7 +884,7 @@ fn import_folder_with_empty_files() {
     fs::write(tmp.path().join("empty.md"), "").unwrap();
     fs::write(tmp.path().join("whitespace.txt"), "   \n\n   ").unwrap();
 
-    let output = soma()
+    let output = soul()
         .args(["import", tmp.path().to_str().unwrap()])
         .output()
         .expect("should run");
@@ -904,22 +904,22 @@ fn import_folder_with_empty_files() {
 
 #[test]
 fn import_nonexistent_shows_banner() {
-    // Import should show the Soma banner before the error.
+    // Import should show the Soul Vault banner before the error.
     // Banner goes to stdout, error goes to stderr.
-    soma()
+    soul()
         .args(["import", "/nonexistent"])
         .assert()
         .failure()
-        .stdout(predicate::str::contains("Soma"));
+        .stdout(predicate::str::contains("Soul Vault"));
 }
 
 #[test]
 fn status_shows_banner() {
-    soma()
+    soul()
         .arg("status")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Soma"));
+        .stdout(predicate::str::contains("Soul Vault"));
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -1042,7 +1042,7 @@ fn extract_box_sections(output: &str) -> Vec<String> {
 
 #[test]
 fn status_vault_overview_box_alignment() {
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -1061,7 +1061,7 @@ fn status_vault_overview_box_alignment() {
 
 #[test]
 fn status_providers_box_alignment() {
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -1080,7 +1080,7 @@ fn status_providers_box_alignment() {
 
 #[test]
 fn status_all_boxes_aligned() {
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -1116,7 +1116,7 @@ fn status_all_boxes_aligned() {
 
 #[test]
 fn status_top_bottom_borders_same_length() {
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -1157,7 +1157,7 @@ fn status_top_bottom_borders_same_length() {
 
 #[test]
 fn status_stat_rows_have_space_after_colon() {
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -1188,7 +1188,7 @@ fn status_stat_rows_have_space_after_colon() {
 
 #[test]
 fn status_stat_values_aligned_at_same_column() {
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -1234,7 +1234,7 @@ fn status_stat_values_aligned_at_same_column() {
 
 #[test]
 fn status_provider_names_consistently_padded() {
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -1293,7 +1293,7 @@ fn status_ansi_codes_dont_inflate_box_width() {
     // The raw output (with ANSI codes) should have the same box structure
     // as the stripped output. If ANSI codes are used in width calculations,
     // the boxes will be misaligned.
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -1352,7 +1352,7 @@ fn strip_ansi_helper_works() {
     // Verify our strip_ansi function handles common cases
     assert_eq!(strip_ansi("hello"), "hello");
     assert_eq!(strip_ansi("\x1b[31mred\x1b[0m"), "red");
-    assert_eq!(strip_ansi("\x1b[1;38;2;124;58;237mbold purple\x1b[0m"), "bold purple");
+    assert_eq!(strip_ansi("\x1b[1;38;2;245;166;35mbold gold\x1b[0m"), "bold gold");
     assert_eq!(strip_ansi("no codes here"), "no codes here");
     assert_eq!(strip_ansi("│\x1b[1mtext\x1b[0m│"), "│text│");
 
@@ -1415,7 +1415,7 @@ fn status_no_emoji_in_box_headers() {
     // Emoji in box headers cause terminal width inconsistencies because
     // different terminals render emoji at different widths (1 or 2 cells).
     // The fix was to remove emoji from box headers entirely.
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -1446,7 +1446,7 @@ fn status_no_emoji_in_box_headers() {
 #[test]
 fn status_box_content_no_trailing_text_after_border() {
     // After the closing │, there should be nothing but optional whitespace
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -1478,7 +1478,7 @@ fn status_box_content_no_trailing_text_after_border() {
 #[test]
 fn status_border_lines_no_trailing_text() {
     // After ┐, ┘, ┤ there should be nothing
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -1510,7 +1510,7 @@ fn status_border_lines_no_trailing_text() {
 #[test]
 fn status_box_structure_complete() {
     // Each box should have exactly: top border, header, separator, content lines, bottom border
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -1567,7 +1567,7 @@ fn status_box_structure_complete() {
 #[test]
 fn status_consistent_indentation() {
     // All box lines should start with the same indentation (2 spaces)
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -1603,7 +1603,7 @@ fn status_consistent_indentation() {
 fn import_nonexistent_no_double_blank_lines() {
     // Regression: banner() ends with \n, and the error handler in main()
     // used to prepend \n, creating a double blank line between banner and error.
-    let output = soma()
+    let output = soul()
         .args(["import", "/nonexistent"])
         .output()
         .expect("should run");
@@ -1622,7 +1622,7 @@ fn import_nonexistent_no_double_blank_lines() {
 
 #[test]
 fn watch_nonexistent_no_double_blank_lines() {
-    let output = soma()
+    let output = soul()
         .args(["watch", "/nonexistent"])
         .output()
         .expect("should run");
@@ -1640,8 +1640,8 @@ fn watch_nonexistent_no_double_blank_lines() {
 
 #[test]
 fn watch_no_folder_error_has_cross_icon() {
-    // Watch (no args) should use ✗ icon like import does
-    soma()
+    // Watch (no args) in non-TTY shows ✗ icon
+    soul()
         .arg("watch")
         .assert()
         .failure()
@@ -1650,21 +1650,21 @@ fn watch_no_folder_error_has_cross_icon() {
 
 #[test]
 fn watch_no_folder_error_shows_usage() {
-    soma()
+    soul()
         .arg("watch")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Usage: soma watch"));
+        .stderr(predicate::str::contains("Usage: soul watch"));
 }
 
 #[test]
 fn watch_and_import_no_args_errors_consistent() {
-    // Both import and watch should produce the same error format for missing folder
-    let import_out = soma()
+    // Both import and watch should produce error format for missing folder/non-TTY
+    let import_out = soul()
         .arg("import")
         .output()
         .expect("should run");
-    let watch_out = soma()
+    let watch_out = soul()
         .arg("watch")
         .output()
         .expect("should run");
@@ -1672,10 +1672,11 @@ fn watch_and_import_no_args_errors_consistent() {
     let import_stderr = strip_ansi(&String::from_utf8_lossy(&import_out.stderr));
     let watch_stderr = strip_ansi(&String::from_utf8_lossy(&watch_out.stderr));
 
-    // Both should contain "Missing folder path"
+    // Import shows "Missing folder path", watch shows "Auto-watch requires a terminal"
     assert!(import_stderr.contains("Missing folder path"),
         "Import error missing expected text. Got: {}", import_stderr);
-    assert!(watch_stderr.contains("Missing folder path"),
+    assert!(watch_stderr.contains("Auto-watch requires a terminal")
+        || watch_stderr.contains("Usage: soul watch"),
         "Watch error missing expected text. Got: {}", watch_stderr);
 
     // Both should contain ✗
@@ -1694,7 +1695,7 @@ fn watch_and_import_no_args_errors_consistent() {
 #[test]
 fn export_no_ingest_references() {
     // User-facing output should say "import" not "ingest"
-    let output = soma()
+    let output = soul()
         .arg("export")
         .output()
         .expect("should run");
@@ -1712,7 +1713,7 @@ fn export_no_ingest_references() {
 
 #[test]
 fn status_no_ingest_references() {
-    let output = soma()
+    let output = soul()
         .arg("status")
         .output()
         .expect("should run");
@@ -1732,7 +1733,7 @@ fn status_no_ingest_references() {
 #[test]
 fn help_no_ingest_references() {
     // Main help should not mention "ingest"
-    let output = soma()
+    let output = soul()
         .arg("--help")
         .output()
         .expect("should run");
@@ -1748,7 +1749,7 @@ fn help_no_ingest_references() {
 
 #[test]
 fn import_help_no_ingest_references() {
-    let output = soma()
+    let output = soul()
         .args(["import", "--help"])
         .output()
         .expect("should run");
@@ -1768,7 +1769,7 @@ fn import_help_no_ingest_references() {
 
 #[test]
 fn help_reset_subcommand() {
-    soma()
+    soul()
         .args(["help", "reset"])
         .assert()
         .success()
@@ -1778,7 +1779,7 @@ fn help_reset_subcommand() {
 
 #[test]
 fn reset_dash_dash_help() {
-    soma()
+    soul()
         .args(["reset", "--help"])
         .assert()
         .success()
@@ -1788,7 +1789,7 @@ fn reset_dash_dash_help() {
 
 #[test]
 fn help_flag_shows_reset_command() {
-    soma()
+    soul()
         .arg("--help")
         .assert()
         .success()
@@ -1797,9 +1798,9 @@ fn help_flag_shows_reset_command() {
 
 #[test]
 fn reset_without_vault_shows_nothing_to_reset() {
-    // Set HOME to a temp dir so ~/soma/ doesn't exist
+    // Set HOME to a temp dir so ~/soul-vault/ doesn't exist
     let tmp = tempdir().unwrap();
-    soma()
+    soul()
         .env("HOME", tmp.path().to_str().unwrap())
         .arg("reset")
         .assert()
@@ -1810,7 +1811,7 @@ fn reset_without_vault_shows_nothing_to_reset() {
 #[test]
 fn reset_force_without_vault_shows_nothing_to_reset() {
     let tmp = tempdir().unwrap();
-    soma()
+    soul()
         .env("HOME", tmp.path().to_str().unwrap())
         .args(["reset", "--force"])
         .assert()
@@ -1822,7 +1823,7 @@ fn reset_force_without_vault_shows_nothing_to_reset() {
 fn reset_force_with_temp_vault_deletes_vault() {
     // Create a fake vault in a temp home directory
     let tmp_home = tempdir().unwrap();
-    let vault_root = tmp_home.path().join("soma");
+    let vault_root = tmp_home.path().join("soul-vault");
     let config_dir = vault_root.join(".config");
     fs::create_dir_all(&config_dir).unwrap();
     fs::create_dir_all(vault_root.join("memories")).unwrap();
@@ -1835,7 +1836,7 @@ fn reset_force_with_temp_vault_deletes_vault() {
     let config = r#"{
         "providers": [],
         "processingLlm": "claude",
-        "vaultPath": "/tmp/soma",
+        "vaultPath": "/tmp/soul-vault",
         "createdAt": "2026-02-14T00:00:00Z"
     }"#;
     fs::write(config_dir.join("config.json"), config).unwrap();
@@ -1848,7 +1849,7 @@ fn reset_force_with_temp_vault_deletes_vault() {
     assert!(config_dir.join("config.json").exists());
 
     // Run reset --force with HOME set to our temp dir
-    soma()
+    soul()
         .env("HOME", tmp_home.path().to_str().unwrap())
         .args(["reset", "--force"])
         .assert()
@@ -1861,10 +1862,10 @@ fn reset_force_with_temp_vault_deletes_vault() {
 
 #[test]
 fn reset_without_force_in_non_tty_fails() {
-    // In tests, stdin is not a TTY, so `soma reset` without --force should fail
+    // In tests, stdin is not a TTY, so `soul reset` without --force should fail
     // But only if the vault exists. Use a temp home with a vault.
     let tmp_home = tempdir().unwrap();
-    let vault_root = tmp_home.path().join("soma");
+    let vault_root = tmp_home.path().join("soul-vault");
     let config_dir = vault_root.join(".config");
     fs::create_dir_all(&config_dir).unwrap();
     fs::create_dir_all(vault_root.join("memories")).unwrap();
@@ -1874,12 +1875,12 @@ fn reset_without_force_in_non_tty_fails() {
     let config = r#"{
         "providers": [],
         "processingLlm": "claude",
-        "vaultPath": "/tmp/soma",
+        "vaultPath": "/tmp/soul-vault",
         "createdAt": "2026-02-14T00:00:00Z"
     }"#;
     fs::write(config_dir.join("config.json"), config).unwrap();
 
-    soma()
+    soul()
         .env("HOME", tmp_home.path().to_str().unwrap())
         .arg("reset")
         .assert()
@@ -1890,7 +1891,7 @@ fn reset_without_force_in_non_tty_fails() {
 
 #[test]
 fn reset_no_panic() {
-    let output = soma()
+    let output = soul()
         .arg("reset")
         .output()
         .expect("should run");
@@ -1903,7 +1904,7 @@ fn reset_no_panic() {
 #[test]
 fn reset_force_short_flag() {
     let tmp = tempdir().unwrap();
-    soma()
+    soul()
         .env("HOME", tmp.path().to_str().unwrap())
         .args(["reset", "-f"])
         .assert()

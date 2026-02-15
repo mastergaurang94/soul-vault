@@ -10,4 +10,4 @@ Quick notes from today:
 - Need to schedule dentist appointment for next month
 - Reading "The Art of War" — finding interesting parallels to business strategy
 - Crypto portfolio: mostly ETH, some SOL positions, interested in AI tokens
-- Soma should support incremental syncing in v0.2
+- SoulVolt should support incremental syncing in v0.2

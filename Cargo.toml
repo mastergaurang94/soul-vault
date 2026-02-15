@@ -1,15 +1,15 @@
 [package]
-name = "soma-vault"
+name = "soul-vault"
 version = "0.1.0"
 edition = "2021"
 description = "Your AI memory, unified. Distills AI conversations into a structured local vault."
 license = "MIT"
-repository = "https://github.com/user/soma"
+repository = "https://github.com/user/soul-vault"
 keywords = ["ai", "memory", "cli", "vault"]
 categories = ["command-line-utilities"]
 
 [[bin]]
-name = "soma"
+name = "soul"
 path = "src/main.rs"
 
 [dependencies]
@@ -35,6 +35,9 @@ colored = "2"
 # Error handling
 anyhow = "1"
 thiserror = "2"
+
+# Archive handling
+zip = "2"
 
 # Utilities
 dirs = "5"

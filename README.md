@@ -1,6 +1,6 @@
-# Soma — Your AI Memory, Unified
+# Soul Vault — Your AI Memory, Unified
 
-A CLI tool that distills AI conversations into a structured local vault. Point it at any folder of transcripts, notes, or ChatGPT exports and Soma extracts structured memories — identity, preferences, decisions, relationships, topics — into readable markdown files at `~/soma/`.
+A CLI tool that distills AI conversations into a structured local vault. Point it at any folder of transcripts, notes, or ChatGPT exports and Soul Vault extracts structured memories — identity, preferences, decisions, relationships, topics — into readable markdown files at `~/soul-vault/`.
 
 Built in Rust for instant startup, single-binary distribution, and premium terminal experience.
 
@@ -9,7 +9,7 @@ Built in Rust for instant startup, single-binary distribution, and premium termi
 ### Quick Install (recommended)
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/user/soma/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/user/soul-vault/main/install.sh | bash
 ```
 
 Downloads the latest release binary for your platform and installs to `~/.local/bin/`.
@@ -17,45 +17,45 @@ Downloads the latest release binary for your platform and installs to `~/.local/
 Set a custom install directory or version:
 
 ```bash
-SOMA_INSTALL_DIR=/usr/local/bin SOMA_VERSION=v0.1.0 bash install.sh
+SOUL_VAULT_INSTALL_DIR=/usr/local/bin SOUL_VAULT_VERSION=v0.1.0 bash install.sh
 ```
 
 ### Homebrew (coming soon)
 
 ```bash
-brew install user/tap/soma
+brew install user/tap/soul-vault
 ```
 
 ### Cargo install
 
 ```bash
-cargo install soma-vault
+cargo install soul-vault
 ```
 
 ### From source
 
 ```bash
-git clone https://github.com/user/soma.git
-cd soma
+git clone https://github.com/user/soul-vault.git
+cd soul-vault
 cargo build --release
-# Binary at target/release/soma (~4.3 MB)
+# Binary at target/release/soul (~4.3 MB)
 ```
 
 ### GitHub Releases
 
-Download pre-built binaries directly from [GitHub Releases](https://github.com/user/soma/releases):
+Download pre-built binaries directly from [GitHub Releases](https://github.com/user/soul-vault/releases):
 
 | Platform | Binary |
 |----------|--------|
-| macOS (Apple Silicon) | `soma-macos-arm64` |
-| macOS (Intel) | `soma-macos-x86_64` |
-| Linux (x86_64) | `soma-linux-x86_64` |
-| Linux (ARM64) | `soma-linux-arm64` |
+| macOS (Apple Silicon) | `soul-macos-arm64` |
+| macOS (Intel) | `soul-macos-x86_64` |
+| Linux (x86_64) | `soul-linux-x86_64` |
+| Linux (ARM64) | `soul-linux-arm64` |
 
 ```bash
 # Example: download, make executable, move to PATH
-chmod +x soma-macos-arm64
-mv soma-macos-arm64 ~/.local/bin/soma
+chmod +x soul-macos-arm64
+mv soul-macos-arm64 ~/.local/bin/soul
 ```
 
 ## Usage
@@ -63,7 +63,7 @@ mv soma-macos-arm64 ~/.local/bin/soma
 ### Interactive Menu
 
 ```bash
-soma
+soul
 ```
 
 Launches a beautiful TUI menu with arrow key / vim binding navigation.
@@ -71,27 +71,27 @@ Launches a beautiful TUI menu with arrow key / vim binding navigation.
 ### Initialize Vault
 
 ```bash
-soma init
+soul init
 ```
 
 First-time setup wizard:
-1. Creates `~/soma/` directory structure
+1. Creates `~/soul-vault/` directory structure
 2. Asks which providers to connect (Claude, ChatGPT, Gemini)
 3. Selects which LLM to use for memory extraction
-4. Collects API keys (stored locally in `~/soma/.config/keys.json`)
+4. Collects API keys (stored locally in `~/soul-vault/.config/keys.json`)
 
 ### Import Files
 
 ```bash
-soma import ~/Documents/ai-conversations/
+soul import ~/Documents/ai-conversations/
 ```
 
-**The killer feature.** Point at any folder and Soma:
+**The killer feature.** Point at any folder and Soul Vault:
 - Discovers `.md`, `.txt`, `.json`, `.jsonl` files recursively
 - Chunks them for LLM processing
 - Sends through Claude to extract structured memories
 - Merges and deduplicates with existing vault
-- Writes to `~/soma/` as clean markdown
+- Writes to `~/soul-vault/` as clean markdown
 
 Supports: raw transcripts, ChatGPT JSON exports, session logs, Obsidian notes, and any text.
 
@@ -99,16 +99,16 @@ Supports: raw transcripts, ChatGPT JSON exports, session logs, Obsidian notes, a
 
 ```bash
 # Print to stdout
-soma export
+soul export
 
 # Write to file
-soma export -o ~/context.md
+soul export -o ~/context.md
 
 # JSON format
-soma export --format json
+soul export --format json
 
 # Filter by topic
-soma export --topic crypto
+soul export --topic crypto
 ```
 
 Outputs your entire vault as a single context document that any AI can consume.
@@ -116,7 +116,7 @@ Outputs your entire vault as a single context document that any AI can consume.
 ### Status
 
 ```bash
-soma status
+soul status
 ```
 
 Shows vault summary: memory counts, topics, people, provider status.
@@ -124,7 +124,7 @@ Shows vault summary: memory counts, topics, people, provider status.
 ### Watch
 
 ```bash
-soma watch ~/Documents/ai-conversations/
+soul watch ~/Documents/ai-conversations/
 ```
 
 Watches a folder for changes and automatically imports new or modified files.
@@ -132,7 +132,7 @@ Watches a folder for changes and automatically imports new or modified files.
 ## Vault Structure
 
 ```
-~/soma/
+~/soul-vault/
   .config/
     config.json          # Settings, provider config
     keys.json            # API keys (0600 permissions, gitignored)
@@ -169,11 +169,12 @@ All files are human-readable markdown. Open them in any text editor.
 
 ## Color Palette
 
-- **Purple** `#7C3AED` — primary brand
-- **Cyan** `#06B6D4` — secondary / links
-- **Amber** `#F59E0B` — accents / warnings
+- **Gold** `#FFBF00` — primary brand (warm, soulful)
+- **Cyan** `#06B6D4` — secondary / accents, links, active states
+- **Amber** `#F59E0B` — warm highlights / warnings
 - **Emerald** `#10B981` — success
 - **Red** `#EF4444` — errors
+- **Gray** — muted / secondary text
 
 ## Development
 

@@ -1,4 +1,4 @@
-# Soma — Design Principles
+# Soul Vault — Design Principles
 
 ## Code Organization
 
@@ -14,11 +14,11 @@
 
 5. **Error messages are instructions.** Every error tells the user both what happened AND what to do about it:
    ```rust
-   #[error("Soma vault not initialized.\n      → Run `soma init` to create your vault.")]
+   #[error("Soul Vault not initialized.\n      → Run `soul init` to create your vault.")]
    NotInitialized,
    ```
 
-6. **Use `thiserror` for typed errors.** `SomaError` in `types/mod.rs` defines all domain errors with actionable messages.
+6. **Use `thiserror` for typed errors.** `SoulVaultError` in `types/mod.rs` defines all domain errors with actionable messages.
 
 ## Validate at Boundaries
 

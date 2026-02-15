@@ -1,10 +1,10 @@
-# CLAUDE.md — Soma
+# CLAUDE.md — Soul Vault
 
 > Start here. Read this file first, then follow the links.
 
-## What is Soma?
+## What is Soul Vault?
 
-Rust CLI that distills AI conversations into a structured local vault (`~/soma/`).
+Rust CLI that distills AI conversations into a structured local vault (`~/soul-vault/`).
 Point it at any folder of transcripts, notes, or exports → it extracts structured memories into readable markdown.
 
 ## Orientation

@@ -1,4 +1,4 @@
-//! `soma ingest <folder>` — file ingestion with source tracking and dedup.
+//! `soul ingest <folder>` — file ingestion with source tracking and dedup.
 
 use anyhow::Result;
 use indicatif::{ProgressBar, ProgressStyle};
@@ -49,7 +49,7 @@ pub async fn run(folder_path: &str, force: bool) -> Result<()> {
         println!(
             "\n  {} {} {}",
             dim("Use"),
-            cyan("soma import --force <folder>"),
+            cyan("soul import --force <folder>"),
             dim("to re-import everything.")
         );
         println!();
@@ -268,7 +268,7 @@ async fn process_all_chunks(
     println!(
         "\n  {} {}\n",
         ICON_BRAIN,
-        purple("Processing through Claude...")
+        gold("Processing through Claude...")
     );
 
     let client = reqwest::Client::new();
@@ -278,7 +278,7 @@ async fn process_all_chunks(
     let pb = ProgressBar::new(all_chunks.len() as u64);
     pb.set_style(
         ProgressStyle::with_template(
-            "  {spinner:.magenta} [{bar:20.magenta/dark_gray}] {pos}/{len} {msg}",
+            "  {spinner:.yellow} [{bar:20.yellow/dark_gray}] {pos}/{len} {msg}",
         )
         .unwrap()
         .progress_chars("█░░"),
@@ -311,7 +311,7 @@ async fn process_all_chunks(
                 // Fatal errors
                 if msg.contains("API key") || msg.contains("401") {
                     pb.finish_and_clear();
-                    anyhow::bail!("API key error. Run `soma init` to reconfigure.");
+                    anyhow::bail!("API key error. Run `soul init` to reconfigure.");
                 }
 
                 // Rate limit — wait and retry
@@ -356,7 +356,7 @@ fn print_summary(
     println!(
         "\n  {} {}\n",
         amber(ICON_STAR),
-        bold_purple("Import complete!")
+        bold_gold("Import complete!")
     );
 
     // Import stats
@@ -394,7 +394,7 @@ fn print_summary(
     println!(
         "\n  {} {} {}",
         dim("Run"),
-        cyan("soma status"),
+        cyan("soul status"),
         dim("to see your vault.")
     );
     println!();
@@ -405,7 +405,7 @@ fn print_summary(
 fn spinner(msg: &str) -> ProgressBar {
     let pb = ProgressBar::new_spinner();
     pb.set_style(
-        ProgressStyle::with_template("  {spinner:.magenta} {msg}")
+        ProgressStyle::with_template("  {spinner:.yellow} {msg}")
             .unwrap()
             .tick_strings(&["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]),
     );

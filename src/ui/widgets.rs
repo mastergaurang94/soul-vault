@@ -1,4 +1,4 @@
-//! Reusable ratatui widgets for Soma's TUI.
+//! Reusable ratatui widgets for Soul Vault's TUI.
 
 use ratatui::{
     buffer::Buffer,
@@ -24,7 +24,9 @@ impl<'a> Widget for MenuItem<'a> {
         let (prefix, label_style, desc_style) = if self.selected {
             (
                 "  ▶ ",
-                Style::default().fg(rat::PURPLE).add_modifier(Modifier::BOLD),
+                Style::default()
+                    .fg(rat::GOLD)
+                    .add_modifier(Modifier::BOLD),
                 Style::default().fg(rat::DIM),
             )
         } else {
@@ -45,12 +47,16 @@ impl<'a> Widget for MenuItem<'a> {
     }
 }
 
-/// A themed block with Soma's purple border.
+/// A themed block with Soul Vault's gold border.
 #[allow(dead_code)]
-pub fn soma_block(title: &str) -> Block<'_> {
+pub fn soul_vault_block(title: &str) -> Block<'_> {
     Block::default()
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(rat::PURPLE))
-        .title_style(Style::default().fg(rat::PURPLE).add_modifier(Modifier::BOLD))
+        .border_style(Style::default().fg(rat::GOLD))
+        .title_style(
+            Style::default()
+                .fg(rat::GOLD)
+                .add_modifier(Modifier::BOLD),
+        )
         .title(title)
 }

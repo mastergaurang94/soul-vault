@@ -1,6 +1,6 @@
 //! Source tracking: dedup prevention via file hash tracking.
 //!
-//! Tracks ingested paths with metadata in ~/soma/.config/sources.json
+//! Tracks ingested paths with metadata in ~/soul-vault/.config/sources.json
 //! to prevent duplicate ingestion on repeated runs.
 
 use anyhow::{Context, Result};

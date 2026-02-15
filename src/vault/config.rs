@@ -5,15 +5,15 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use crate::types::{KeysConfig, SomaConfig, SomaError};
+use crate::types::{KeysConfig, SoulVaultConfig, SoulVaultError};
 
 // ─── Paths ────────────────────────────────────────────────────────────────────
 
-/// Returns the vault root directory: ~/soma/
+/// Returns the vault root directory: ~/soul-vault/
 pub fn vault_root() -> PathBuf {
     dirs::home_dir()
         .expect("Could not determine home directory")
-        .join("soma")
+        .join("soul-vault")
 }
 
 pub fn config_dir() -> PathBuf {
@@ -77,21 +77,21 @@ pub fn create_vault_structure() -> Result<()> {
 
 // ─── Config Read/Write ────────────────────────────────────────────────────────
 
-/// Reads and validates config.json. Returns SomaError::NotInitialized if missing.
-pub fn read_config() -> Result<SomaConfig> {
+/// Reads and validates config.json. Returns SoulVaultError::NotInitialized if missing.
+pub fn read_config() -> Result<SoulVaultConfig> {
     let path = config_path();
     if !path.exists() {
-        return Err(SomaError::NotInitialized.into());
+        return Err(SoulVaultError::NotInitialized.into());
     }
     let raw = fs::read_to_string(&path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
-    let config: SomaConfig = serde_json::from_str(&raw)
+    let config: SoulVaultConfig = serde_json::from_str(&raw)
         .with_context(|| "Failed to parse config.json")?;
     Ok(config)
 }
 
 /// Writes config.json with pretty formatting.
-pub fn write_config(config: &SomaConfig) -> Result<()> {
+pub fn write_config(config: &SoulVaultConfig) -> Result<()> {
     let path = config_path();
     fs::create_dir_all(config_dir())?;
     let json = serde_json::to_string_pretty(config)?;
@@ -174,10 +174,10 @@ pub fn create_default_files() -> Result<()> {
     Ok(())
 }
 
-/// Asserts that the vault is initialized. Returns SomaError::NotInitialized if not.
+/// Asserts that the vault is initialized. Returns SoulVaultError::NotInitialized if not.
 pub fn assert_initialized() -> Result<()> {
     if !is_initialized() {
-        return Err(SomaError::NotInitialized.into());
+        return Err(SoulVaultError::NotInitialized.into());
     }
     Ok(())
 }
@@ -185,7 +185,7 @@ pub fn assert_initialized() -> Result<()> {
 /// Asserts that a path exists.
 pub fn assert_path_exists(path: &Path) -> Result<()> {
     if !path.exists() {
-        return Err(SomaError::PathNotFound {
+        return Err(SoulVaultError::PathNotFound {
             path: path.display().to_string(),
         }
         .into());
@@ -198,9 +198,9 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_vault_root_is_home_soma() {
+    fn test_vault_root_is_home_soul_vault() {
         let root = vault_root();
-        assert!(root.ends_with("soma"));
+        assert!(root.ends_with("soul-vault"));
     }
 
     #[test]
@@ -222,20 +222,20 @@ mod tests {
     fn test_config_serde_roundtrip() {
         use crate::types::{Provider, ProviderConfig};
 
-        let config = SomaConfig {
+        let config = SoulVaultConfig {
             providers: vec![ProviderConfig {
                 name: Provider::Claude,
                 enabled: true,
                 last_pull: None,
             }],
             processing_llm: Provider::Claude,
-            vault_path: "/tmp/soma".to_string(),
+            vault_path: "/tmp/soul-vault".to_string(),
             created_at: "2026-02-14T00:00:00Z".to_string(),
             last_sync: None,
         };
 
         let json = serde_json::to_string_pretty(&config).unwrap();
-        let parsed: SomaConfig = serde_json::from_str(&json).unwrap();
+        let parsed: SoulVaultConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.processing_llm, Provider::Claude);
         assert_eq!(parsed.providers.len(), 1);
     }

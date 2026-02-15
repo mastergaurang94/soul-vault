@@ -1,5 +1,8 @@
-//! `soma` (no args) — inline interactive menu with arrow key / vim bindings.
-//! No alternate screen — renders in the normal terminal flow.
+//! `soul` (no args) — legacy inline interactive menu.
+//! Replaced by `tui::run()` for the full-screen TUI experience.
+//! Kept for reference; may be removed in a future release.
+
+#![allow(dead_code)]
 
 use anyhow::Result;
 use crossterm::{
@@ -107,8 +110,8 @@ pub fn run() -> Result<()> {
                 let folder = input.trim();
                 if folder.is_empty() {
                     println!("\n  No folder path provided.\n");
-                    println!("  Usage: soma import <folder>");
-                    println!("  Example: soma import ~/Documents/chatgpt-exports\n");
+                    println!("  Usage: soul import <folder>");
+                    println!("  Example: soul import ~/Documents/chatgpt-exports\n");
                 } else {
                     let rt = tokio::runtime::Handle::current();
                     rt.block_on(crate::cli::ingest::run(folder, false))?;
@@ -122,8 +125,8 @@ pub fn run() -> Result<()> {
                 let folder = input.trim();
                 if folder.is_empty() {
                     println!("\n  No folder path provided.\n");
-                    println!("  Usage: soma watch <folder>");
-                    println!("  Example: soma watch ~/Documents/chatgpt-exports\n");
+                    println!("  Usage: soul watch <folder>");
+                    println!("  Example: soul watch ~/Documents/chatgpt-exports\n");
                 } else {
                     let rt = tokio::runtime::Handle::current();
                     rt.block_on(crate::cli::watch::run(folder))?;
@@ -219,11 +222,11 @@ fn print_menu_item(index: usize, item: &MenuItem, is_selected: bool) {
     if is_selected {
         let label = format!("  > {} {}", num, item.label);
         if item.description.is_empty() {
-            println!("{}", bold_purple(&label));
+            println!("{}", bold_gold(&label));
         } else {
             println!(
                 "{}  {}",
-                bold_purple(&label),
+                bold_gold(&label),
                 dim(item.description)
             );
         }
@@ -258,10 +261,10 @@ fn reprint_menu(selected: usize, menu_len: usize) -> Result<()> {
         if i == selected {
             let label = format!("  > {} {}", num, item.label);
             if item.description.is_empty() {
-                let line = bold_purple(&label);
+                let line = bold_gold(&label);
                 out.execute(Print(format!("{}\r\n", line)))?;
             } else {
-                let line = format!("{}  {}", bold_purple(&label), dim(item.description));
+                let line = format!("{}  {}", bold_gold(&label), dim(item.description));
                 out.execute(Print(format!("{}\r\n", line)))?;
             }
         } else {
@@ -296,24 +299,24 @@ fn print_non_tty_help() {
     println!("{}", banner());
     println!("  Interactive mode requires a terminal (TTY).");
     println!("  Use a subcommand instead:\n");
-    println!("    {}              Initialize vault", cyan("soma init"));
+    println!("    {}              Initialize vault", cyan("soul init"));
     println!(
         "    {}  Import files",
-        cyan("soma import <folder>")
+        cyan("soul import <folder>")
     );
     println!(
         "    {}   Watch folder for changes",
-        cyan("soma watch <folder>")
+        cyan("soul watch <folder>")
     );
-    println!("    {}            Export vault context", cyan("soma export"));
-    println!("    {}            Show vault summary", cyan("soma status"));
+    println!("    {}            Export vault context", cyan("soul export"));
+    println!("    {}            Show vault summary", cyan("soul status"));
     println!(
         "    {}            Delete vault and start over",
-        cyan("soma reset")
+        cyan("soul reset")
     );
     println!(
         "    {}            Show all commands",
-        dim("soma --help")
+        dim("soul --help")
     );
     println!();
 }

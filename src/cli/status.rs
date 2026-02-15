@@ -1,4 +1,4 @@
-//! `soma status` — displays vault summary with source tracking and provider status.
+//! `soul status` — displays vault summary with source tracking and provider status.
 
 use anyhow::Result;
 use std::fs;
@@ -26,7 +26,7 @@ pub fn run() -> Result<()> {
     // ─── Header ───────────────────────────────────────────────────────────
     println!(
         "  {} {} {}",
-        bold_purple("Soma Vault"),
+        bold_gold("Soul Vault"),
         amber(ICON_STAR),
         dim(&stats.vault_path)
     );
@@ -115,7 +115,7 @@ pub fn run() -> Result<()> {
         println!(
             "  {} {} {}",
             dim("Run"),
-            cyan("soma import <folder>"),
+            cyan("soul import <folder>"),
             dim("to get started.")
         );
     }

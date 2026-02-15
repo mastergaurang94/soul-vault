@@ -21,19 +21,19 @@ jobs:
         include:
           - target: aarch64-apple-darwin
             runner: macos-14
-            artifact: soma-macos-arm64
+            artifact: soul-macos-arm64
             cross: false
           - target: x86_64-apple-darwin
             runner: macos-14
-            artifact: soma-macos-x86_64
+            artifact: soul-macos-x86_64
             cross: false
           - target: x86_64-unknown-linux-gnu
             runner: ubuntu-latest
-            artifact: soma-linux-x86_64
+            artifact: soul-linux-x86_64
             cross: false
           - target: aarch64-unknown-linux-gnu
             runner: ubuntu-latest
-            artifact: soma-linux-arm64
+            artifact: soul-linux-arm64
             cross: true
 
     steps:
@@ -70,7 +70,7 @@ jobs:
       - name: Package binary
         run: |
           mkdir -p dist
-          cp target/${{ matrix.target }}/release/soma dist/${{ matrix.artifact }}
+          cp target/${{ matrix.target }}/release/soul dist/${{ matrix.artifact }}
           cd dist
           shasum -a 256 ${{ matrix.artifact }} > ${{ matrix.artifact }}.sha256
           cat ${{ matrix.artifact }}.sha256
@@ -110,7 +110,7 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            release/soma-*
+            release/soul-*
           body_path: release/checksums.txt
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

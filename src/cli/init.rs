@@ -1,9 +1,9 @@
-//! `soma init` — first-time setup wizard.
+//! `soul init` — first-time setup wizard.
 
 use anyhow::Result;
 use std::io::{self, Write};
 
-use crate::types::{Provider, ProviderConfig, SomaConfig};
+use crate::types::{Provider, ProviderConfig, SoulVaultConfig};
 use crate::ui::theme::*;
 use crate::vault::config::{
     create_default_files, create_gitignore, create_vault_structure, is_initialized, set_api_key,
@@ -19,7 +19,7 @@ pub fn run() -> Result<()> {
 
     if is_initialized() {
         println!(
-            "\n  {} Soma vault already initialized at {}",
+            "\n  {} Soul Vault already initialized at {}",
             amber(ICON_STAR),
             cyan(&vault_root().display().to_string())
         );
@@ -43,7 +43,7 @@ pub fn run() -> Result<()> {
     println!("{}", check("Vault structure created"));
 
     // Step 2: Provider selection
-    println!("\n{}\n", purple("  Select providers to connect:"));
+    println!("\n{}\n", gold("  Select providers to connect:"));
     let mut providers = Vec::new();
 
     for provider in &[Provider::Claude, Provider::ChatGpt, Provider::Gemini] {
@@ -70,7 +70,7 @@ pub fn run() -> Result<()> {
     }
 
     // Step 3: Processing LLM selection
-    println!("\n{}", purple("  Select processing LLM:"));
+    println!("\n{}", gold("  Select processing LLM:"));
     println!(
         "{}",
         dim("  This is the AI that will extract memories from your conversations.\n")
@@ -99,10 +99,10 @@ pub fn run() -> Result<()> {
     let enabled_providers: Vec<&ProviderConfig> =
         providers.iter().filter(|p| p.enabled).collect();
     if !enabled_providers.is_empty() || processing_llm != Provider::Gemini {
-        println!("\n{}", purple("  API Keys:"));
+        println!("\n{}", gold("  API Keys:"));
         println!(
             "{}",
-            dim("  Keys are stored locally in ~/soma/.config/keys.json\n")
+            dim("  Keys are stored locally in ~/soul-vault/.config/keys.json\n")
         );
 
         let mut needed: Vec<Provider> = vec![processing_llm.clone()];
@@ -140,7 +140,7 @@ pub fn run() -> Result<()> {
     // Step 5: Save config
     print!("  Saving configuration... ");
     io::stdout().flush()?;
-    let config = SomaConfig {
+    let config = SoulVaultConfig {
         providers,
         processing_llm,
         vault_path: vault_root().display().to_string(),
@@ -155,14 +155,14 @@ pub fn run() -> Result<()> {
     println!(
         "\n  {} {} {}",
         amber(ICON_STAR),
-        bold_purple("Soma vault initialized!"),
+        bold_gold("Soul Vault initialized!"),
         dim(&format!("→ {}", vault_root().display()))
     );
     println!("\n{}", dim("  Next steps:"));
     let next_steps: &[(&str, &str)] = &[
-        ("soma import <folder>", "Import your AI conversations"),
-        ("soma status", "Check your vault"),
-        ("soma export", "Output context for any AI"),
+        ("soul import <folder>", "Import your AI conversations"),
+        ("soul status", "Check your vault"),
+        ("soul export", "Output context for any AI"),
     ];
     let col_width = 24; // visible width for command column
     for (cmd, desc) in next_steps {

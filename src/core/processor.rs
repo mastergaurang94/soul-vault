@@ -5,7 +5,7 @@ use serde_json::json;
 
 use crate::core::parser::parse_extraction_response;
 use crate::core::prompt::EXTRACTION_PROMPT;
-use crate::types::{ChunkInfo, ExtractedMemories, SomaError};
+use crate::types::{ChunkInfo, ExtractedMemories, SoulVaultError};
 use crate::vault::config::get_api_key;
 
 // ─── API Constants ────────────────────────────────────────────────────────────
@@ -24,7 +24,7 @@ pub async fn process_chunk(
     chunk: &ChunkInfo,
 ) -> Result<ExtractedMemories> {
     let api_key = get_api_key("claude")?
-        .ok_or(SomaError::MissingApiKey {
+        .ok_or(SoulVaultError::MissingApiKey {
             provider: "Claude".to_string(),
         })?;
 
@@ -63,11 +63,11 @@ pub async fn process_chunk(
     let status = response.status();
 
     if status == reqwest::StatusCode::TOO_MANY_REQUESTS {
-        return Err(SomaError::RateLimited.into());
+        return Err(SoulVaultError::RateLimited.into());
     }
 
     if status == reqwest::StatusCode::UNAUTHORIZED {
-        return Err(SomaError::MissingApiKey {
+        return Err(SoulVaultError::MissingApiKey {
             provider: "Claude".to_string(),
         }
         .into());
@@ -75,7 +75,7 @@ pub async fn process_chunk(
 
     if !status.is_success() {
         let body = response.text().await.unwrap_or_default();
-        return Err(SomaError::ApiError {
+        return Err(SoulVaultError::ApiError {
             status: status.as_u16(),
             message: body,
         }

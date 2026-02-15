@@ -1,17 +1,29 @@
-# Soma — Architecture
+# Soul Vault — Architecture
 
 ## Module Map
 
 ```
 src/
 ├── main.rs                    Entry point. Clap CLI definition, tokio runtime, dispatch to commands.
+├── tui/                       Full-screen ratatui TUI (launched by `soul` with no args)
+│   ├── mod.rs                 Entry point, event loop, layout (header + sidebar + content + footer)
+│   ├── app.rs                 App state (current page, sidebar selection, focus, vault status)
+│   ├── sidebar.rs             Sidebar navigation widget with gold selection highlight
+│   └── pages/                 Page implementations (each: render + handle_key)
+│       ├── mod.rs             PageWidget trait + PageAction enum
+│       ├── status.rs          Status dashboard (vault stats, providers, sources)
+│       ├── browse.rs          Vault file browser (tree + preview)
+│       ├── import.rs          Import workflow (folder input + validation)
+│       ├── export.rs          Export options (format, topic filter, output path)
+│       ├── watch.rs           Watch mode (folder input + guidance)
+│       └── settings.rs        Config display (providers, LLM, vault path)
 ├── cli/                       Command implementations (thin wrappers orchestrating core + vault)
 │   ├── mod.rs                 Module declarations
-│   ├── init.rs                `soma init` — interactive setup wizard (providers, API keys, vault creation)
-│   ├── ingest.rs              `soma ingest <folder>` — scan → classify → chunk → LLM → merge → write pipeline
-│   ├── export.rs              `soma export` — reads vault, builds context document (markdown or JSON)
-│   ├── status.rs              `soma status` — vault summary (counts, providers, last sync)
-│   └── interactive.rs         `soma` (no args) — ratatui TUI menu with arrow/vim navigation
+│   ├── init.rs                `soul init` — interactive setup wizard (providers, API keys, vault creation)
+│   ├── ingest.rs              `soul ingest <folder>` — scan → classify → chunk → LLM → merge → write pipeline
+│   ├── export.rs              `soul export` — reads vault, builds context document (markdown or JSON)
+│   ├── status.rs              `soul status` — vault summary (counts, providers, last sync)
+│   └── interactive.rs         Legacy inline menu (replaced by tui/, kept for reference)
 ├── core/                      Business logic (no I/O, no UI)
 │   ├── mod.rs                 Module declarations
 │   ├── processor.rs           LLM API calls — sends chunks to Claude via reqwest, returns ExtractedMemories
@@ -29,11 +41,11 @@ src/
 │   ├── local.rs               Discovers .md/.txt/.json/.jsonl files, reads content, parses ChatGPT exports
 │   └── chatgpt.rs             Placeholder for future ChatGPT API direct integration
 ├── types/                     All shared types (leaf node — no internal imports)
-│   └── mod.rs                 Provider, Confidence, SomaConfig, ExtractedMemories, all fact types, SomaError
+│   └── mod.rs                 Provider, Confidence, SoulVaultConfig, ExtractedMemories, all fact types, SoulVaultError
 └── ui/                        Terminal presentation
     ├── mod.rs                 Module declarations
-    ├── theme.rs               Color palette (purple/cyan/amber/emerald/red), icons, text formatters
-    └── widgets.rs             Ratatui widgets: MenuItem, soma_block
+    ├── theme.rs               Color palette (gold/cyan/amber/emerald/red), icons, text formatters
+    └── widgets.rs             Ratatui widgets: MenuItem, soul_vault_block
 ```
 
 ## Dependency Direction
@@ -48,7 +60,7 @@ ui/        ← depends on nothing internal (standalone formatters)
 main.rs    ← depends on cli/, ui/
 ```
 
-**Rule:** Core never imports CLI. Types are leaf nodes. UI is standalone.
+**Rule:** Core never imports CLI. Types are leaf nodes. UI is standalone. TUI depends on vault/, ui/, cli/ (for export).
 
 ## Key Types (all in `types/mod.rs`)
 
@@ -56,7 +68,7 @@ main.rs    ← depends on cli/, ui/
 |------|---------|
 | `Provider` | Enum: Claude, ChatGpt, Gemini |
 | `Confidence` | Enum: High, Medium, Low |
-| `SomaConfig` | Vault config (providers, processing LLM, vault path) |
+| `SoulVaultConfig` | Vault config (providers, processing LLM, vault path) |
 | `KeysConfig` | HashMap<String, String> for API keys |
 | `ExtractedMemories` | Container for all extracted facts (identity, preferences, decisions, relationships, topics, emotional_context) |
 | `IdentityFact` | Identity fact (content, category, confidence, source, date) |
@@ -68,11 +80,11 @@ main.rs    ← depends on cli/, ui/
 | `ChunkInfo` | Text chunk for LLM processing (content, source, index, total) |
 | `VaultStats` | Vault summary for status command |
 | `VaultContent` | Full vault content for export |
-| `SomaError` | Typed errors with actionable messages (thiserror) |
+| `SoulVaultError` | Typed errors with actionable messages (thiserror) |
 
 ## Ingest Pipeline
 
-The core data flow when you run `soma ingest <folder>`:
+The core data flow when you run `soul ingest <folder>`:
 
 ```
 1. SCAN           discover_files(folder)                     → Vec<FileInfo>
@@ -103,9 +115,9 @@ The core data flow when you run `soma ingest <folder>`:
 ## Vault Layout
 
 ```
-~/soma/
+~/soul-vault/
   .config/
-    config.json      Settings, provider config (created by `soma init`)
+    config.json      Settings, provider config (created by `soul init`)
     keys.json        API keys (0600 permissions, gitignored)
     sources.json     File hash tracking for ingestion dedup
   identity/
@@ -125,6 +137,6 @@ The core data flow when you run `soma ingest <folder>`:
 
 ## Error Handling
 
-- **Library code:** `anyhow::Result` for propagation, `thiserror` for typed errors in `SomaError`
+- **Library code:** `anyhow::Result` for propagation, `thiserror` for typed errors in `SoulVaultError`
 - **main.rs only:** `std::process::exit(1)` — the single place where errors become exit codes
-- **Every error message tells the user what to do:** e.g., `"Run \`soma init\` to create your vault."`
+- **Every error message tells the user what to do:** e.g., `"Run \`soul init\` to create your vault."`

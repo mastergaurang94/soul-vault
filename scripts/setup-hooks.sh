@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Set up git hooks for the Soma repository.
+# Set up git hooks for the Soul Vault repository.
 # Run once after cloning: ./scripts/setup-hooks.sh
 
 set -e

@@ -1,4 +1,4 @@
-//! Integration tests for Soma vault operations.
+//! Integration tests for Soul Vault operations.
 
 use std::fs;
 use tempfile::tempdir;

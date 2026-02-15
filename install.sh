@@ -1,19 +1,19 @@
 #!/usr/bin/env bash
-# Soma installer — downloads the latest release binary for your platform.
+# Soul Vault installer — downloads the latest release binary for your platform.
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/user/soma/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/user/soul-vault/main/install.sh | bash
 #
 # Options:
-#   SOMA_INSTALL_DIR  — override install directory (default: ~/.local/bin)
-#   SOMA_VERSION      — install a specific version (default: latest)
+#   SOUL_VAULT_INSTALL_DIR  — override install directory (default: ~/.local/bin)
+#   SOUL_VAULT_VERSION      — install a specific version (default: latest)
 
 set -euo pipefail
 
-REPO="user/soma"
-BINARY_NAME="soma"
+REPO="user/soul-vault"
+BINARY_NAME="soul"
 DEFAULT_INSTALL_DIR="$HOME/.local/bin"
-INSTALL_DIR="${SOMA_INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
+INSTALL_DIR="${SOUL_VAULT_INSTALL_DIR:-$DEFAULT_INSTALL_DIR}"
 
 # ─── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -34,13 +34,13 @@ detect_platform() {
     case "$(uname -s)" in
         Darwin) os="macos"  ;;
         Linux)  os="linux"  ;;
-        *)      die "Unsupported OS: $(uname -s). Soma supports macOS and Linux." ;;
+        *)      die "Unsupported OS: $(uname -s). Soul Vault supports macOS and Linux." ;;
     esac
 
     case "$(uname -m)" in
         x86_64|amd64)       arch="x86_64" ;;
         arm64|aarch64)      arch="arm64"  ;;
-        *)                  die "Unsupported architecture: $(uname -m). Soma supports x86_64 and arm64." ;;
+        *)                  die "Unsupported architecture: $(uname -m). Soul Vault supports x86_64 and arm64." ;;
     esac
 
     echo "${os}-${arch}"
@@ -49,8 +49,8 @@ detect_platform() {
 # ─── Resolve version ──────────────────────────────────────────────────────────
 
 resolve_version() {
-    if [ -n "${SOMA_VERSION:-}" ]; then
-        echo "$SOMA_VERSION"
+    if [ -n "${SOUL_VAULT_VERSION:-}" ]; then
+        echo "$SOUL_VAULT_VERSION"
         return
     fi
 
@@ -71,7 +71,7 @@ resolve_version() {
 # ─── Download & install ───────────────────────────────────────────────────────
 
 main() {
-    info "Soma Installer"
+    info "Soul Vault Installer"
     info "─────────────────────────────────"
 
     need curl
@@ -138,12 +138,12 @@ main() {
     fi
 
     echo ""
-    ok "Soma ${version} installed successfully!"
+    ok "Soul Vault ${version} installed successfully!"
     echo ""
     info "Get started:"
-    info "  soma          — launch interactive menu"
-    info "  soma init     — set up your vault"
-    info "  soma --help   — see all commands"
+    info "  soul          — launch interactive menu"
+    info "  soul init     — set up your vault"
+    info "  soul --help   — see all commands"
     echo ""
 }
 

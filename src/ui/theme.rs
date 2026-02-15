@@ -1,30 +1,35 @@
-//! Soma color palette, icons, and text formatting utilities.
+//! Soul Vault color palette, icons, and text formatting utilities.
 
 use colored::Colorize;
 
 // ─── Color Palette ────────────────────────────────────────────────────────────
+// Gold/Amber = primary brand (warm, soulful)
+// Cyan/Electric Blue = accents, links, active states
+// Emerald = success
+// Red = errors
+// Gray = muted/secondary
 
-/// Purple (#7C3AED)
-pub fn purple(text: &str) -> String {
-    text.truecolor(124, 58, 237).to_string()
+/// Gold (#FFBF00) — primary brand color
+pub fn gold(text: &str) -> String {
+    text.truecolor(255, 191, 0).to_string()
 }
 
-/// Cyan (#06B6D4)
+/// Cyan (#06B6D4) — accents, links, active states
 pub fn cyan(text: &str) -> String {
     text.truecolor(6, 182, 212).to_string()
 }
 
-/// Amber (#F59E0B)
+/// Amber (#F59E0B) — warm highlights, warnings
 pub fn amber(text: &str) -> String {
     text.truecolor(245, 158, 11).to_string()
 }
 
-/// Emerald (#10B981)
+/// Emerald (#10B981) — success
 pub fn emerald(text: &str) -> String {
     text.truecolor(16, 185, 129).to_string()
 }
 
-/// Red (#EF4444)
+/// Red (#EF4444) — errors
 pub fn red(text: &str) -> String {
     text.truecolor(239, 68, 68).to_string()
 }
@@ -37,8 +42,8 @@ pub fn bold_white(text: &str) -> String {
     text.white().bold().to_string()
 }
 
-pub fn bold_purple(text: &str) -> String {
-    text.truecolor(124, 58, 237).bold().to_string()
+pub fn bold_gold(text: &str) -> String {
+    text.truecolor(255, 191, 0).bold().to_string()
 }
 
 // ─── Ratatui Colors ───────────────────────────────────────────────────────────
@@ -46,14 +51,17 @@ pub fn bold_purple(text: &str) -> String {
 pub mod rat {
     use ratatui::style::Color;
 
-    pub const PURPLE: Color = Color::Rgb(124, 58, 237);
-    #[allow(dead_code)]
+    /// Gold (#FFBF00) — primary: headers, highlights, selection
+    pub const GOLD: Color = Color::Rgb(255, 191, 0);
+    /// Electric Cyan (#06B6D4) — secondary: accents, links, active states
     pub const CYAN: Color = Color::Rgb(6, 182, 212);
+    /// Amber (#F59E0B) — warm highlights, warnings
     pub const AMBER: Color = Color::Rgb(245, 158, 11);
-    #[allow(dead_code)]
+    /// Emerald (#10B981) — success
     pub const EMERALD: Color = Color::Rgb(16, 185, 129);
-    #[allow(dead_code)]
+    /// Red (#EF4444) — errors
     pub const RED: Color = Color::Rgb(239, 68, 68);
+    /// Muted gray — secondary text
     pub const DIM: Color = Color::DarkGray;
 }
 
@@ -87,7 +95,7 @@ pub fn line() -> String {
 pub fn banner() -> String {
     format!(
         "\n{} {} {}\n",
-        bold_purple("  Soma"),
+        bold_gold("  Soul Vault"),
         amber(ICON_STAR),
         dim("Your AI memory, unified.")
     )
@@ -114,7 +122,12 @@ pub fn provider_line(name: &str, connected: bool, last_pull: Option<&str>) -> St
     } else {
         dim("not connected")
     };
-    format!("    {} {}{}", icon, bold_white(&format!("{:<14}", name)), status)
+    format!(
+        "    {} {}{}",
+        icon,
+        bold_white(&format!("{:<14}", name)),
+        status
+    )
 }
 
 /// Formats byte count as human-readable string.
@@ -144,7 +157,7 @@ pub fn progress_bar(current: usize, total: usize) -> String {
     };
     format!(
         "{}{} {}",
-        purple(&"█".repeat(filled)),
+        gold(&"█".repeat(filled)),
         dim(&"░".repeat(w - filled)),
         dim(&format!("{}%", pct))
     )

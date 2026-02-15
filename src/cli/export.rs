@@ -1,4 +1,4 @@
-//! `soma export` — outputs vault as markdown or JSON context document.
+//! `soul export` — outputs vault as markdown or JSON context document.
 
 use anyhow::Result;
 use std::fs;
@@ -59,7 +59,7 @@ fn output_json(vault: &VaultContent, output_path: Option<&str>) -> Result<()> {
 fn build_context_document(vault: &VaultContent, topic_filter: Option<&str>) -> String {
     let mut sections = Vec::new();
 
-    sections.push("# Soma Memory Vault — Context Export".to_string());
+    sections.push("# Soul Vault Memory — Context Export".to_string());
     sections.push(format!(
         "> Generated: {}\n",
         chrono::Utc::now().format("%Y-%m-%d")
@@ -161,7 +161,7 @@ mod tests {
             people: vec![],
         };
         let doc = build_context_document(&vault, None);
-        assert!(doc.contains("Soma Memory Vault"));
+        assert!(doc.contains("Soul Vault Memory"));
     }
 
     #[test]

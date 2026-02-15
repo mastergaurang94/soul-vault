@@ -1,4 +1,4 @@
-//! `soma reset` — wipe vault and config, returning to pre-init state.
+//! `soul reset` — wipe vault and config, returning to pre-init state.
 
 use anyhow::{bail, Result};
 use std::fs;
@@ -12,7 +12,7 @@ use crate::vault::config;
 
 /// Validates that a path is safe to delete. Returns true only if:
 /// - Path is not `/`, `~`, or the home directory itself
-/// - Path contains "soma"
+/// - Path contains "soul-vault"
 /// - Path is inside the user's home directory
 pub fn is_safe_to_delete(path: &Path) -> bool {
     let Some(home) = dirs::home_dir() else {
@@ -26,8 +26,8 @@ pub fn is_safe_to_delete(path: &Path) -> bool {
         return false;
     }
 
-    // Must contain "soma" somewhere in the path
-    if !path_str.contains("soma") {
+    // Must contain "soul-vault" somewhere in the path
+    if !path_str.contains("soul-vault") {
         return false;
     }
 
@@ -81,7 +81,7 @@ pub fn run(force: bool) -> Result<()> {
     if !is_safe_to_delete(&vault_root) {
         bail!(
             "Refusing to delete path: {}\n      \
-             → Path failed safety validation. It must be inside your home directory and contain \"soma\".",
+             → Path failed safety validation. It must be inside your home directory and contain \"soul-vault\".",
             vault_root.display()
         );
     }
@@ -96,7 +96,7 @@ pub fn run(force: bool) -> Result<()> {
         if !io::stdin().is_terminal() {
             bail!(
                 "Cannot confirm reset in non-interactive mode.\n      \
-                 → Use `soma reset --force` to skip confirmation."
+                 → Use `soul reset --force` to skip confirmation."
             );
         }
 
@@ -105,7 +105,7 @@ pub fn run(force: bool) -> Result<()> {
         println!(
             "  {} {}",
             red("⚠"),
-            red("This will delete your entire Soma vault and all configuration.")
+            red("This will delete your entire Soul Vault and all configuration.")
         );
         println!();
         println!("  {}", bold_white("What will be deleted:"));
@@ -152,7 +152,7 @@ pub fn run(force: bool) -> Result<()> {
 
     println!(
         "\n{}\n",
-        check("Vault reset. Run `soma init` to start fresh.")
+        check("Vault reset. Run `soul init` to start fresh.")
     );
 
     Ok(())
@@ -166,16 +166,16 @@ mod tests {
     use std::path::PathBuf;
 
     #[test]
-    fn test_safe_to_delete_valid_soma_path() {
+    fn test_safe_to_delete_valid_soul_vault_path() {
         let home = dirs::home_dir().unwrap();
-        let path = home.join("soma");
+        let path = home.join("soul-vault");
         assert!(is_safe_to_delete(&path));
     }
 
     #[test]
-    fn test_safe_to_delete_nested_soma_path() {
+    fn test_safe_to_delete_nested_soul_vault_path() {
         let home = dirs::home_dir().unwrap();
-        let path = home.join("projects").join("soma");
+        let path = home.join("projects").join("soul-vault");
         assert!(is_safe_to_delete(&path));
     }
 
@@ -196,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn test_reject_path_without_soma() {
+    fn test_reject_path_without_soul_vault() {
         let home = dirs::home_dir().unwrap();
         let path = home.join("Documents");
         assert!(!is_safe_to_delete(&path));
@@ -204,12 +204,12 @@ mod tests {
 
     #[test]
     fn test_reject_path_outside_home() {
-        assert!(!is_safe_to_delete(Path::new("/tmp/soma")));
+        assert!(!is_safe_to_delete(Path::new("/tmp/soul-vault")));
     }
 
     #[test]
-    fn test_reject_etc_path_with_soma() {
-        assert!(!is_safe_to_delete(Path::new("/etc/soma")));
+    fn test_reject_etc_path_with_soul_vault() {
+        assert!(!is_safe_to_delete(Path::new("/etc/soul-vault")));
     }
 
     #[test]
@@ -233,9 +233,9 @@ mod tests {
     }
 
     #[test]
-    fn test_safe_to_delete_rejects_slash_soma_outside_home() {
-        // /soma is outside home directory
-        let path = PathBuf::from("/soma");
+    fn test_safe_to_delete_rejects_slash_soul_vault_outside_home() {
+        // /soul-vault is outside home directory
+        let path = PathBuf::from("/soul-vault");
         assert!(!is_safe_to_delete(&path));
     }
 }

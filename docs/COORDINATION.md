@@ -1,4 +1,4 @@
-# Soma — Multi-Agent Coordination
+# Soul Vault — Multi-Agent Coordination
 
 ## Before Starting Work
 

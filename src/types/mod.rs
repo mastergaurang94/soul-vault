@@ -1,4 +1,4 @@
-//! Core types for Soma — structs, enums, and serde derives.
+//! Core types for Soul Vault — structs, enums, and serde derives.
 
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -65,7 +65,7 @@ impl std::fmt::Display for Confidence {
 
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SomaConfig {
+pub struct SoulVaultConfig {
     pub providers: Vec<ProviderConfig>,
     pub processing_llm: Provider,
     pub vault_path: String,
@@ -255,11 +255,11 @@ pub struct NamedContent {
 // ─── Errors ───────────────────────────────────────────────────────────────────
 
 #[derive(Debug, thiserror::Error)]
-pub enum SomaError {
-    #[error("Soma vault not initialized.\n      → Run `soma init` to create your vault.")]
+pub enum SoulVaultError {
+    #[error("Soul Vault not initialized.\n      → Run `soul init` to create your vault.")]
     NotInitialized,
 
-    #[error("No API key found for {provider}.\n      → Run `soma init` to configure your API key.")]
+    #[error("No API key found for {provider}.\n      → Run `soul init` to configure your API key.")]
     MissingApiKey { provider: String },
 
     #[error("Failed to parse LLM response: {reason}")]
@@ -312,19 +312,19 @@ mod tests {
 
     #[test]
     fn test_config_serde() {
-        let config = SomaConfig {
+        let config = SoulVaultConfig {
             providers: vec![ProviderConfig {
                 name: Provider::Claude,
                 enabled: true,
                 last_pull: None,
             }],
             processing_llm: Provider::Claude,
-            vault_path: "/home/user/soma".to_string(),
+            vault_path: "/home/user/soul-vault".to_string(),
             created_at: "2026-02-14T00:00:00Z".to_string(),
             last_sync: None,
         };
         let json = serde_json::to_string(&config).unwrap();
-        let parsed: SomaConfig = serde_json::from_str(&json).unwrap();
+        let parsed: SoulVaultConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.processing_llm, Provider::Claude);
     }
 

@@ -1,4 +1,4 @@
-{"role": "user", "content": "Let's work on the Soma project. I need to set up the ingest pipeline."}
+{"role": "user", "content": "Let's work on the SoulVolt project. I need to set up the import pipeline."}
 {"role": "assistant", "content": "Sure! The ingest pipeline needs to: discover files, extract content, chunk text, process with LLM, merge, and write to vault."}
 {"role": "user", "content": "I want it to handle .md, .txt, .json, and .jsonl files. Recursive directory walking."}
 {"role": "assistant", "content": "Got it. I'll implement discoverFiles() with recursive walking, filtering by those extensions, and ignoring .git and node_modules."}

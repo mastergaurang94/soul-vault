@@ -1,21 +1,38 @@
-//! Local file reader: discovers and reads .md, .txt, .json, .jsonl files.
+//! Local file reader: discovers and reads .md, .txt, .json, .jsonl, .zip files.
 
 use anyhow::Result;
 use std::collections::HashSet;
 use std::fs;
 use std::path::Path;
 
+use crate::extractors::chatgpt;
 use crate::types::FileInfo;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const SUPPORTED_EXTENSIONS: &[&str] = &["md", "txt", "json", "jsonl"];
+const SUPPORTED_EXTENSIONS: &[&str] = &["md", "txt", "json", "jsonl", "zip"];
 const IGNORED_DIRS: &[&str] = &[".git", ".config", "node_modules", ".DS_Store"];
 
 // ─── File Discovery ───────────────────────────────────────────────────────────
 
 /// Recursively discovers supported files in a directory.
+///
+/// Smart detection: if the directory is an extracted ChatGPT export
+/// (contains `conversations.json`), it returns only that file so the
+/// import pipeline routes it through the ChatGPT parser.
 pub fn discover_files(dir_path: &Path) -> Result<Vec<FileInfo>> {
+    // Smart detection: extracted ChatGPT export folder
+    if chatgpt::is_chatgpt_export_dir(dir_path) {
+        let conv_path = dir_path.join("conversations.json");
+        let metadata = fs::metadata(&conv_path)?;
+        return Ok(vec![FileInfo {
+            path: conv_path,
+            name: "conversations".to_string(),
+            extension: ".json".to_string(),
+            size: metadata.len(),
+        }]);
+    }
+
     let supported: HashSet<&str> = SUPPORTED_EXTENSIONS.iter().copied().collect();
     let ignored: HashSet<&str> = IGNORED_DIRS.iter().copied().collect();
     let mut files = Vec::new();
@@ -71,14 +88,65 @@ fn walk_dir(
 // ─── File Content Extraction ──────────────────────────────────────────────────
 
 /// Reads and normalizes file content based on extension.
+///
+/// Handles ChatGPT exports specially:
+/// - `.zip` files that are ChatGPT exports → parsed via the ChatGPT parser
+/// - `.json` files named `conversations.json` → parsed via the ChatGPT parser
+/// - Other files → existing behavior
 pub fn extract_file_content(file: &FileInfo) -> Result<String> {
     match file.extension.as_str() {
+        ".zip" => {
+            if chatgpt::is_chatgpt_zip(&file.path) {
+                let convs = chatgpt::parse_chatgpt_zip(&file.path)?;
+                Ok(chatgpt::format_conversations(&convs))
+            } else {
+                // Non-ChatGPT zip — skip it
+                anyhow::bail!("Unsupported zip format (not a ChatGPT export)")
+            }
+        }
+        ".json" => {
+            // Check if this is a ChatGPT conversations.json
+            if is_chatgpt_conversations_file(&file.path) {
+                let convs = chatgpt::parse_chatgpt_json(&file.path)?;
+                Ok(chatgpt::format_conversations(&convs))
+            } else {
+                extract_json(&file.path)
+            }
+        }
         ".jsonl" => extract_jsonl(&file.path),
-        ".json" => extract_json(&file.path),
         _ => {
             let content = fs::read_to_string(&file.path)?;
             Ok(content.trim().to_string())
         }
+    }
+}
+
+/// Detects if a JSON file is a ChatGPT `conversations.json` by checking the
+/// filename and peeking at the content structure.
+fn is_chatgpt_conversations_file(path: &Path) -> bool {
+    // Quick filename check
+    let file_name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("");
+    if file_name != "conversations.json" {
+        return false;
+    }
+
+    // Peek at the content: should be a JSON array with objects that have "mapping"
+    let content = match fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(_) => return false,
+    };
+    let value: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return false,
+    };
+    match value.as_array() {
+        Some(arr) => arr
+            .first()
+            .is_some_and(|item| item.get("mapping").is_some()),
+        None => false,
     }
 }
 
@@ -199,6 +267,7 @@ fn extract_chatgpt_mapping(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::io::Write;
 
     #[test]
     fn test_discover_files() {
@@ -211,6 +280,25 @@ mod tests {
 
         let files = discover_files(tmp.path()).unwrap();
         assert_eq!(files.len(), 4);
+    }
+
+    #[test]
+    fn test_discover_files_includes_zip() {
+        let tmp = tempfile::tempdir().unwrap();
+        fs::write(tmp.path().join("test.md"), "# Hello").unwrap();
+
+        // Create a real zip file (not a ChatGPT export)
+        let zip_path = tmp.path().join("archive.zip");
+        let file = fs::File::create(&zip_path).unwrap();
+        let mut zip_writer = zip::ZipWriter::new(file);
+        let options =
+            zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        zip_writer.start_file("readme.txt", options).unwrap();
+        zip_writer.write_all(b"hello").unwrap();
+        zip_writer.finish().unwrap();
+
+        let files = discover_files(tmp.path()).unwrap();
+        assert_eq!(files.len(), 2); // .md + .zip
     }
 
     #[test]
@@ -236,6 +324,30 @@ mod tests {
 
         let files = discover_files(tmp.path()).unwrap();
         assert_eq!(files.len(), 2);
+    }
+
+    #[test]
+    fn test_discover_chatgpt_export_dir() {
+        let tmp = tempfile::tempdir().unwrap();
+        // Create a ChatGPT export directory structure
+        let conv_json = serde_json::json!([{
+            "title": "Test",
+            "mapping": {
+                "root": {"id": "root", "parent": null, "children": [], "message": null}
+            }
+        }]);
+        fs::write(
+            tmp.path().join("conversations.json"),
+            conv_json.to_string(),
+        )
+        .unwrap();
+        fs::write(tmp.path().join("chat.html"), "<html></html>").unwrap();
+        fs::write(tmp.path().join("other.md"), "notes").unwrap();
+
+        // Should detect as ChatGPT export and only return conversations.json
+        let files = discover_files(tmp.path()).unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].name, "conversations");
     }
 
     #[test]
@@ -318,5 +430,160 @@ mod tests {
         let content = extract_file_content(&file).unwrap();
         assert!(content.contains("## Test Chat"));
         assert!(content.contains("Hello from ChatGPT export"));
+    }
+
+    #[test]
+    fn test_extract_chatgpt_conversations_json() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("conversations.json");
+        let json = serde_json::json!([{
+            "title": "Parsed via ChatGPT parser",
+            "create_time": 1700000000.0,
+            "mapping": {
+                "root": {"id": "root", "parent": null, "children": ["n1"], "message": null},
+                "n1": {
+                    "id": "n1", "parent": "root", "children": ["n2"],
+                    "message": {
+                        "author": {"role": "user"},
+                        "content": {"content_type": "text", "parts": ["Hello via parser"]},
+                        "create_time": 1700000000.0
+                    }
+                },
+                "n2": {
+                    "id": "n2", "parent": "n1", "children": [],
+                    "message": {
+                        "author": {"role": "assistant"},
+                        "content": {"content_type": "text", "parts": ["Reply via parser"]},
+                        "create_time": 1700000001.0
+                    }
+                }
+            }
+        }]);
+        fs::write(&path, json.to_string()).unwrap();
+
+        let file = FileInfo {
+            path,
+            name: "conversations".to_string(),
+            extension: ".json".to_string(),
+            size: 0,
+        };
+        let content = extract_file_content(&file).unwrap();
+        assert!(content.contains("## Parsed via ChatGPT parser"));
+        assert!(content.contains("user: Hello via parser"));
+        assert!(content.contains("assistant: Reply via parser"));
+    }
+
+    #[test]
+    fn test_extract_chatgpt_zip() {
+        let tmp = tempfile::tempdir().unwrap();
+        let zip_path = tmp.path().join("chatgpt-export.zip");
+
+        let json = serde_json::json!([{
+            "title": "Zip Import Test",
+            "create_time": 1700000000.0,
+            "mapping": {
+                "root": {"id": "root", "parent": null, "children": ["n1"], "message": null},
+                "n1": {
+                    "id": "n1", "parent": "root", "children": [],
+                    "message": {
+                        "author": {"role": "user"},
+                        "content": {"content_type": "text", "parts": ["From zip import"]},
+                        "create_time": 1700000000.0
+                    }
+                }
+            }
+        }]);
+
+        // Create the zip
+        let file = fs::File::create(&zip_path).unwrap();
+        let mut zip_writer = zip::ZipWriter::new(file);
+        let options =
+            zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        zip_writer
+            .start_file("conversations.json", options)
+            .unwrap();
+        zip_writer
+            .write_all(json.to_string().as_bytes())
+            .unwrap();
+        zip_writer.finish().unwrap();
+
+        let file_info = FileInfo {
+            path: zip_path,
+            name: "chatgpt-export".to_string(),
+            extension: ".zip".to_string(),
+            size: 0,
+        };
+        let content = extract_file_content(&file_info).unwrap();
+        assert!(content.contains("## Zip Import Test"));
+        assert!(content.contains("user: From zip import"));
+    }
+
+    #[test]
+    fn test_extract_non_chatgpt_zip_fails() {
+        let tmp = tempfile::tempdir().unwrap();
+        let zip_path = tmp.path().join("random.zip");
+
+        let file = fs::File::create(&zip_path).unwrap();
+        let mut zip_writer = zip::ZipWriter::new(file);
+        let options =
+            zip::write::SimpleFileOptions::default().compression_method(zip::CompressionMethod::Stored);
+        zip_writer.start_file("readme.txt", options).unwrap();
+        zip_writer.write_all(b"not chatgpt").unwrap();
+        zip_writer.finish().unwrap();
+
+        let file_info = FileInfo {
+            path: zip_path,
+            name: "random".to_string(),
+            extension: ".zip".to_string(),
+            size: 0,
+        };
+        let result = extract_file_content(&file_info);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_is_chatgpt_conversations_file_true() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("conversations.json");
+        let json = serde_json::json!([{
+            "title": "Test",
+            "mapping": {"root": {"id": "root"}}
+        }]);
+        fs::write(&path, json.to_string()).unwrap();
+
+        assert!(is_chatgpt_conversations_file(&path));
+    }
+
+    #[test]
+    fn test_is_chatgpt_conversations_file_wrong_name() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("other.json");
+        let json = serde_json::json!([{
+            "title": "Test",
+            "mapping": {"root": {"id": "root"}}
+        }]);
+        fs::write(&path, json.to_string()).unwrap();
+
+        assert!(!is_chatgpt_conversations_file(&path));
+    }
+
+    #[test]
+    fn test_is_chatgpt_conversations_file_no_mapping() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("conversations.json");
+        let json = serde_json::json!([{"title": "Test"}]);
+        fs::write(&path, json.to_string()).unwrap();
+
+        assert!(!is_chatgpt_conversations_file(&path));
+    }
+
+    #[test]
+    fn test_is_chatgpt_conversations_file_empty_array() {
+        let tmp = tempfile::tempdir().unwrap();
+        let path = tmp.path().join("conversations.json");
+        fs::write(&path, "[]").unwrap();
+
+        // Empty array — no first element with mapping, so false
+        assert!(!is_chatgpt_conversations_file(&path));
     }
 }

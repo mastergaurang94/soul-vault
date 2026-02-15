@@ -1,16 +1,72 @@
 # Changelog
 
-All notable changes to Soma will be documented in this file.
+All notable changes to Soul Vault will be documented in this file.
 Agents: append entries here after completing work.
+
+---
+
+## 2026-02-14 — TUI Async Import & Live Watch
+
+### Async import pipeline in TUI
+- Import page now runs the full import pipeline within the TUI
+- New `src/core/pipeline.rs`: reusable import pipeline with `tokio::sync::mpsc` progress reporting
+- `ImportProgress` enum with structured states: Scanning → Classifying → Processing → Writing → Done/Error
+- Live progress bar during LLM processing (current/total chunks, file name, percentage)
+- Results summary on completion: files (new/modified/skipped), facts extracted, topics, people
+- Error handling: API key errors abort with guidance, rate limits auto-retry after 30s
+- TUI event loop polls channels every 50ms — remains responsive during long imports
+
+### Live file watching in TUI
+- Watch page now runs `notify` file watcher directly in the TUI (no separate terminal needed)
+- New `src/tui/watcher.rs`: background thread with 2s debounced file system events
+- Events sent to TUI via `tokio::sync::mpsc` channels
+- Scrollable event log with timestamps, color-coded icons by type (info/success/warning/error)
+- Auto-imports changed files using existing `run_for_files()` pipeline
+- Stop watcher with Esc (sends stop signal, returns to sidebar)
+- Clean shutdown on app quit
+
+### Architecture changes
+- New `PageAction` variants: `StartImport(String)`, `StartWatch(String)`, `StopWatch`
+- `Channels` struct in TUI event loop holds `mpsc::Receiver` endpoints
+- Event loop changed from blocking `event::read()` to `event::poll(50ms)` + `try_recv()` pattern
+- New files: `src/core/pipeline.rs` (~170 lines), `src/tui/watcher.rs` (~200 lines)
+- Modified: `src/tui/mod.rs`, `src/tui/pages/mod.rs`, `src/tui/pages/import.rs`, `src/tui/pages/watch.rs`
+- 205 tests (89 unit + 104 CLI UX + 12 integration), zero clippy warnings
+
+---
+
+## 2026-02-14 — Full-Screen TUI
+
+### `soul` (no args) → ratatui full-screen TUI
+- Replaced inline menu (`cli/interactive.rs`) with full-screen alternate-screen TUI
+- New `src/tui/` module (8 files):
+  - `mod.rs` — entry point, event loop, layout (header / sidebar+content / footer)
+  - `app.rs` — App state (current page, sidebar selection, focus, vault status)
+  - `sidebar.rs` — Navigation widget with selection highlight, gold theme
+  - `pages/mod.rs` — PageWidget trait (render + handle_key + PageAction)
+  - `pages/status.rs` — Vault overview (memories/topics/people/size/files/last activity), providers, imported sources
+  - `pages/browse.rs` — Tree view of vault directories + scrollable file preview (40/60 split)
+  - `pages/import.rs` — Folder path input with tilde expansion and path validation
+  - `pages/export.rs` — Format toggle, topic filter, output path, execute button, word count preview
+  - `pages/watch.rs` — Folder path input with terminal command guidance
+  - `pages/settings.rs` — Config display (vault path, processing LLM, created date, providers)
+- Keyboard bindings:
+  - Sidebar: j/k/arrows navigate, Enter select, q/Esc quit
+  - Global: Tab toggle sidebar/content, 1-6 jump to page, ? help toggle
+  - Content: Esc back to sidebar, page-specific keys
+- Non-TTY fallback preserved (prints help text with subcommand usage)
+- All subcommands (`soul import <folder>`, `soul status`, etc.) unchanged
+- Old `cli/interactive.rs` kept as dead code reference
+- 205 tests (89 unit + 104 CLI UX + 12 integration), zero clippy warnings
 
 ---
 
 ## 2026-02-14 — Reset Command
 
-### `soma reset`
+### `soul reset`
 - New command to completely wipe vault and config, returning to pre-init state
 - Safety-first design:
-  - `is_safe_to_delete()` validates path is inside home directory and contains "soma"
+  - `is_safe_to_delete()` validates path is inside home directory and contains "soul"
   - Rejects `/`, `~`, home dir, and paths outside home
   - Interactive confirmation requires typing "reset" (not just y/n)
   - Non-TTY environments require `--force` flag
@@ -30,7 +86,7 @@ Agents: append entries here after completing work.
 ### Rename: ingest → import
 - CLI subcommand renamed from `ingest` to `import`; `ingest` kept as hidden alias for backward compatibility
 - All user-facing strings updated: help text, status output, error messages, watch output, non-TTY fallback
-- `soma import` (no args) now shows helpful error with usage example and exit code 1 (instead of clap's generic error)
+- `soul import` (no args) now shows helpful error with usage example and exit code 1 (instead of clap's generic error)
 - Docs updated: README.md, STATUS.md, CHANGELOG.md, AGENTS.md, CLAUDE.md
 
 ### Status UI Fix
@@ -57,7 +113,7 @@ Agents: append entries here after completing work.
   - Ingest alias: backward compatibility verified
 
 ### Distribution
-- Binary symlinked to `~/.local/bin/soma` for global access
+- Binary symlinked to `~/.local/bin/soul` for global access
 
 ---
 
@@ -66,7 +122,7 @@ Agents: append entries here after completing work.
 ### TypeScript v0.1
 - Built MVP with 14 source files, 5 commands
 - 89 tests (vitest), Zod validation, Ink TUI
-- Package: soma-vault (npm)
+- Package: soul-vault (npm)
 
 ### Rust Rewrite
 - Full rewrite: 24 source files, ~4,431 lines
@@ -76,8 +132,8 @@ Agents: append entries here after completing work.
 - Stack: clap, ratatui+crossterm, reqwest, serde, tokio, indicatif, anyhow+thiserror
 
 ### Cleanup
-- TS version archived to `soma-ts-archive/`
-- Rust promoted to primary at `/Users/gaurangpatel/Documents/dev/soma/`
+- TS version archived to `soul-vault-ts-archive/`
+- Rust promoted to primary at `/Users/gaurangpatel/Documents/dev/soul-vault/`
 - Fixed: `process::exit` → `anyhow::bail`, ASCII slugify, removed unused `IngestResult`
 
 ### Source Tracking & Dedup
@@ -91,7 +147,7 @@ Agents: append entries here after completing work.
 - GitHub Actions Release (`.github/workflows/release.yml`): 4-target binary builds, SHA256 checksums, auto GitHub Release
 - Pre-commit hooks (`.githooks/pre-commit`): fmt + clippy + test gate
 - Install script (`install.sh`): auto-detect OS/arch, download from GitHub Releases, checksum verification
-- Homebrew formula scaffold (`homebrew/soma.rb`): platform-specific binary blocks
+- Homebrew formula scaffold (`homebrew/soul-vault.rb`): platform-specific binary blocks
 - `rustfmt.toml`, `.gitignore`, `.cargo/config.toml`
 
 ### Documentation
