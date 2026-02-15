@@ -9,6 +9,14 @@ Last updated: 2026-02-15
   - Removed library-level `process::exit()` from `soul watch` auto-watch path; now returns actionable `Result` errors
   - Added regression tests for both fixes in `src/cli/init.rs` and `src/cli/watch.rs`
   - Updated docs to match current command set and architecture wording (`import`/`pull`/`reset`, full-screen TUI wording)
+- [x] OAuth scaffolding + cloud pull gate (2026-02-15):
+  - Added `soul login [provider]` and `soul logout [provider]`
+  - Implemented local OAuth callback flow for Claude (browser open, localhost callback, code exchange, token storage)
+  - Added credential storage at `~/soul-vault/auth.yaml` with `0600` file permissions
+  - Added token validity + refresh checks in `src/auth/mod.rs`
+  - Added `soul pull --cloud [--provider <claude|chatgpt|gemini>]`
+  - Cloud pull now checks login status and prints API integration stub guidance
+  - ChatGPT/Gemini OAuth flows are scaffolded with explicit "coming soon" output
 - [x] Rust rewrite — full CLI with 7 commands (init, import, export, status, watch, reset, interactive TUI)
 - [x] 200 tests (84 unit + 104 CLI UX + 12 integration), zero clippy warnings
 - [x] Vault format: `~/soul-vault/` with structured markdown (identity/, preferences/, memories/, topics/, people/, sources/)
@@ -85,8 +93,9 @@ Last updated: 2026-02-15
 
 ## 📋 Backlog
 
-- [ ] `soul pull` — auto-pull from Claude/ChatGPT/Gemini APIs
-  - `extractors/chatgpt.rs` is a placeholder for future ChatGPT API integration
+- [ ] Cloud API implementation for `soul pull --cloud`
+  - OAuth scaffolding is complete; conversation list/download API calls are still stubs
+  - `extractors/chatgpt.rs` remains a placeholder for future ChatGPT API integration
 - [ ] `soul search` — full-text vault search
 - [ ] `soul diff` — show changes since last import
 - [ ] `SOUL_VAULT_VAULT_PATH` env var for testability and multi-vault workflows

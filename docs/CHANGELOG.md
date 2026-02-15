@@ -5,6 +5,44 @@ Agents: append entries here after completing work.
 
 ---
 
+## 2026-02-15 — OAuth Scaffolding for Cloud Pull
+
+### New CLI commands
+- Added `soul login [provider]` (defaults to Claude)
+- Added `soul logout [provider]` (provider-specific or global credential removal)
+- Wired both commands into clap in `src/main.rs` and module exports in `src/cli/mod.rs`
+
+### New auth module
+- Added `src/auth/mod.rs` with:
+  - `AuthCredentials` model (`access_token`, `refresh_token`, `expires_at`, `provider`)
+  - `save_credentials()` / `load_credentials()` / `is_logged_in()` / `remove_credentials()` / `clear_credentials()`
+  - Credential storage at `~/soul-vault/auth.yaml` with enforced `0600` permissions
+  - Expiry check + refresh path (`ensure_valid_credentials()` + refresh token grant)
+
+### OAuth flow scaffolding
+- Implemented real localhost callback flow for Claude:
+  - Starts random local callback listener on `127.0.0.1:0`
+  - Opens browser to provider authorization URL
+  - Receives callback and validates `state`
+  - Exchanges auth code for token and persists credentials
+- Added provider stubs for ChatGPT and Gemini with explicit "coming soon" guidance
+- OAuth endpoints/client IDs are scaffolded with placeholders and Claude env-var overrides
+
+### Pull command integration
+- Extended `soul pull` with:
+  - `--cloud` flag to enable cloud path
+  - `--provider` flag (`claude`, `chatgpt`, `gemini`; default Claude)
+- `soul pull --cloud` now:
+  - Checks login state
+  - Validates/refreshes tokens when possible
+  - Prints provider API stub: "Coming soon — use soul import with your exported data"
+- Existing local pull behavior remains default unchanged
+
+### UX/help updates
+- Added `login/logout` lines to non-TTY help output (`src/tui/layout.rs`, `src/cli/interactive.rs`)
+- Added OAuth hints to Settings page (`src/tui/pages/settings.rs`)
+- Extended legacy interactive menu with Pull/Login/Logout actions (`src/cli/interactive.rs`)
+
 ## 2026-02-15 — Hardening & QA Pass
 
 ### Reliability fixes
