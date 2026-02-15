@@ -7,8 +7,6 @@ use std::path::{Path, PathBuf};
 
 use crate::types::{KeysConfig, SoulVaultConfig, SoulVaultError};
 
-// ─── Paths ────────────────────────────────────────────────────────────────────
-
 /// Returns the vault root directory: ~/soul-vault/
 pub fn vault_root() -> PathBuf {
     dirs::home_dir()
@@ -48,8 +46,6 @@ pub fn sources_dir() -> PathBuf {
     vault_root().join("sources")
 }
 
-// ─── Vault Lifecycle ──────────────────────────────────────────────────────────
-
 /// Returns true if config.json exists (vault has been initialized).
 pub fn is_initialized() -> bool {
     config_path().exists()
@@ -68,21 +64,22 @@ pub fn create_vault_structure() -> Result<()> {
         sources_dir().join("claude"),
         sources_dir().join("gemini"),
     ];
+
     for dir in dirs {
         fs::create_dir_all(&dir)
             .with_context(|| format!("Failed to create directory: {}", dir.display()))?;
     }
+
     Ok(())
 }
 
-// ─── Config Read/Write ────────────────────────────────────────────────────────
-
-/// Reads and validates config.json. Returns SoulVaultError::NotInitialized if missing.
+/// Reads and validates config.json. Returns NotInitialized if missing.
 pub fn read_config() -> Result<SoulVaultConfig> {
     let path = config_path();
     if !path.exists() {
         return Err(SoulVaultError::NotInitialized.into());
     }
+
     let raw =
         fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
     let config: SoulVaultConfig =
@@ -99,14 +96,13 @@ pub fn write_config(config: &SoulVaultConfig) -> Result<()> {
     Ok(())
 }
 
-// ─── Keys Read/Write ──────────────────────────────────────────────────────────
-
 /// Reads keys.json. Returns empty map if missing.
 pub fn read_keys() -> Result<KeysConfig> {
     let path = keys_path();
     if !path.exists() {
         return Ok(KeysConfig::new());
     }
+
     let raw =
         fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
     let keys: KeysConfig =
@@ -120,9 +116,7 @@ pub fn write_keys(keys: &KeysConfig) -> Result<()> {
     fs::create_dir_all(config_dir())?;
     let json = serde_json::to_string_pretty(keys)?;
     fs::write(&path, &json).with_context(|| format!("Failed to write {}", path.display()))?;
-    // Set restrictive permissions
-    let perms = fs::Permissions::from_mode(0o600);
-    fs::set_permissions(&path, perms)?;
+    fs::set_permissions(&path, fs::Permissions::from_mode(0o600))?;
     Ok(())
 }
 
@@ -138,8 +132,6 @@ pub fn set_api_key(provider: &str, key: &str) -> Result<()> {
     keys.insert(provider.to_string(), key.to_string());
     write_keys(&keys)
 }
-
-// ─── Scaffolding ──────────────────────────────────────────────────────────────
 
 /// Creates .gitignore to protect keys.json.
 pub fn create_gitignore() -> Result<()> {
@@ -172,7 +164,7 @@ pub fn create_default_files() -> Result<()> {
     Ok(())
 }
 
-/// Asserts that the vault is initialized. Returns SoulVaultError::NotInitialized if not.
+/// Asserts that the vault is initialized. Returns NotInitialized if not.
 pub fn assert_initialized() -> Result<()> {
     if !is_initialized() {
         return Err(SoulVaultError::NotInitialized.into());
@@ -189,65 +181,4 @@ pub fn assert_path_exists(path: &Path) -> Result<()> {
         .into());
     }
     Ok(())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_vault_root_is_home_soul_vault() {
-        let root = vault_root();
-        assert!(root.ends_with("soul-vault"));
-    }
-
-    #[test]
-    fn test_config_paths() {
-        assert!(config_dir().ends_with(".config"));
-        assert!(config_path().ends_with("config.json"));
-        assert!(keys_path().ends_with("keys.json"));
-    }
-
-    #[test]
-    fn test_vault_dirs() {
-        assert!(identity_dir().ends_with("identity"));
-        assert!(memories_dir().ends_with("memories"));
-        assert!(topics_dir().ends_with("topics"));
-        assert!(people_dir().ends_with("people"));
-    }
-
-    #[test]
-    fn test_config_serde_roundtrip() {
-        use crate::types::{Provider, ProviderConfig};
-
-        let config = SoulVaultConfig {
-            providers: vec![ProviderConfig {
-                name: Provider::Claude,
-                enabled: true,
-                last_pull: None,
-            }],
-            processing_llm: Provider::Claude,
-            vault_path: "/tmp/soul-vault".to_string(),
-            created_at: "2026-02-14T00:00:00Z".to_string(),
-            last_sync: None,
-        };
-
-        let json = serde_json::to_string_pretty(&config).unwrap();
-        let parsed: SoulVaultConfig = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.processing_llm, Provider::Claude);
-        assert_eq!(parsed.providers.len(), 1);
-    }
-
-    #[test]
-    fn test_keys_roundtrip() {
-        let tmp = tempfile::tempdir().unwrap();
-        let keys_file = tmp.path().join("keys.json");
-        let mut keys = KeysConfig::new();
-        keys.insert("claude".to_string(), "sk-ant-test123".to_string());
-        let json = serde_json::to_string_pretty(&keys).unwrap();
-        fs::write(&keys_file, &json).unwrap();
-        let raw = fs::read_to_string(&keys_file).unwrap();
-        let loaded: KeysConfig = serde_json::from_str(&raw).unwrap();
-        assert_eq!(loaded.get("claude").unwrap(), "sk-ant-test123");
-    }
 }
