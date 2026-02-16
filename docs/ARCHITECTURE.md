@@ -1,5 +1,5 @@
 # Soul Vault — Architecture
-Last updated: 2026-02-15
+Last updated: 2026-02-16
 
 
 ## Module Map
@@ -54,8 +54,7 @@ src/
 │       ├── export.rs
 │       ├── watch.rs
 │       ├── watch_render.rs
-│       ├── login.rs
-│       ├── logout.rs
+│       ├── reset.rs
 │       └── settings.rs
 ├── types/
 │   └── mod.rs                 Shared domain/config/fact types (`Provider`, `ExtractedMemories`, etc.)
@@ -75,15 +74,14 @@ src/
 
 ## TUI Page Model
 
-The TUI currently has **8 pages** in this order:
+The TUI currently has **7 pages** in this order:
 1. Status
 2. Import
 3. Browse
 4. Export
 5. Watch
-6. Login
-7. Logout
-8. Settings
+6. Reset
+7. Settings
 
 ## Dependency Direction
 

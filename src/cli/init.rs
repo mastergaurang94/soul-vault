@@ -3,16 +3,17 @@
 use anyhow::Result;
 use std::io::{self, Write};
 
+use crate::cli::init_validate::{validate_api_key, ApiKeyValidation};
 use crate::types::{Provider, ProviderConfig, SoulVaultConfig};
 use crate::ui::theme::*;
 use crate::vault::config::{
     create_default_files, create_gitignore, create_vault_structure, is_initialized, set_api_key,
-    vault_root, write_config,
+    set_key_health, vault_root, write_config, ApiKeyHealth,
 };
 
 // ─── Init Command ─────────────────────────────────────────────────────────────
 
-pub fn run() -> Result<()> {
+pub async fn run() -> Result<()> {
     println!("{}", banner());
     println!("{}", dim("  First-time setup wizard\n"));
     println!("{}", line());
@@ -104,26 +105,67 @@ pub fn run() -> Result<()> {
         );
 
         for provider in &needed {
-            let key_input = ask(&format!(
-                "    {} {} API key {} ",
-                ICON_KEY,
-                provider.display_name(),
-                dim(&format!("({})", provider.api_key_hint()))
-            ))?;
+            loop {
+                let key_input = ask(&format!(
+                    "    {} {} API key {} ",
+                    ICON_KEY,
+                    provider.display_name(),
+                    dim(&format!("({})", provider.api_key_hint()))
+                ))?;
 
-            let key = key_input.trim();
-            if !key.is_empty() {
-                set_api_key(&provider.to_string(), key)?;
-                println!(
-                    "{}",
-                    check(&format!("{} key saved", provider.display_name()))
-                );
-            } else {
-                println!(
-                    "    {} {} key skipped (you can add it later)",
-                    dim(ICON_DOT),
-                    provider.display_name()
-                );
+                let key = key_input.trim();
+                if key.is_empty() {
+                    println!(
+                        "    {} {} key skipped (you can add it later)",
+                        dim(ICON_DOT),
+                        provider.display_name()
+                    );
+                    break;
+                }
+
+                print!("    {} Validating key... ", dim(ICON_DOT));
+                io::stdout().flush()?;
+                match validate_api_key(provider, key).await {
+                    ApiKeyValidation::Verified => {
+                        println!("{}", check("valid"));
+                        set_api_key(&provider.to_string(), key)?;
+                        set_key_health(provider, ApiKeyHealth::Verified, None)?;
+                        println!(
+                            "{}",
+                            check(&format!("{} key saved", provider.display_name()))
+                        );
+                        break;
+                    }
+                    ApiKeyValidation::Unverified(reason) => {
+                        println!("{}", amber("unverified"));
+                        println!("      {} {}", amber("!"), dim(&reason));
+                        set_api_key(&provider.to_string(), key)?;
+                        set_key_health(provider, ApiKeyHealth::Unverified, Some(reason.clone()))?;
+                        println!(
+                            "{}",
+                            check(&format!("{} key saved", provider.display_name()))
+                        );
+                        break;
+                    }
+                    ApiKeyValidation::Invalid(reason) => {
+                        println!("{}", red("invalid"));
+                        println!("      {} {}", red("✗"), reason);
+                        set_key_health(provider, ApiKeyHealth::Invalid, Some(reason.clone()))?;
+                        let retry = ask(&format!(
+                            "      Re-enter {} key? {} ",
+                            provider.display_name(),
+                            dim("(Y/n)")
+                        ))?;
+                        if retry.trim().to_lowercase() == "n" {
+                            println!(
+                                "    {} {} key skipped (you can add it later)",
+                                dim(ICON_DOT),
+                                provider.display_name()
+                            );
+                            break;
+                        }
+                    }
+                }
             }
         }
     }

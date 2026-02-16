@@ -1,9 +1,100 @@
 # Changelog
-Last updated: 2026-02-15
+Last updated: 2026-02-16
 
 
 All notable changes to Soul Vault will be documented in this file.
 Agents: append entries here after completing work.
+
+---
+
+## 2026-02-16 — TUI Auth UX Consolidation Under Settings Connections
+
+### Sidebar and page model
+- Removed standalone TUI `Login` and `Logout` pages.
+- Sidebar now keeps a stable 7-page structure:
+  - Status, Import, Browse, Export, Watch, Reset, Settings
+- Updated TUI page wiring:
+  - `src/tui/app.rs` page enum/list and tests
+  - `src/tui/layout.rs` page set routing
+  - `src/tui/pages/mod.rs` module exports
+
+### Settings > Connections language and action model
+- Reworked OAuth status section in `src/tui/pages/settings.rs` into a `Connections` section.
+- Replaced product-account framing (`logged in`) with provider-connection framing:
+  - `connected`, `ready`, `not set up`, `coming soon`
+- Added selective next-action hints per provider state:
+  - `Connect via soul login`
+  - `Disconnect via soul logout`
+  - `Set up in soul init`
+- Hides impossible actions (for example, no disconnect prompt when not connected).
+
+### Documentation sync
+- Updated TUI page counts/lists in:
+  - `docs/STATUS.md`
+  - `docs/ARCHITECTURE.md`
+  - `README.md`
+
+## 2026-02-16 — API Key Validation During `soul init` (All Providers)
+
+### Validation behavior
+- Added provider-aware API key validation in `src/cli/init_validate.rs` and wired into `src/cli/init.rs`.
+- `soul init` now validates keys immediately after entry for:
+  - Claude: Anthropic API check
+  - ChatGPT: OpenAI models API check
+  - Gemini: Google Generative Language models API check
+- Validation outcomes now drive setup UX:
+  - `verified`: key is accepted and saved
+  - `invalid`: key is rejected and user is prompted to re-enter
+  - `unverified` (network/transient): warning shown, key can still be saved
+
+### Persisted key health + Settings UX
+- Added persisted key health tracking in `src/vault/config.rs`:
+  - `.config/key_status.json` with per-provider `status`, `checked_at`, and optional message
+- Updated Settings page (`src/tui/pages/settings.rs`) to use key health state instead of key presence:
+  - provider rows now reflect `ready`, `key unverified`, or `key invalid`
+  - API Key section now shows Claude/ChatGPT/Gemini with masked key + health label
+
+### Status command accuracy fix
+- Updated CLI status provider rendering in `src/cli/status.rs` to match credential reality:
+  - green `+` now requires OAuth login or verified API key state
+  - providers with invalid/unverified/missing keys no longer show as ready
+  - `no imports yet` now appears only when provider credentials are actually ready
+
+### TUI reset UX
+- Updated Reset page behavior in `src/tui/pages/reset.rs`:
+  - after successful vault deletion, TUI now exits immediately
+  - avoids leaving users inside a now-uninitialized vault session
+
+### Runtime wiring
+- Converted `cli::init::run` to async and updated call sites:
+  - `src/main.rs` direct `soul init` command path
+  - `src/main.rs` first-run no-args init prompt flow
+  - `src/cli/interactive.rs` legacy menu init action
+
+---
+
+## 2026-02-16 — First-Run Init Prompt for `soul` (No Args)
+
+### UX behavior
+- Updated no-subcommand flow in `src/main.rs`:
+  - if the vault is not initialized and stdin is a TTY, `soul` now prompts:
+    - `Vault not initialized. Run setup now with soul init? (Y/n)`
+  - accepting runs `soul init` immediately, then continues into the TUI
+  - declining exits cleanly with a reminder to run `soul init`
+- Non-TTY behavior remains unchanged through existing TUI non-interactive help path
+
+### Tests
+- Added unit coverage in `src/main.rs` for init-prompt decision logic (`should_run_init`)
+
+---
+
+## 2026-02-16 — Lazy Provider Source Directory Creation
+
+### Init behavior change
+- Updated `create_vault_structure()` to stop pre-creating provider-specific source folders:
+  - removed eager creation of `sources/chatgpt`, `sources/claude`, and `sources/gemini`
+  - keeps creation of core vault directories and `sources/` root unchanged
+- Result: running `soul init` no longer creates integration/provider folders before the user has chosen or used those providers
 
 ---
 

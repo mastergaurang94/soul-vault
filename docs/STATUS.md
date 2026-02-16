@@ -1,14 +1,18 @@
 # Soul Vault — Project Status
 
-Last updated: 2026-02-15
+Last updated: 2026-02-16
 
 ## ✅ Completed
 
 - [x] Current command set is live in `src/main.rs`:
   - `init`, `import`, `export`, `status`, `watch`, `reset`, `login`, `logout`
   - No-args launch (`soul`) opens the full-screen TUI
-- [x] TUI navigation currently has 8 pages:
-  - Status, Import, Browse, Export, Watch, Login, Logout, Settings
+- [x] TUI navigation currently has 7 pages:
+  - Status, Import, Browse, Export, Watch, Reset, Settings
+- [x] OAuth controls moved under Settings > Connections:
+  - sidebar is stable (no separate Login/Logout pages)
+  - connections copy now uses provider-scoped language (`Connect`/`Disconnect`) instead of product login framing
+  - only valid next actions are shown per provider state
 - [x] Export overhaul landed:
   - `soul export --format context|json|bundle`
   - `soul export --sections identity,preferences,topics,people,memories`
@@ -36,6 +40,27 @@ Last updated: 2026-02-15
   - moved local file discovery/content extraction helpers from `extractors/` to `vault/`
   - updated `core/`, `tui/`, and CLI call sites to import from `vault::local`
   - added missing top-level `//!` module docs in `cli/`, `core/`, `extractors/`, `ui/`, and `vault/`
+- [x] Init vault structure no longer pre-creates provider source folders:
+  - `soul init` now creates only core directories plus `sources/`
+  - provider-specific source directories are now lazy by usage, not scaffolded up front
+- [x] First-run no-args UX now prompts initialization:
+  - running `soul` before initialization prompts to run `soul init`
+  - accepting runs init immediately, then launches the TUI
+  - declining exits cleanly with a reminder to run `soul init`
+- [x] API keys now validate during setup:
+  - `soul init` validates Claude, ChatGPT, and Gemini keys immediately after entry
+  - invalid keys are rejected with a re-enter prompt before saving
+  - transient network/endpoint issues are marked unverified but can still be saved
+- [x] Settings now reflects credential health, not just key presence:
+  - persisted key validation state stored in `.config/key_status.json`
+  - provider statuses now show `ready`, `key unverified`, or `key invalid` based on last validation
+  - API Key section now shows Claude/ChatGPT/Gemini keys with masked values and health labels
+- [x] CLI `soul status` provider health now matches credential reality:
+  - green `+` appears only when provider credentials are truly ready (OAuth or verified key)
+  - failed/unverified key states now show amber/red status instead of a misleading ready import state
+- [x] TUI reset now exits after successful vault deletion:
+  - resetting from the Reset page now closes the TUI immediately
+  - prevents staying in an uninitialized post-reset UI session
 
 ## 🔨 In Progress
 

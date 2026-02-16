@@ -135,7 +135,10 @@ pub(super) fn start_provider_import(import_page: &mut ImportPage, channels: &mut
             .unwrap_or_default();
         if api_key.trim().is_empty() {
             let _ = tx
-                .send("ERROR:No API key configured. Run `soul init` to set up your Claude API key.".to_string())
+                .send(
+                    "ERROR:No API key configured. Run `soul init` to set up your Claude API key."
+                        .to_string(),
+                )
                 .await;
             return;
         }
@@ -158,7 +161,10 @@ pub(super) fn start_provider_import(import_page: &mut ImportPage, channels: &mut
         match check {
             Ok(resp) if resp.status() == reqwest::StatusCode::UNAUTHORIZED => {
                 let _ = tx
-                    .send("ERROR:API key is invalid or expired. Run `soul init` to reconfigure.".to_string())
+                    .send(
+                        "ERROR:API key is invalid or expired. Run `soul init` to reconfigure."
+                            .to_string(),
+                    )
                     .await;
                 return;
             }
@@ -200,9 +206,7 @@ pub(super) fn start_provider_import(import_page: &mut ImportPage, channels: &mut
         let mut errors = 0usize;
         let chunk_count = all_chunks.len();
         for (i, chunk) in all_chunks.iter().enumerate() {
-            let _ = tx
-                .send(format!("PROGRESS:{}/{}", i + 1, chunk_count))
-                .await;
+            let _ = tx.send(format!("PROGRESS:{}/{}", i + 1, chunk_count)).await;
             match process_chunk(&client, chunk).await {
                 Ok(memories) => all_memories.push(memories),
                 Err(e) => {
@@ -210,7 +214,10 @@ pub(super) fn start_provider_import(import_page: &mut ImportPage, channels: &mut
                     let msg = e.to_string();
                     if msg.contains("API key") || msg.contains("401") {
                         let _ = tx
-                            .send("ERROR:API key rejected during processing. Run `soul init`.".to_string())
+                            .send(
+                                "ERROR:API key rejected during processing. Run `soul init`."
+                                    .to_string(),
+                            )
                             .await;
                         return;
                     }

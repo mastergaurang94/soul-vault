@@ -7,6 +7,7 @@ mod export_types;
 mod ingest_process;
 mod ingest_scan;
 mod ingest_summary;
+mod init_validate;
 mod interactive_menu;
 mod login_oauth;
 mod pull_pipeline;

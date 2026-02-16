@@ -56,7 +56,11 @@ pub fn render_running(area: Rect, buf: &mut Buffer, progress: &[String]) {
 }
 
 pub fn render_processing(area: Rect, buf: &mut Buffer, current: usize, total: usize) {
-    let pct = if total > 0 { (current * 100) / total } else { 0 };
+    let pct = if total > 0 {
+        (current * 100) / total
+    } else {
+        0
+    };
     let bar_w = 20;
     let filled = if total > 0 {
         (current * bar_w) / total

@@ -13,6 +13,7 @@ mod ui;
 mod vault;
 
 use clap::{Parser, Subcommand};
+use std::io::{self, IsTerminal, Write};
 
 // ─── CLI Definition ───────────────────────────────────────────────────────────
 
@@ -21,7 +22,7 @@ use clap::{Parser, Subcommand};
     name = "soul",
     about = "Your AI memory, unified. Distills AI conversations into a structured local vault.",
     version,
-    disable_version_flag = true,
+    disable_version_flag = true
 )]
 struct Cli {
     #[command(subcommand)]
@@ -110,11 +111,8 @@ async fn main() {
     let cli = Cli::parse();
 
     let result = match cli.command {
-        None => {
-            // No subcommand → full-screen TUI
-            tui::run()
-        }
-        Some(Commands::Init) => cli::init::run(),
+        None => run_no_subcommand().await,
+        Some(Commands::Init) => cli::init::run().await,
         Some(Commands::Import {
             folder,
             force,
@@ -145,5 +143,57 @@ async fn main() {
     if let Err(e) = result {
         eprintln!("  {} {}\n", ui::theme::red("✗"), e);
         std::process::exit(1);
+    }
+}
+
+async fn run_no_subcommand() -> anyhow::Result<()> {
+    if io::stdin().is_terminal() && !vault::config::is_initialized() {
+        print!(
+            "  Vault not initialized. Run setup now with {}? {} ",
+            ui::theme::cyan("soul init"),
+            ui::theme::dim("(Y/n)")
+        );
+        io::stdout().flush()?;
+
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        if !should_run_init(&input) {
+            println!(
+                "\n  {} Run {} when you're ready.\n",
+                ui::theme::dim("Setup skipped."),
+                ui::theme::cyan("soul init")
+            );
+            return Ok(());
+        }
+
+        println!();
+        cli::init::run().await?;
+    }
+
+    // No subcommand → full-screen TUI
+    tui::run()
+}
+
+fn should_run_init(input: &str) -> bool {
+    input.trim().to_lowercase() != "n"
+}
+
+#[cfg(test)]
+mod tests {
+    use super::should_run_init;
+
+    #[test]
+    fn should_run_init_defaults_to_yes() {
+        assert!(should_run_init(""));
+        assert!(should_run_init("y"));
+        assert!(should_run_init("Y"));
+        assert!(should_run_init("yes"));
+    }
+
+    #[test]
+    fn should_run_init_respects_no() {
+        assert!(!should_run_init("n"));
+        assert!(!should_run_init("N"));
+        assert!(!should_run_init(" n "));
     }
 }

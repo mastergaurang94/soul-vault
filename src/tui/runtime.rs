@@ -81,7 +81,9 @@ fn handle_key(
     channels: &mut Channels,
 ) {
     // Ctrl+C always quits, regardless of focus
-    if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL)
+    if key
+        .modifiers
+        .contains(crossterm::event::KeyModifiers::CONTROL)
         && key.code == KeyCode::Char('c')
     {
         app.should_quit = true;

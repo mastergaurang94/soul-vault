@@ -35,7 +35,10 @@ pub fn run() -> Result<()> {
     if let Some(ref action) = selected {
         println!();
         match action {
-            Action::Init => crate::cli::init::run()?,
+            Action::Init => {
+                let rt = tokio::runtime::Handle::current();
+                rt.block_on(crate::cli::init::run())?;
+            }
             Action::Import => run_import_prompt()?,
             Action::Login => {
                 let rt = tokio::runtime::Handle::current();

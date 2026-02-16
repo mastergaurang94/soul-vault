@@ -51,11 +51,36 @@ pub fn render_form(area: Rect, buf: &mut Buffer, page: &ExportPage) {
             "  Sections",
             Style::default().fg(rat::DIM).add_modifier(Modifier::BOLD),
         )),
-        checkbox_line(page.active_field, ExportField::Identity, "Identity", page.include_identity),
-        checkbox_line(page.active_field, ExportField::Preferences, "Preferences", page.include_preferences),
-        checkbox_line(page.active_field, ExportField::Topics, "Topics", page.include_topics),
-        checkbox_line(page.active_field, ExportField::People, "People", page.include_people),
-        checkbox_line(page.active_field, ExportField::Memories, "Memories", page.include_memories),
+        checkbox_line(
+            page.active_field,
+            ExportField::Identity,
+            "Identity",
+            page.include_identity,
+        ),
+        checkbox_line(
+            page.active_field,
+            ExportField::Preferences,
+            "Preferences",
+            page.include_preferences,
+        ),
+        checkbox_line(
+            page.active_field,
+            ExportField::Topics,
+            "Topics",
+            page.include_topics,
+        ),
+        checkbox_line(
+            page.active_field,
+            ExportField::People,
+            "People",
+            page.include_people,
+        ),
+        checkbox_line(
+            page.active_field,
+            ExportField::Memories,
+            "Memories",
+            page.include_memories,
+        ),
         Line::from(""),
         Line::from(Span::styled(
             truncate_line(&format!("  Output: {}", page.output_path()), max_w),
@@ -71,7 +96,12 @@ pub fn render_form(area: Rect, buf: &mut Buffer, page: &ExportPage) {
     }
 
     lines.push(Line::from(""));
-    lines.push(field_line(page.active_field, ExportField::Execute, "[ Export ]", ""));
+    lines.push(field_line(
+        page.active_field,
+        ExportField::Execute,
+        "[ Export ]",
+        "",
+    ));
 
     if let Some((ok, msg)) = &page.result_msg {
         lines.push(Line::from(""));

@@ -4,8 +4,11 @@ use anyhow::Result;
 use std::fs;
 use std::path::Path;
 
+use crate::auth::is_logged_in;
 use crate::ui::theme::*;
-use crate::vault::config::{assert_initialized, vault_root};
+use crate::vault::config::{
+    assert_initialized, get_api_key, get_key_health, vault_root, ApiKeyHealth,
+};
 use crate::vault::read::get_vault_stats;
 use crate::vault::sources::get_source_stats;
 
@@ -62,23 +65,16 @@ pub fn run() -> Result<()> {
 
     for p in &stats.providers {
         let name = p.name.display_name();
-        let (icon, status_text) = if p.connected {
-            let import_info = match &p.last_import {
-                Some(lp) => format!("last: {}", format_time_ago(lp)),
-                None => "no imports yet".to_string(),
-            };
-            (emerald(ICON_CHECK), import_info)
-        } else {
-            (dim(ICON_DOT), "not connected".to_string())
-        };
+        let (icon, status_text, status_colored) =
+            provider_line_state(p.connected, &p.name, &p.last_import);
 
         // Build the visible content: "  ✓ Claude         no imports yet"
         // icon(1) + space(1) + name(padded to 14) + status
-        let visible_content = format!("  {} {:<14}{}", "X", name, &status_text);
+        let visible_content = format!("  {} {:<14}{}", "X", name, status_text);
         let vis_len = visible_content.len(); // no ANSI here, plain measurement
 
         // Now build with colors
-        let colored_content = format!("  {} {:<14}{}", icon, name, dim(&status_text));
+        let colored_content = format!("  {} {:<14}{}", icon, name, status_colored);
         let pad = if vis_len < INNER_WIDTH {
             INNER_WIDTH - vis_len
         } else {
@@ -120,6 +116,57 @@ pub fn run() -> Result<()> {
     println!();
 
     Ok(())
+}
+
+fn provider_line_state(
+    enabled: bool,
+    provider: &crate::types::Provider,
+    last_import: &Option<String>,
+) -> (String, String, String) {
+    if !enabled {
+        let status = "disabled".to_string();
+        return (dim(ICON_DOT), status.clone(), dim(&status));
+    }
+
+    if is_logged_in(provider).unwrap_or(false) {
+        let status = match last_import {
+            Some(lp) => format!("last: {}", format_time_ago(lp)),
+            None => "no imports yet".to_string(),
+        };
+        return (emerald(ICON_CHECK), status.clone(), dim(&status));
+    }
+
+    let has_key = get_api_key(&provider.to_string())
+        .ok()
+        .flatten()
+        .map(|k| !k.trim().is_empty())
+        .unwrap_or(false);
+    if !has_key {
+        let status = "enabled · no credentials".to_string();
+        return (amber(ICON_DOT), status.clone(), amber(&status));
+    }
+
+    match get_key_health(provider).ok().flatten().map(|r| r.status) {
+        Some(ApiKeyHealth::Verified) => {
+            let status = match last_import {
+                Some(lp) => format!("last: {}", format_time_ago(lp)),
+                None => "no imports yet".to_string(),
+            };
+            (emerald(ICON_CHECK), status.clone(), dim(&status))
+        }
+        Some(ApiKeyHealth::Unverified) => {
+            let status = "key unverified".to_string();
+            (amber(ICON_DOT), status.clone(), amber(&status))
+        }
+        Some(ApiKeyHealth::Invalid) => {
+            let status = "key invalid".to_string();
+            (red(ICON_CROSS), status.clone(), red(&status))
+        }
+        None => {
+            let status = "key set · unknown".to_string();
+            (amber(ICON_DOT), status.clone(), amber(&status))
+        }
+    }
 }
 
 // ─── Box Drawing ──────────────────────────────────────────────────────────────

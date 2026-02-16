@@ -1,4 +1,4 @@
-//! Settings page — vault config overview with provider connection status.
+//! Settings page — vault config overview with provider connections.
 
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
@@ -12,9 +12,11 @@ use ratatui::{
 use crate::auth::is_logged_in;
 use crate::tui::app::App;
 use crate::tui::pages::{PageAction, PageWidget};
-use crate::types::Provider;
+use crate::types::{Provider, SoulVaultConfig};
 use crate::ui::theme::rat;
-use crate::vault::config::{get_api_key, read_config, vault_root};
+use crate::vault::config::{
+    get_api_key, get_key_health, read_config, vault_root, ApiKeyHealth, ApiKeyHealthRecord,
+};
 
 #[derive(Default)]
 pub struct SettingsPage {
@@ -109,13 +111,13 @@ fn render_settings(area: Rect, buf: &mut Buffer, scroll: u16) {
     lines.extend(api_key_lines());
 
     lines.push(Line::from(""));
-    lines.push(section_header("  OAuth"));
+    lines.push(section_header("  Connections"));
     lines.push(Line::from(""));
-    lines.extend(oauth_lines());
+    lines.extend(connection_lines(&config));
 
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        "  Manage keys: `soul init` · OAuth: `soul login`",
+        "  Configure: `soul init` · Connect: `soul login <provider>` · Disconnect: `soul logout <provider>`",
         Style::default().fg(rat::DIM),
     )));
 
@@ -142,49 +144,93 @@ fn provider_status(provider: &Provider, enabled: bool) -> (String, ratatui::styl
         .unwrap_or(false);
     let has_oauth = is_logged_in(provider).unwrap_or(false);
 
-    if has_key || has_oauth {
+    if has_oauth {
         ("ready".into(), rat::EMERALD)
-    } else {
+    } else if !has_key {
         ("enabled · no credentials".into(), rat::AMBER)
+    } else {
+        match get_key_health(provider).ok().flatten() {
+            Some(record) => match record.status {
+                ApiKeyHealth::Verified => ("ready".into(), rat::EMERALD),
+                ApiKeyHealth::Unverified => ("key unverified".into(), rat::AMBER),
+                ApiKeyHealth::Invalid => ("key invalid".into(), rat::RED),
+            },
+            None => ("key set · unknown".into(), rat::AMBER),
+        }
     }
 }
 
 fn api_key_lines() -> Vec<Line<'static>> {
-    let key = get_api_key("claude")
-        .ok()
-        .flatten()
-        .unwrap_or_default();
-    if key.trim().is_empty() {
-        vec![Line::from(Span::styled(
-            "    Claude: not set",
-            Style::default().fg(rat::DIM),
-        ))]
-    } else {
-        let masked = mask_key(&key);
-        vec![Line::from(vec![
-            Span::styled("    Claude: ", Style::default().fg(rat::DIM)),
-            Span::styled(masked, Style::default().fg(rat::EMERALD)),
-        ])]
-    }
+    let providers = [Provider::Claude, Provider::ChatGpt, Provider::Gemini];
+    providers
+        .iter()
+        .map(|provider| {
+            let key = get_api_key(&provider.to_string())
+                .ok()
+                .flatten()
+                .unwrap_or_default();
+            let health = get_key_health(provider).ok().flatten();
+            api_key_line(provider, &key, health.as_ref())
+        })
+        .collect()
 }
 
-fn oauth_lines() -> Vec<Line<'static>> {
+fn connection_lines(config: &SoulVaultConfig) -> Vec<Line<'static>> {
     let providers = [Provider::Claude, Provider::ChatGpt, Provider::Gemini];
     providers
         .iter()
         .map(|p| {
-            let logged_in = is_logged_in(p).unwrap_or(false);
-            let (status, color) = if logged_in {
-                ("logged in", rat::EMERALD)
-            } else {
-                ("not connected", rat::DIM)
-            };
-            Line::from(vec![
-                Span::styled(format!("    {:<12}", p.display_name()), Style::default().fg(rat::DIM)),
-                Span::styled(status, Style::default().fg(color)),
-            ])
+            let (status, status_color, action) = connection_state(config, p);
+            let mut spans = vec![
+                Span::styled(
+                    format!("    {:<12}", p.display_name()),
+                    Style::default().fg(rat::DIM),
+                ),
+                Span::styled(status, Style::default().fg(status_color)),
+            ];
+            if let Some(action) = action {
+                spans.push(Span::raw("  "));
+                spans.push(Span::styled(action, Style::default().fg(rat::CYAN)));
+            }
+            Line::from(spans)
         })
         .collect()
+}
+
+fn connection_state(
+    config: &SoulVaultConfig,
+    provider: &Provider,
+) -> (&'static str, ratatui::style::Color, Option<&'static str>) {
+    if !oauth_supported(provider) {
+        return ("coming soon", rat::DIM, None);
+    }
+
+    if !provider_enabled(config, provider) {
+        return ("not set up", rat::AMBER, Some("Set up in `soul init`"));
+    }
+
+    if is_logged_in(provider).unwrap_or(false) {
+        return (
+            "connected",
+            rat::EMERALD,
+            Some("Disconnect via `soul logout`"),
+        );
+    }
+
+    ("ready", rat::CYAN, Some("Connect via `soul login`"))
+}
+
+fn oauth_supported(provider: &Provider) -> bool {
+    matches!(provider, Provider::Claude)
+}
+
+fn provider_enabled(config: &SoulVaultConfig, provider: &Provider) -> bool {
+    config
+        .providers
+        .iter()
+        .find(|entry| entry.name == *provider)
+        .map(|entry| entry.enabled)
+        .unwrap_or(false)
 }
 
 fn mask_key(key: &str) -> String {
@@ -193,6 +239,40 @@ fn mask_key(key: &str) -> String {
     } else {
         format!("{}••••{}", &key[..4], &key[key.len() - 4..])
     }
+}
+
+fn api_key_line(
+    provider: &Provider,
+    key: &str,
+    health: Option<&ApiKeyHealthRecord>,
+) -> Line<'static> {
+    if key.trim().is_empty() {
+        return Line::from(vec![
+            Span::styled(
+                format!("    {:<12}", provider.display_name()),
+                Style::default().fg(rat::DIM),
+            ),
+            Span::styled("not set", Style::default().fg(rat::DIM)),
+        ]);
+    }
+
+    let masked = mask_key(key);
+    let (label, color) = match health.map(|h| &h.status) {
+        Some(ApiKeyHealth::Verified) => ("verified", rat::EMERALD),
+        Some(ApiKeyHealth::Unverified) => ("unverified", rat::AMBER),
+        Some(ApiKeyHealth::Invalid) => ("invalid", rat::RED),
+        None => ("unknown", rat::AMBER),
+    };
+
+    Line::from(vec![
+        Span::styled(
+            format!("    {:<12}", provider.display_name()),
+            Style::default().fg(rat::DIM),
+        ),
+        Span::styled(masked, Style::default().fg(rat::EMERALD)),
+        Span::raw("  "),
+        Span::styled(format!("[{}]", label), Style::default().fg(color)),
+    ])
 }
 
 fn section_header(label: &str) -> Line<'static> {
@@ -205,6 +285,9 @@ fn section_header(label: &str) -> Line<'static> {
 fn kv_line(label: &str, value: &str) -> Line<'static> {
     Line::from(vec![
         Span::styled(format!("{:<18}", label), Style::default().fg(rat::DIM)),
-        Span::styled(value.to_string(), Style::default().add_modifier(Modifier::BOLD)),
+        Span::styled(
+            value.to_string(),
+            Style::default().add_modifier(Modifier::BOLD),
+        ),
     ])
 }

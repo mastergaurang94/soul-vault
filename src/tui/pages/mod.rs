@@ -7,8 +7,6 @@ pub mod export_state;
 pub mod import;
 pub mod import_provider_render;
 pub mod import_render;
-pub mod login;
-pub mod logout;
 pub mod reset;
 pub mod settings;
 pub mod status;

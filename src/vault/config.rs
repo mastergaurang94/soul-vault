@@ -1,11 +1,13 @@
 //! Vault configuration: paths, config.json, keys.json management.
 
 use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use crate::types::{KeysConfig, SoulVaultConfig, SoulVaultError};
+use crate::types::{KeysConfig, Provider, SoulVaultConfig, SoulVaultError};
 
 /// Returns the vault root directory: ~/soul-vault/
 pub fn vault_root() -> PathBuf {
@@ -24,6 +26,10 @@ pub fn config_path() -> PathBuf {
 
 pub fn keys_path() -> PathBuf {
     config_dir().join("keys.json")
+}
+
+pub fn key_status_path() -> PathBuf {
+    config_dir().join("key_status.json")
 }
 
 pub fn identity_dir() -> PathBuf {
@@ -60,9 +66,6 @@ pub fn create_vault_structure() -> Result<()> {
         topics_dir(),
         people_dir(),
         sources_dir(),
-        sources_dir().join("chatgpt"),
-        sources_dir().join("claude"),
-        sources_dir().join("gemini"),
     ];
 
     for dir in dirs {
@@ -118,6 +121,72 @@ pub fn write_keys(keys: &KeysConfig) -> Result<()> {
     fs::write(&path, &json).with_context(|| format!("Failed to write {}", path.display()))?;
     fs::set_permissions(&path, fs::Permissions::from_mode(0o600))?;
     Ok(())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ApiKeyHealth {
+    Verified,
+    Unverified,
+    Invalid,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ApiKeyHealthRecord {
+    pub status: ApiKeyHealth,
+    pub checked_at: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+}
+
+pub type ApiKeyHealthConfig = HashMap<String, ApiKeyHealthRecord>;
+
+/// Reads key_status.json. Returns empty map if missing.
+pub fn read_key_health() -> Result<ApiKeyHealthConfig> {
+    let path = key_status_path();
+    if !path.exists() {
+        return Ok(ApiKeyHealthConfig::new());
+    }
+
+    let raw =
+        fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let health: ApiKeyHealthConfig =
+        serde_json::from_str(&raw).with_context(|| "Failed to parse key_status.json")?;
+    Ok(health)
+}
+
+/// Writes key_status.json with pretty formatting.
+pub fn write_key_health(health: &ApiKeyHealthConfig) -> Result<()> {
+    let path = key_status_path();
+    fs::create_dir_all(config_dir())?;
+    let json = serde_json::to_string_pretty(health)?;
+    fs::write(&path, json).with_context(|| format!("Failed to write {}", path.display()))?;
+    Ok(())
+}
+
+/// Updates one provider key validation state.
+pub fn set_key_health(
+    provider: &Provider,
+    status: ApiKeyHealth,
+    message: Option<String>,
+) -> Result<()> {
+    let mut health = read_key_health()?;
+    health.insert(
+        provider.to_string(),
+        ApiKeyHealthRecord {
+            status,
+            checked_at: chrono::Utc::now().to_rfc3339(),
+            message,
+        },
+    );
+    write_key_health(&health)
+}
+
+/// Returns one provider key validation state, if present.
+pub fn get_key_health(provider: &Provider) -> Result<Option<ApiKeyHealthRecord>> {
+    let health = read_key_health()?;
+    Ok(health.get(&provider.to_string()).cloned())
 }
 
 /// Returns a single provider's API key, or None.

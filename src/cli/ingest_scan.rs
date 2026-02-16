@@ -125,7 +125,10 @@ pub(crate) fn read_and_chunk(files: &[FileInfo]) -> Result<Vec<ChunkInfo>> {
         files.len()
     ));
     if !read_errors.is_empty() {
-        msg.push_str(&format!(" ({})", amber(&format!("{} skipped", read_errors.len()))));
+        msg.push_str(&format!(
+            " ({})",
+            amber(&format!("{} skipped", read_errors.len()))
+        ));
     }
     pb.finish_and_clear();
     println!("{msg}");

@@ -63,7 +63,7 @@ impl PageWidget for ResetPage {
         }
     }
 
-    fn handle_key(&mut self, key: KeyEvent, _app: &mut App) -> PageAction {
+    fn handle_key(&mut self, key: KeyEvent, app: &mut App) -> PageAction {
         match &self.phase {
             Phase::Confirm => match key.code {
                 KeyCode::Char('j') | KeyCode::Down => {
@@ -81,7 +81,11 @@ impl PageWidget for ResetPage {
                         PageAction::BackToSidebar
                     } else {
                         match crate::cli::reset::delete_vault() {
-                            Ok(()) => self.phase = Phase::Done,
+                            Ok(()) => {
+                                self.phase = Phase::Done;
+                                app.vault_initialized = false;
+                                app.should_quit = true;
+                            }
                             Err(e) => self.phase = Phase::Error(e.to_string()),
                         }
                         PageAction::Consumed
@@ -111,9 +115,7 @@ fn render_confirm(area: Rect, buf: &mut Buffer, selected: usize) {
         Line::from(""),
         Line::from(Span::styled(
             "  ⚠ This will delete your entire vault.",
-            Style::default()
-                .fg(rat::AMBER)
-                .add_modifier(Modifier::BOLD),
+            Style::default().fg(rat::AMBER).add_modifier(Modifier::BOLD),
         )),
         Line::from(""),
         Line::from(Span::styled(
@@ -136,10 +138,7 @@ fn render_confirm(area: Rect, buf: &mut Buffer, selected: usize) {
             Style::default().fg(rat::DIM)
         };
         let prefix = if i == selected { "  > " } else { "    " };
-        lines.push(Line::from(Span::styled(
-            format!("{prefix}{label}"),
-            style,
-        )));
+        lines.push(Line::from(Span::styled(format!("{prefix}{label}"), style)));
     }
 
     lines.push(Line::from(""));

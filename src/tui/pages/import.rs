@@ -96,7 +96,11 @@ impl ImportPage {
     pub fn on_provider_progress(&mut self, msg: String) {
         match &mut self.provider_phase {
             ProviderPhase::Running { progress } => progress.push(msg),
-            _ => self.provider_phase = ProviderPhase::Running { progress: vec![msg] },
+            _ => {
+                self.provider_phase = ProviderPhase::Running {
+                    progress: vec![msg],
+                }
+            }
         }
     }
     pub fn on_provider_processing(&mut self, current: usize, total: usize) {
