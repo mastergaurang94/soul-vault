@@ -13,6 +13,14 @@ Last updated: 2026-02-16
   - sidebar is stable (no separate Login/Logout pages)
   - connections copy now uses provider-scoped language (`Connect`/`Disconnect`) instead of product login framing
   - only valid next actions are shown per provider state
+  - users can now select providers with arrow keys and press Enter to connect/disconnect directly in Settings
+  - split-pane focus now supports `Right` (sidebar -> content) and `Left` (content -> sidebar where appropriate)
+- [x] Init onboarding is now one-provider-at-a-time with explicit completion:
+  - users pick a provider (`Claude`, `ChatGPT`, `Gemini`) or `Done`
+  - each provider setup now asks for auth method (`API key`, `OAuth`, `Back`)
+  - credentials are entered/validated immediately, then setup returns to provider picker
+  - users can add more providers or finish with `Done`
+  - init now shows a final setup summary (`Connected` / `API key set` / `Skipped`) before save confirmation
 - [x] Export overhaul landed:
   - `soul export --format context|json|bundle`
   - `soul export --sections identity,preferences,topics,people,memories`
@@ -61,6 +69,11 @@ Last updated: 2026-02-16
 - [x] TUI reset now exits after successful vault deletion:
   - resetting from the Reset page now closes the TUI immediately
   - prevents staying in an uninitialized post-reset UI session
+- [x] Reset safety flow hardened:
+  - `soul reset` now moves the vault to Trash by default (safer rollback)
+  - `soul reset --permanent` performs irreversible delete
+  - non-interactive permanent delete requires `--force --permanent`
+  - TUI reset now requires typed confirmation (`RESET`) before execution
 
 ## 🔨 In Progress
 

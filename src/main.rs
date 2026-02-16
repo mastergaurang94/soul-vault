@@ -101,6 +101,10 @@ enum Commands {
         /// Skip confirmation prompt (for scripting/testing)
         #[arg(short, long)]
         force: bool,
+
+        /// Permanently delete vault instead of moving to Trash
+        #[arg(long)]
+        permanent: bool,
     },
 }
 
@@ -137,7 +141,7 @@ async fn main() {
             sections.as_deref(),
         ),
         Some(Commands::Status) => cli::status::run(),
-        Some(Commands::Reset { force }) => cli::reset::run(force),
+        Some(Commands::Reset { force, permanent }) => cli::reset::run(force, permanent),
     };
 
     if let Err(e) = result {
@@ -161,7 +165,7 @@ async fn run_no_subcommand() -> anyhow::Result<()> {
             println!(
                 "\n  {} Run {} when you're ready.\n",
                 ui::theme::dim("Setup skipped."),
-                ui::theme::cyan("soul init")
+                ui::theme::cyan("soul")
             );
             return Ok(());
         }

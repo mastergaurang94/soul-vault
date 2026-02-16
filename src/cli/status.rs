@@ -4,7 +4,6 @@ use anyhow::Result;
 use std::fs;
 use std::path::Path;
 
-use crate::auth::is_logged_in;
 use crate::ui::theme::*;
 use crate::vault::config::{
     assert_initialized, get_api_key, get_key_health, vault_root, ApiKeyHealth,
@@ -71,7 +70,7 @@ pub fn run() -> Result<()> {
         // Build the visible content: "  ✓ Claude         no imports yet"
         // icon(1) + space(1) + name(padded to 14) + status
         let visible_content = format!("  {} {:<14}{}", "X", name, status_text);
-        let vis_len = visible_content.len(); // no ANSI here, plain measurement
+        let vis_len = visible_len(&visible_content); // no ANSI here, plain measurement
 
         // Now build with colors
         let colored_content = format!("  {} {:<14}{}", icon, name, status_colored);
@@ -128,22 +127,14 @@ fn provider_line_state(
         return (dim(ICON_DOT), status.clone(), dim(&status));
     }
 
-    if is_logged_in(provider).unwrap_or(false) {
-        let status = match last_import {
-            Some(lp) => format!("last: {}", format_time_ago(lp)),
-            None => "no imports yet".to_string(),
-        };
-        return (emerald(ICON_CHECK), status.clone(), dim(&status));
-    }
-
     let has_key = get_api_key(&provider.to_string())
         .ok()
         .flatten()
         .map(|k| !k.trim().is_empty())
         .unwrap_or(false);
     if !has_key {
-        let status = "enabled · no credentials".to_string();
-        return (amber(ICON_DOT), status.clone(), amber(&status));
+        let status = "not connected".to_string();
+        return (dim(ICON_DOT), status.clone(), dim(&status));
     }
 
     match get_key_health(provider).ok().flatten().map(|r| r.status) {
@@ -154,17 +145,13 @@ fn provider_line_state(
             };
             (emerald(ICON_CHECK), status.clone(), dim(&status))
         }
-        Some(ApiKeyHealth::Unverified) => {
-            let status = "key unverified".to_string();
-            (amber(ICON_DOT), status.clone(), amber(&status))
-        }
-        Some(ApiKeyHealth::Invalid) => {
-            let status = "key invalid".to_string();
-            (red(ICON_CROSS), status.clone(), red(&status))
+        Some(ApiKeyHealth::Unverified) | Some(ApiKeyHealth::Invalid) => {
+            let status = "not connected".to_string();
+            (dim(ICON_DOT), status.clone(), dim(&status))
         }
         None => {
-            let status = "key set · unknown".to_string();
-            (amber(ICON_DOT), status.clone(), amber(&status))
+            let status = "not connected".to_string();
+            (dim(ICON_DOT), status.clone(), dim(&status))
         }
     }
 }
@@ -187,7 +174,7 @@ fn print_box_header(title: &str) {
     // Simple header: "  │  TITLE                           │"
     // No emoji — they cause inconsistent terminal widths across terminals.
     // Visible: 2 (indent) + title.len()
-    let visible_used = 2 + title.len();
+    let visible_used = 2 + visible_len(title);
     let pad = if visible_used < INNER_WIDTH {
         INNER_WIDTH - visible_used
     } else {
@@ -201,7 +188,7 @@ fn print_stat_row(label: &str, value: &str) {
     // 4 spaces indent + label + ":" + padding to col 20 + value
     let label_with_colon = format!("{}:", label);
     let visible = format!("    {:<16}{}", label_with_colon, value);
-    let vis_len = visible.len();
+    let vis_len = visible_len(&visible);
     let pad = if vis_len < INNER_WIDTH {
         INNER_WIDTH - vis_len
     } else {
@@ -217,7 +204,7 @@ fn print_stat_row(label: &str, value: &str) {
 }
 
 fn print_content_row(text: &str, color_fn: Option<&dyn Fn(&str) -> String>) {
-    let vis_len = text.len();
+    let vis_len = visible_len(text);
     let colored = match color_fn {
         Some(f) => f(text),
         None => text.to_string(),
@@ -228,6 +215,10 @@ fn print_content_row(text: &str, color_fn: Option<&dyn Fn(&str) -> String>) {
         1
     };
     println!("  │{}{}│", colored, " ".repeat(pad));
+}
+
+fn visible_len(s: &str) -> usize {
+    s.chars().count()
 }
 
 // ─── Path & Size Helpers ──────────────────────────────────────────────────────

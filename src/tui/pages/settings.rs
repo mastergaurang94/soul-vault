@@ -9,7 +9,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Widget},
 };
 
-use crate::auth::is_logged_in;
+use crate::auth::{is_logged_in, remove_credentials};
 use crate::tui::app::App;
 use crate::tui::pages::{PageAction, PageWidget};
 use crate::types::{Provider, SoulVaultConfig};
@@ -20,7 +20,24 @@ use crate::vault::config::{
 
 #[derive(Default)]
 pub struct SettingsPage {
-    scroll: u16,
+    selected_connection: usize,
+    pending_oauth: bool,
+    status_message: Option<(bool, String)>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ConnectionAction {
+    Connect,
+    Disconnect,
+    Setup,
+    None,
+}
+
+struct ConnectionState {
+    label: &'static str,
+    color: ratatui::style::Color,
+    action: ConnectionAction,
+    action_label: Option<&'static str>,
 }
 
 impl PageWidget for SettingsPage {
@@ -29,21 +46,97 @@ impl PageWidget for SettingsPage {
             render_not_init(area, buf);
             return;
         }
-        render_settings(area, buf, self.scroll);
+        render_settings(area, buf, self);
     }
 
     fn handle_key(&mut self, key: KeyEvent, _app: &mut App) -> PageAction {
+        if self.pending_oauth {
+            return match key.code {
+                KeyCode::Esc => PageAction::BackToSidebar,
+                _ => PageAction::Consumed,
+            };
+        }
+
         match key.code {
             KeyCode::Char('j') | KeyCode::Down => {
-                self.scroll = self.scroll.saturating_add(1);
+                self.selected_connection =
+                    (self.selected_connection + 1) % connection_providers().len();
                 PageAction::Consumed
             }
             KeyCode::Char('k') | KeyCode::Up => {
-                self.scroll = self.scroll.saturating_sub(1);
+                let len = connection_providers().len();
+                self.selected_connection = (self.selected_connection + len - 1) % len;
                 PageAction::Consumed
             }
+            KeyCode::Enter => self.select_connection_action(),
             KeyCode::Esc => PageAction::BackToSidebar,
             _ => PageAction::Ignored,
+        }
+    }
+}
+
+impl SettingsPage {
+    pub fn on_oauth_complete(&mut self, ok: bool, message: String) {
+        self.pending_oauth = false;
+        self.status_message = Some((ok, message));
+    }
+
+    fn selected_provider(&self) -> Provider {
+        connection_providers()[self.selected_connection].clone()
+    }
+
+    fn select_connection_action(&mut self) -> PageAction {
+        let config = match read_config() {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                self.status_message = Some((false, format!("Failed to read config: {e}")));
+                return PageAction::Consumed;
+            }
+        };
+
+        let provider = self.selected_provider();
+        let state = connection_state(&config, &provider);
+        match state.action {
+            ConnectionAction::Connect => {
+                self.pending_oauth = true;
+                self.status_message = Some((
+                    true,
+                    format!("Starting OAuth for {}...", provider.display_name()),
+                ));
+                PageAction::StartOAuthConnect(provider)
+            }
+            ConnectionAction::Disconnect => {
+                match remove_credentials(&provider) {
+                    Ok(true) => {
+                        self.status_message =
+                            Some((true, format!("Disconnected {}.", provider.display_name())))
+                    }
+                    Ok(false) => {
+                        self.status_message = Some((
+                            false,
+                            format!("No active {} connection.", provider.display_name()),
+                        ))
+                    }
+                    Err(e) => {
+                        self.status_message = Some((false, format!("Disconnect failed: {e}")));
+                    }
+                }
+                PageAction::Consumed
+            }
+            ConnectionAction::Setup => {
+                self.status_message = Some((
+                    false,
+                    format!("Set up {} in `soul init` first.", provider.display_name()),
+                ));
+                PageAction::Consumed
+            }
+            ConnectionAction::None => {
+                self.status_message = Some((
+                    false,
+                    format!("OAuth for {} is coming soon.", provider.display_name()),
+                ));
+                PageAction::Consumed
+            }
         }
     }
 }
@@ -70,7 +163,7 @@ fn render_not_init(area: Rect, buf: &mut Buffer) {
     .render(area, buf);
 }
 
-fn render_settings(area: Rect, buf: &mut Buffer, scroll: u16) {
+fn render_settings(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
     let config = match read_config() {
         Ok(c) => c,
         Err(_) => {
@@ -113,7 +206,26 @@ fn render_settings(area: Rect, buf: &mut Buffer, scroll: u16) {
     lines.push(Line::from(""));
     lines.push(section_header("  Connections"));
     lines.push(Line::from(""));
-    lines.extend(connection_lines(&config));
+    lines.extend(connection_lines(&config, page.selected_connection));
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "  Up/Down select · Enter action · Esc back",
+        Style::default().fg(rat::DIM),
+    )));
+    if page.pending_oauth {
+        lines.push(Line::from(Span::styled(
+            "  Waiting for OAuth callback in your browser...",
+            Style::default().fg(rat::CYAN),
+        )));
+    }
+    if let Some((ok, msg)) = &page.status_message {
+        let color = if *ok { rat::EMERALD } else { rat::RED };
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            format!("  {}", msg),
+            Style::default().fg(color),
+        )));
+    }
 
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
@@ -121,8 +233,7 @@ fn render_settings(area: Rect, buf: &mut Buffer, scroll: u16) {
         Style::default().fg(rat::DIM),
     )));
 
-    let visible: Vec<Line> = lines.into_iter().skip(scroll as usize).collect();
-    Paragraph::new(visible)
+    Paragraph::new(lines)
         .block(
             Block::default()
                 .borders(Borders::ALL)
@@ -131,6 +242,86 @@ fn render_settings(area: Rect, buf: &mut Buffer, scroll: u16) {
                 .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD)),
         )
         .render(area, buf);
+}
+
+fn connection_providers() -> Vec<Provider> {
+    vec![Provider::Claude, Provider::ChatGpt, Provider::Gemini]
+}
+
+fn connection_lines(config: &SoulVaultConfig, selected_idx: usize) -> Vec<Line<'static>> {
+    connection_providers()
+        .into_iter()
+        .enumerate()
+        .map(|(idx, provider)| {
+            let state = connection_state(config, &provider);
+            let selected = idx == selected_idx;
+            let prefix = if selected { "  > " } else { "    " };
+            let name_style = if selected {
+                Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(rat::DIM)
+            };
+            let mut spans = vec![
+                Span::styled(prefix, name_style),
+                Span::styled(format!("{:<12}", provider.display_name()), name_style),
+                Span::styled(state.label, Style::default().fg(state.color)),
+            ];
+            if let Some(label) = state.action_label {
+                spans.push(Span::raw("  "));
+                spans.push(Span::styled(label, Style::default().fg(rat::CYAN)));
+            }
+            Line::from(spans)
+        })
+        .collect()
+}
+
+fn connection_state(config: &SoulVaultConfig, provider: &Provider) -> ConnectionState {
+    if !oauth_supported(provider) {
+        return ConnectionState {
+            label: "coming soon",
+            color: rat::DIM,
+            action: ConnectionAction::None,
+            action_label: None,
+        };
+    }
+
+    if !provider_enabled(config, provider) {
+        return ConnectionState {
+            label: "not set up",
+            color: rat::AMBER,
+            action: ConnectionAction::Setup,
+            action_label: Some("Run `soul init`"),
+        };
+    }
+
+    if is_logged_in(provider).unwrap_or(false) {
+        return ConnectionState {
+            label: "connected",
+            color: rat::EMERALD,
+            action: ConnectionAction::Disconnect,
+            action_label: Some("[Enter] Disconnect"),
+        };
+    }
+
+    ConnectionState {
+        label: "ready",
+        color: rat::CYAN,
+        action: ConnectionAction::Connect,
+        action_label: Some("[Enter] Connect via OAuth"),
+    }
+}
+
+fn oauth_supported(provider: &Provider) -> bool {
+    matches!(provider, Provider::Claude)
+}
+
+fn provider_enabled(config: &SoulVaultConfig, provider: &Provider) -> bool {
+    config
+        .providers
+        .iter()
+        .find(|entry| entry.name == *provider)
+        .map(|entry| entry.enabled)
+        .unwrap_or(false)
 }
 
 fn provider_status(provider: &Provider, enabled: bool) -> (String, ratatui::style::Color) {
@@ -173,64 +364,6 @@ fn api_key_lines() -> Vec<Line<'static>> {
             api_key_line(provider, &key, health.as_ref())
         })
         .collect()
-}
-
-fn connection_lines(config: &SoulVaultConfig) -> Vec<Line<'static>> {
-    let providers = [Provider::Claude, Provider::ChatGpt, Provider::Gemini];
-    providers
-        .iter()
-        .map(|p| {
-            let (status, status_color, action) = connection_state(config, p);
-            let mut spans = vec![
-                Span::styled(
-                    format!("    {:<12}", p.display_name()),
-                    Style::default().fg(rat::DIM),
-                ),
-                Span::styled(status, Style::default().fg(status_color)),
-            ];
-            if let Some(action) = action {
-                spans.push(Span::raw("  "));
-                spans.push(Span::styled(action, Style::default().fg(rat::CYAN)));
-            }
-            Line::from(spans)
-        })
-        .collect()
-}
-
-fn connection_state(
-    config: &SoulVaultConfig,
-    provider: &Provider,
-) -> (&'static str, ratatui::style::Color, Option<&'static str>) {
-    if !oauth_supported(provider) {
-        return ("coming soon", rat::DIM, None);
-    }
-
-    if !provider_enabled(config, provider) {
-        return ("not set up", rat::AMBER, Some("Set up in `soul init`"));
-    }
-
-    if is_logged_in(provider).unwrap_or(false) {
-        return (
-            "connected",
-            rat::EMERALD,
-            Some("Disconnect via `soul logout`"),
-        );
-    }
-
-    ("ready", rat::CYAN, Some("Connect via `soul login`"))
-}
-
-fn oauth_supported(provider: &Provider) -> bool {
-    matches!(provider, Provider::Claude)
-}
-
-fn provider_enabled(config: &SoulVaultConfig, provider: &Provider) -> bool {
-    config
-        .providers
-        .iter()
-        .find(|entry| entry.name == *provider)
-        .map(|entry| entry.enabled)
-        .unwrap_or(false)
 }
 
 fn mask_key(key: &str) -> String {

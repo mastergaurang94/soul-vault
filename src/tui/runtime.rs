@@ -2,8 +2,9 @@
 
 use anyhow::Result;
 use crossterm::{
+    cursor,
     event::{self, Event, KeyCode, KeyEventKind},
-    terminal::{self, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{self, Clear, ClearType, EnterAlternateScreen, LeaveAlternateScreen},
     ExecutableCommand,
 };
 use std::io::{self, IsTerminal};
@@ -32,6 +33,9 @@ pub fn run() -> Result<()> {
 
     io::stdout().execute(LeaveAlternateScreen)?;
     terminal::disable_raw_mode()?;
+    io::stdout().execute(Clear(ClearType::All))?;
+    io::stdout().execute(cursor::MoveTo(0, 0))?;
+    println!("Exited Soul Vault.");
 
     result
 }
@@ -49,6 +53,7 @@ fn run_app(
         runtime_tasks::drain_folder_import_progress(&mut pages.import, &mut channels);
         runtime_tasks::drain_watch_events(&mut pages.watch, &mut channels);
         runtime_tasks::drain_provider_import_progress(&mut pages.import, &mut channels);
+        runtime_tasks::drain_oauth_updates(&mut pages.settings, &mut channels);
 
         terminal.draw(|frame| {
             layout::render_layout(frame.area(), frame.buffer_mut(), &app, &pages);
@@ -95,6 +100,14 @@ fn handle_key(
             app.should_quit = true;
             return;
         }
+        KeyCode::Right if app.focus == Focus::Sidebar => {
+            app.focus = Focus::Content;
+            return;
+        }
+        KeyCode::Left if app.focus == Focus::Content && app.current_page != Page::Import => {
+            app.focus = Focus::Sidebar;
+            return;
+        }
         KeyCode::Char('?') => {
             app.show_help = !app.show_help;
             return;
@@ -138,6 +151,9 @@ fn handle_key(
         }
         pages::PageAction::StartProviderImport => {
             runtime_tasks::start_provider_import(&mut pages.import, channels);
+        }
+        pages::PageAction::StartOAuthConnect(provider) => {
+            runtime_tasks::start_oauth_connect(provider, channels);
         }
         pages::PageAction::Consumed | pages::PageAction::Ignored => {}
     }

@@ -3,9 +3,11 @@
 use tokio::sync::mpsc;
 
 use super::pages::import::ImportPage;
+use super::pages::settings::SettingsPage;
 use super::pages::watch::{WatchEvent, WatchPage};
 use super::watcher;
 use crate::core::pipeline::ImportProgress;
+use crate::types::Provider;
 
 // ─── Channels ─────────────────────────────────────────────────────────────────
 
@@ -15,6 +17,12 @@ pub(super) struct Channels {
     pub(super) watch_event_rx: Option<mpsc::Receiver<WatchEvent>>,
     pub(super) watch_stop_tx: Option<mpsc::Sender<()>>,
     pub(super) pull_rx: Option<mpsc::Receiver<String>>,
+    pub(super) oauth_rx: Option<mpsc::Receiver<OAuthUpdate>>,
+}
+
+pub(super) enum OAuthUpdate {
+    Success(String),
+    Error(String),
 }
 
 pub(super) fn shutdown_watcher(channels: &mut Channels) {
@@ -70,6 +78,22 @@ pub(super) fn drain_provider_import_progress(import: &mut ImportPage, channels: 
             } else {
                 import.on_provider_progress(msg);
             }
+        }
+    }
+}
+
+pub(super) fn drain_oauth_updates(settings: &mut SettingsPage, channels: &mut Channels) {
+    if let Some(rx) = &mut channels.oauth_rx {
+        let mut should_clear = false;
+        while let Ok(update) = rx.try_recv() {
+            match update {
+                OAuthUpdate::Success(msg) => settings.on_oauth_complete(true, msg),
+                OAuthUpdate::Error(msg) => settings.on_oauth_complete(false, msg),
+            }
+            should_clear = true;
+        }
+        if should_clear {
+            channels.oauth_rx = None;
         }
     }
 }
@@ -253,4 +277,25 @@ pub(super) fn stop_watch(watch_page: &mut WatchPage, channels: &mut Channels) {
     shutdown_watcher(channels);
     channels.watch_event_rx = None;
     watch_page.stop_watching();
+}
+
+pub(super) fn start_oauth_connect(provider: Provider, channels: &mut Channels) {
+    let (tx, rx) = mpsc::channel(1);
+    channels.oauth_rx = Some(rx);
+
+    tokio::spawn(async move {
+        match crate::auth::connect_provider(&provider).await {
+            Ok(()) => {
+                let _ = tx
+                    .send(OAuthUpdate::Success(format!(
+                        "Connected to {}.",
+                        provider.display_name()
+                    )))
+                    .await;
+            }
+            Err(e) => {
+                let _ = tx.send(OAuthUpdate::Error(e.to_string())).await;
+            }
+        }
+    });
 }

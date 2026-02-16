@@ -1,9 +1,9 @@
-//! `soul reset` — wipe vault and config, returning to pre-init state.
+//! `soul reset` — move vault to trash by default, with optional permanent delete.
 
 use anyhow::{bail, Result};
 use std::fs;
 use std::io::{self, IsTerminal, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use crate::ui::theme::*;
 use crate::vault::config;
@@ -62,7 +62,7 @@ fn count_md_files(dir: &Path) -> usize {
 
 // ─── Reset Command ───────────────────────────────────────────────────────────
 
-pub fn run(force: bool) -> Result<()> {
+pub fn run(force: bool, permanent: bool) -> Result<()> {
     let vault_root = config::vault_root();
 
     // Check if vault exists
@@ -101,10 +101,15 @@ pub fn run(force: bool) -> Result<()> {
 
         // Show warning
         println!();
+        let action = if permanent {
+            red("This will permanently delete your entire Soul Vault and all configuration.")
+        } else {
+            amber("This will move your Soul Vault to Trash.")
+        };
         println!(
             "  {} {}",
-            red("⚠"),
-            red("This will delete your entire Soul Vault and all configuration.")
+            if permanent { red("⚠") } else { amber("!") },
+            action
         );
         println!();
         println!("  {}", bold_white("What will be deleted:"));
@@ -127,31 +132,49 @@ pub fn run(force: bool) -> Result<()> {
         );
         println!();
 
-        // Require typing "reset"
-        print!("  Type '{}' to confirm: ", bold_white("reset"));
+        let confirm_token = if permanent { "DELETE" } else { "reset" };
+        print!(
+            "  Type '{}' to confirm {}: ",
+            bold_white(confirm_token),
+            if permanent {
+                "(permanent)"
+            } else {
+                "(move to Trash)"
+            }
+        );
         io::stdout().flush()?;
         let mut input = String::new();
         io::stdin().read_line(&mut input)?;
         let trimmed = input.trim();
 
-        if trimmed != "reset" {
+        if trimmed != confirm_token {
             println!("{}", dim("\n  Cancelled.\n"));
             return Ok(());
         }
     }
 
-    delete_vault()?;
-
-    println!(
-        "\n{}\n",
-        check("Vault reset. Run `soul init` to start fresh.")
-    );
+    if permanent {
+        delete_vault_permanently()?;
+        println!(
+            "\n{}\n",
+            check("Vault permanently deleted. Run `soul init` to start fresh.")
+        );
+    } else {
+        let trashed_to = move_vault_to_trash()?;
+        println!(
+            "\n{}\n",
+            check(&format!(
+                "Vault moved to Trash ({}). Run `soul init` to start fresh.",
+                trashed_to.display()
+            ))
+        );
+    }
 
     Ok(())
 }
 
-/// Delete the vault directory. Used by both CLI and TUI reset flows.
-pub fn delete_vault() -> Result<()> {
+/// Delete the vault directory permanently.
+pub fn delete_vault_permanently() -> Result<()> {
     let vault_root = config::vault_root();
 
     if !is_safe_to_delete(&vault_root) {
@@ -171,6 +194,69 @@ pub fn delete_vault() -> Result<()> {
     })?;
 
     Ok(())
+}
+
+/// Move the vault directory to OS trash location.
+pub fn move_vault_to_trash() -> Result<PathBuf> {
+    let vault_root = config::vault_root();
+    if !is_safe_to_delete(&vault_root) {
+        bail!(
+            "Refusing to delete path: {}\n      \
+             → Path failed safety validation.",
+            vault_root.display()
+        );
+    }
+
+    let trash_base = default_trash_dir()?;
+    fs::create_dir_all(&trash_base).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to create trash directory at {}: {}",
+            trash_base.display(),
+            e
+        )
+    })?;
+
+    let timestamp = chrono::Local::now().format("%Y%m%d-%H%M%S");
+    let mut candidate = trash_base.join(format!("soul-vault-{}", timestamp));
+    let mut i = 1usize;
+    while candidate.exists() {
+        candidate = trash_base.join(format!("soul-vault-{}-{}", timestamp, i));
+        i += 1;
+    }
+
+    fs::rename(&vault_root, &candidate).map_err(|e| {
+        anyhow::anyhow!(
+            "Failed to move vault to trash at {}: {}\n      \
+             → Try `soul reset --permanent` if your filesystem doesn't support move-to-trash here.",
+            candidate.display(),
+            e
+        )
+    })?;
+
+    Ok(candidate)
+}
+
+fn default_trash_dir() -> Result<PathBuf> {
+    let home =
+        dirs::home_dir().ok_or_else(|| anyhow::anyhow!("Could not determine home directory"))?;
+    #[cfg(target_os = "macos")]
+    {
+        return Ok(home.join(".Trash"));
+    }
+    #[cfg(target_os = "linux")]
+    {
+        return Ok(home
+            .join(".local")
+            .join("share")
+            .join("Trash")
+            .join("files"));
+    }
+    #[cfg(target_os = "windows")]
+    {
+        return Ok(home.join(".Trash"));
+    }
+    #[allow(unreachable_code)]
+    Ok(home.join(".Trash"))
 }
 
 #[cfg(test)]

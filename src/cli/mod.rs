@@ -9,7 +9,6 @@ mod ingest_scan;
 mod ingest_summary;
 mod init_validate;
 mod interactive_menu;
-mod login_oauth;
 mod pull_pipeline;
 mod pull_summary;
 mod pull_tracking;

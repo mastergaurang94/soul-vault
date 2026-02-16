@@ -3,12 +3,13 @@
 use anyhow::Result;
 use std::io::{self, Write};
 
+use crate::auth::{connect_provider, is_logged_in};
 use crate::cli::init_validate::{validate_api_key, ApiKeyValidation};
 use crate::types::{Provider, ProviderConfig, SoulVaultConfig};
 use crate::ui::theme::*;
 use crate::vault::config::{
-    create_default_files, create_gitignore, create_vault_structure, is_initialized, set_api_key,
-    set_key_health, vault_root, write_config, ApiKeyHealth,
+    create_default_files, create_gitignore, create_vault_structure, get_api_key, is_initialized,
+    set_api_key, set_key_health, vault_root, write_config, ApiKeyHealth,
 };
 
 // ─── Init Command ─────────────────────────────────────────────────────────────
@@ -43,28 +44,14 @@ pub async fn run() -> Result<()> {
     create_default_files()?;
     println!("{}", check("Vault structure created"));
 
-    // Step 2: Provider selection
-    println!("\n{}\n", gold("  Select providers to connect:"));
-    let mut providers = Vec::new();
-
-    for provider in &[Provider::Claude, Provider::ChatGpt, Provider::Gemini] {
-        let answer = ask(&format!(
-            "    Connect {}? {} ",
-            bold_white(provider.display_name()),
-            dim("(Y/n)")
-        ))?;
-        let enabled = answer.to_lowercase() != "n";
-        providers.push(ProviderConfig {
-            name: provider.clone(),
-            enabled,
-            last_import: None,
-        });
-        if enabled {
-            println!("{}", check(&format!("{} enabled", provider.display_name())));
-        } else {
-            println!("    {} {} skipped", dim(ICON_DOT), provider.display_name());
-        }
-    }
+    // Step 2: Provider setup
+    println!("\n{}", gold("  Configure providers:"));
+    println!(
+        "{}",
+        dim("  Choose one provider at a time, then select Done when finished.\n")
+    );
+    let mut providers = default_provider_configs();
+    configure_providers_loop(&mut providers).await?;
 
     // Step 3: Processing LLM selection
     println!("\n{}", gold("  Select processing LLM:"));
@@ -95,82 +82,43 @@ pub async fn run() -> Result<()> {
         ))
     );
 
-    // Step 4: API Keys
-    let needed = providers_needing_keys(&providers, &processing_llm);
-    if !needed.is_empty() {
-        println!("\n{}", gold("  API Keys:"));
+    // Step 4: Ensure processing LLM is configured
+    if !provider_has_credentials(&processing_llm) {
         println!(
-            "{}",
-            dim("  Keys are stored locally in ~/soul-vault/.config/keys.json\n")
+            "\n  {} {} is selected as processing LLM but has no credentials.",
+            amber(ICON_STAR),
+            processing_llm.display_name()
         );
-
-        for provider in &needed {
-            loop {
-                let key_input = ask(&format!(
-                    "    {} {} API key {} ",
-                    ICON_KEY,
-                    provider.display_name(),
-                    dim(&format!("({})", provider.api_key_hint()))
-                ))?;
-
-                let key = key_input.trim();
-                if key.is_empty() {
-                    println!(
-                        "    {} {} key skipped (you can add it later)",
-                        dim(ICON_DOT),
-                        provider.display_name()
-                    );
-                    break;
-                }
-
-                print!("    {} Validating key... ", dim(ICON_DOT));
-                io::stdout().flush()?;
-                match validate_api_key(provider, key).await {
-                    ApiKeyValidation::Verified => {
-                        println!("{}", check("valid"));
-                        set_api_key(&provider.to_string(), key)?;
-                        set_key_health(provider, ApiKeyHealth::Verified, None)?;
-                        println!(
-                            "{}",
-                            check(&format!("{} key saved", provider.display_name()))
-                        );
-                        break;
-                    }
-                    ApiKeyValidation::Unverified(reason) => {
-                        println!("{}", amber("unverified"));
-                        println!("      {} {}", amber("!"), dim(&reason));
-                        set_api_key(&provider.to_string(), key)?;
-                        set_key_health(provider, ApiKeyHealth::Unverified, Some(reason.clone()))?;
-                        println!(
-                            "{}",
-                            check(&format!("{} key saved", provider.display_name()))
-                        );
-                        break;
-                    }
-                    ApiKeyValidation::Invalid(reason) => {
-                        println!("{}", red("invalid"));
-                        println!("      {} {}", red("✗"), reason);
-                        set_key_health(provider, ApiKeyHealth::Invalid, Some(reason.clone()))?;
-                        let retry = ask(&format!(
-                            "      Re-enter {} key? {} ",
-                            provider.display_name(),
-                            dim("(Y/n)")
-                        ))?;
-                        if retry.trim().to_lowercase() == "n" {
-                            println!(
-                                "    {} {} key skipped (you can add it later)",
-                                dim(ICON_DOT),
-                                provider.display_name()
-                            );
-                            break;
-                        }
-                    }
-                }
-            }
+        let answer = ask(&format!(
+            "  Configure {} now? {} ",
+            processing_llm.display_name(),
+            dim("(Y/n)")
+        ))?;
+        if answer.trim().to_lowercase() != "n" {
+            configure_single_provider(&processing_llm, &mut providers).await?;
         }
     }
 
-    // Step 5: Save config
+    // Step 5: Final setup summary + confirmation
+    render_setup_summary(&providers, &processing_llm);
+    let finish = ask(&format!(
+        "\n  Finish setup and save configuration? {} ",
+        dim("(Y/n)")
+    ))?;
+    if finish.trim().to_lowercase() == "n" {
+        println!(
+            "\n  {} Setup not finalized. Your vault folders and any entered credentials were kept.",
+            dim(ICON_DOT)
+        );
+        println!(
+            "  {} Run {} again to finish setup.\n",
+            dim(ICON_DOT),
+            cyan("soul init")
+        );
+        return Ok(());
+    }
+
+    // Step 6: Save config
     print!("  Saving configuration... ");
     io::stdout().flush()?;
     let config = SoulVaultConfig {
@@ -213,17 +161,262 @@ pub async fn run() -> Result<()> {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-fn providers_needing_keys(
-    providers: &[ProviderConfig],
-    processing_llm: &Provider,
-) -> Vec<Provider> {
-    let mut needed = vec![processing_llm.clone()];
-    for provider in providers {
-        if provider.enabled && !needed.contains(&provider.name) {
-            needed.push(provider.name.clone());
+fn default_provider_configs() -> Vec<ProviderConfig> {
+    vec![
+        ProviderConfig {
+            name: Provider::Claude,
+            enabled: false,
+            last_import: None,
+        },
+        ProviderConfig {
+            name: Provider::ChatGpt,
+            enabled: false,
+            last_import: None,
+        },
+        ProviderConfig {
+            name: Provider::Gemini,
+            enabled: false,
+            last_import: None,
+        },
+    ]
+}
+
+async fn configure_providers_loop(providers: &mut [ProviderConfig]) -> Result<()> {
+    loop {
+        print_provider_menu(providers);
+        let choice = ask(&format!(
+            "\n  Select provider {} ",
+            dim("(1-4, default: 4)")
+        ))?;
+        let idx: usize = choice.trim().parse().unwrap_or(4);
+        match idx {
+            1 => configure_single_provider(&Provider::Claude, providers).await?,
+            2 => configure_single_provider(&Provider::ChatGpt, providers).await?,
+            3 => configure_single_provider(&Provider::Gemini, providers).await?,
+            4 => break,
+            _ => println!("  {} Choose 1, 2, 3, or 4.", amber(ICON_STAR)),
         }
     }
-    needed
+    Ok(())
+}
+
+fn print_provider_menu(providers: &[ProviderConfig]) {
+    println!("\n{}", line());
+    println!("{}", gold("  Providers"));
+    for (i, provider) in [Provider::Claude, Provider::ChatGpt, Provider::Gemini]
+        .iter()
+        .enumerate()
+    {
+        let status = provider_menu_status(provider, providers);
+        println!(
+            "    {} {:<8} {}",
+            dim(&format!("{}.", i + 1)),
+            provider.display_name(),
+            status
+        );
+    }
+    println!("    {} Done", dim("4."));
+}
+
+fn provider_menu_status(provider: &Provider, providers: &[ProviderConfig]) -> String {
+    if provider_has_credentials(provider) {
+        return emerald("configured");
+    }
+    if provider_enabled(providers, provider) {
+        return amber("enabled");
+    }
+    dim("not set")
+}
+
+fn provider_enabled(providers: &[ProviderConfig], provider: &Provider) -> bool {
+    providers
+        .iter()
+        .find(|p| p.name == *provider)
+        .map(|p| p.enabled)
+        .unwrap_or(false)
+}
+
+fn set_provider_enabled(providers: &mut [ProviderConfig], provider: &Provider, enabled: bool) {
+    if let Some(entry) = providers.iter_mut().find(|p| p.name == *provider) {
+        entry.enabled = enabled;
+    }
+}
+
+async fn configure_single_provider(
+    provider: &Provider,
+    providers: &mut [ProviderConfig],
+) -> Result<()> {
+    loop {
+        println!("\n{}", line());
+        println!(
+            "  {} {}",
+            gold("Configure provider:"),
+            bold_white(provider.display_name())
+        );
+        println!("    {} API key", dim("1."));
+        if supports_oauth(provider) {
+            println!("    {} OAuth", dim("2."));
+            println!("    {} Back", dim("3."));
+        } else {
+            println!("    {} OAuth {}", dim("2."), dim("(coming soon)"));
+            println!("    {} Back", dim("3."));
+        }
+
+        let choice = ask(&format!(
+            "  Select auth method {} ",
+            dim("(1-3, default: 3)")
+        ))?;
+        let option: usize = choice.trim().parse().unwrap_or(3);
+        match option {
+            1 => {
+                let saved = setup_api_key(provider).await?;
+                if saved {
+                    set_provider_enabled(providers, provider, true);
+                }
+                return Ok(());
+            }
+            2 => {
+                if !supports_oauth(provider) {
+                    println!(
+                        "  {} OAuth for {} is coming soon.",
+                        amber(ICON_STAR),
+                        provider.display_name()
+                    );
+                    continue;
+                }
+                println!(
+                    "  {} Starting OAuth for {}...",
+                    dim(ICON_DOT),
+                    provider.display_name()
+                );
+                match connect_provider(provider).await {
+                    Ok(()) => {
+                        println!(
+                            "{}",
+                            check(&format!("Connected {}.", provider.display_name()))
+                        );
+                        set_provider_enabled(providers, provider, true);
+                    }
+                    Err(e) => println!("  {} {}", red("✗"), e),
+                }
+                return Ok(());
+            }
+            3 => return Ok(()),
+            _ => println!("  {} Choose 1, 2, or 3.", amber(ICON_STAR)),
+        }
+    }
+}
+
+async fn setup_api_key(provider: &Provider) -> Result<bool> {
+    println!(
+        "{}",
+        dim("  Keys are stored locally in ~/soul-vault/.config/keys.json")
+    );
+    loop {
+        let key_input = ask(&format!(
+            "    {} {} API key {} ",
+            ICON_KEY,
+            provider.display_name(),
+            dim(&format!("({})", provider.api_key_hint()))
+        ))?;
+        let key = key_input.trim();
+        if key.is_empty() {
+            println!(
+                "    {} {} key skipped (you can add it later)",
+                dim(ICON_DOT),
+                provider.display_name()
+            );
+            return Ok(false);
+        }
+
+        print!("    {} Validating key... ", dim(ICON_DOT));
+        io::stdout().flush()?;
+        match validate_api_key(provider, key).await {
+            ApiKeyValidation::Verified => {
+                println!("{}", check("valid"));
+                set_api_key(&provider.to_string(), key)?;
+                set_key_health(provider, ApiKeyHealth::Verified, None)?;
+                println!(
+                    "{}",
+                    check(&format!("{} key saved", provider.display_name()))
+                );
+                return Ok(true);
+            }
+            ApiKeyValidation::Unverified(reason) => {
+                println!("{}", amber("unverified"));
+                println!("      {} {}", amber("!"), dim(&reason));
+                set_api_key(&provider.to_string(), key)?;
+                set_key_health(provider, ApiKeyHealth::Unverified, Some(reason.clone()))?;
+                println!(
+                    "{}",
+                    check(&format!("{} key saved", provider.display_name()))
+                );
+                return Ok(true);
+            }
+            ApiKeyValidation::Invalid(reason) => {
+                println!("{}", red("invalid"));
+                println!("      {} {}", red("✗"), reason);
+                set_key_health(provider, ApiKeyHealth::Invalid, Some(reason.clone()))?;
+                let retry = ask(&format!(
+                    "      Re-enter {} key? {} ",
+                    provider.display_name(),
+                    dim("(Y/n)")
+                ))?;
+                if retry.trim().to_lowercase() == "n" {
+                    return Ok(false);
+                }
+            }
+        }
+    }
+}
+
+fn supports_oauth(provider: &Provider) -> bool {
+    matches!(provider, Provider::Claude)
+}
+
+fn provider_has_credentials(provider: &Provider) -> bool {
+    let has_key = get_api_key(&provider.to_string())
+        .ok()
+        .flatten()
+        .map(|v| !v.trim().is_empty())
+        .unwrap_or(false);
+    let has_oauth = is_logged_in(provider).unwrap_or(false);
+    has_key || has_oauth
+}
+
+fn render_setup_summary(providers: &[ProviderConfig], processing_llm: &Provider) {
+    println!("\n{}", line());
+    println!("{}", gold("  Setup summary"));
+    for provider in [Provider::Claude, Provider::ChatGpt, Provider::Gemini] {
+        let status = provider_setup_status(&provider, providers);
+        println!("    {:<8} {}", provider.display_name(), status);
+    }
+    println!(
+        "    {:<8} {}",
+        "Processor",
+        bold_white(processing_llm.display_name())
+    );
+}
+
+fn provider_setup_status(provider: &Provider, providers: &[ProviderConfig]) -> String {
+    if is_logged_in(provider).unwrap_or(false) {
+        return emerald("Connected");
+    }
+
+    let has_key = get_api_key(&provider.to_string())
+        .ok()
+        .flatten()
+        .map(|v| !v.trim().is_empty())
+        .unwrap_or(false);
+    if has_key {
+        return emerald("API key set");
+    }
+
+    if provider_enabled(providers, provider) {
+        return amber("Enabled");
+    }
+
+    dim("Skipped")
 }
 
 fn ask(prompt: &str) -> Result<String> {
@@ -239,45 +432,28 @@ mod tests {
     use super::*;
 
     #[test]
-    fn providers_needing_keys_includes_processing_llm_even_if_no_providers_enabled() {
-        let providers = vec![
-            ProviderConfig {
-                name: Provider::Claude,
-                enabled: false,
-                last_import: None,
-            },
-            ProviderConfig {
-                name: Provider::ChatGpt,
-                enabled: false,
-                last_import: None,
-            },
-            ProviderConfig {
-                name: Provider::Gemini,
-                enabled: false,
-                last_import: None,
-            },
-        ];
-
-        let needed = providers_needing_keys(&providers, &Provider::Gemini);
-        assert_eq!(needed, vec![Provider::Gemini]);
+    fn default_provider_configs_contains_all_disabled() {
+        let providers = default_provider_configs();
+        assert_eq!(providers.len(), 3);
+        assert!(providers.iter().all(|p| !p.enabled));
     }
 
     #[test]
-    fn providers_needing_keys_deduplicates_processing_llm_when_enabled() {
-        let providers = vec![
-            ProviderConfig {
-                name: Provider::Claude,
-                enabled: true,
-                last_import: None,
-            },
-            ProviderConfig {
-                name: Provider::Gemini,
-                enabled: true,
-                last_import: None,
-            },
-        ];
+    fn set_provider_enabled_updates_target_only() {
+        let mut providers = default_provider_configs();
+        set_provider_enabled(&mut providers, &Provider::Gemini, true);
+        assert!(!provider_enabled(&providers, &Provider::Claude));
+        assert!(!provider_enabled(&providers, &Provider::ChatGpt));
+        assert!(provider_enabled(&providers, &Provider::Gemini));
+    }
 
-        let needed = providers_needing_keys(&providers, &Provider::Claude);
-        assert_eq!(needed, vec![Provider::Claude, Provider::Gemini]);
+    #[test]
+    fn provider_setup_status_shows_enabled_without_credentials() {
+        let mut providers = default_provider_configs();
+        set_provider_enabled(&mut providers, &Provider::Claude, true);
+        assert_eq!(
+            provider_setup_status(&Provider::Claude, &providers),
+            amber("Enabled")
+        );
     }
 }

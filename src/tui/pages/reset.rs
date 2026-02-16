@@ -16,6 +16,7 @@ use crate::ui::theme::rat;
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Phase {
     Confirm,
+    TypeConfirm { input: String },
     Done,
     Error(String),
 }
@@ -58,13 +59,14 @@ impl PageWidget for ResetPage {
 
         match &self.phase {
             Phase::Confirm => render_confirm(inner, buf, self.selected),
+            Phase::TypeConfirm { input } => render_type_confirm(inner, buf, input),
             Phase::Done => render_done(inner, buf),
             Phase::Error(msg) => render_error(inner, buf, msg),
         }
     }
 
     fn handle_key(&mut self, key: KeyEvent, app: &mut App) -> PageAction {
-        match &self.phase {
+        match &mut self.phase {
             Phase::Confirm => match key.code {
                 KeyCode::Char('j') | KeyCode::Down => {
                     self.selected = 1;
@@ -80,20 +82,49 @@ impl PageWidget for ResetPage {
                         self.selected = 0;
                         PageAction::BackToSidebar
                     } else {
-                        match crate::cli::reset::delete_vault() {
-                            Ok(()) => {
-                                self.phase = Phase::Done;
-                                app.vault_initialized = false;
-                                app.should_quit = true;
-                            }
-                            Err(e) => self.phase = Phase::Error(e.to_string()),
-                        }
+                        self.phase = Phase::TypeConfirm {
+                            input: String::new(),
+                        };
                         PageAction::Consumed
                     }
                 }
                 KeyCode::Esc => {
                     self.selected = 0;
                     PageAction::BackToSidebar
+                }
+                _ => PageAction::Ignored,
+            },
+            Phase::TypeConfirm { input } => match key.code {
+                KeyCode::Esc => {
+                    self.phase = Phase::Confirm;
+                    self.selected = 0;
+                    PageAction::Consumed
+                }
+                KeyCode::Backspace => {
+                    input.pop();
+                    PageAction::Consumed
+                }
+                KeyCode::Char(c) => {
+                    if c.is_ascii_alphabetic() {
+                        input.push(c.to_ascii_uppercase());
+                    }
+                    PageAction::Consumed
+                }
+                KeyCode::Enter => {
+                    if input.trim() != "RESET" {
+                        self.phase =
+                            Phase::Error("Confirmation mismatch. Type RESET exactly.".to_string());
+                        return PageAction::Consumed;
+                    }
+                    match crate::cli::reset::move_vault_to_trash() {
+                        Ok(_) => {
+                            self.phase = Phase::Done;
+                            app.vault_initialized = false;
+                            app.should_quit = true;
+                        }
+                        Err(e) => self.phase = Phase::Error(e.to_string()),
+                    }
+                    PageAction::Consumed
                 }
                 _ => PageAction::Ignored,
             },
@@ -150,11 +181,32 @@ fn render_confirm(area: Rect, buf: &mut Buffer, selected: usize) {
     Paragraph::new(lines).render(area, buf);
 }
 
+fn render_type_confirm(area: Rect, buf: &mut Buffer, input: &str) {
+    Paragraph::new(vec![
+        Line::from(""),
+        Line::from(Span::styled(
+            "  Type RESET to move vault to Trash:",
+            Style::default().fg(rat::AMBER).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            format!("  > {}", input),
+            Style::default().fg(rat::CYAN).add_modifier(Modifier::BOLD),
+        )),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  Enter confirm · Backspace edit · Esc cancel",
+            Style::default().fg(rat::DIM),
+        )),
+    ])
+    .render(area, buf);
+}
+
 fn render_done(area: Rect, buf: &mut Buffer) {
     Paragraph::new(vec![
         Line::from(""),
         Line::from(Span::styled(
-            "  ✓ Vault deleted successfully.",
+            "  ✓ Vault moved to Trash successfully.",
             Style::default()
                 .fg(rat::EMERALD)
                 .add_modifier(Modifier::BOLD),

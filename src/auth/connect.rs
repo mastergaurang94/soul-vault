@@ -1,4 +1,4 @@
-//! OAuth transport helpers for `soul login`.
+//! OAuth connect flow shared by CLI and TUI.
 
 use anyhow::{bail, Context, Result};
 use std::io::{Read, Write};
@@ -7,46 +7,82 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
 
-pub(crate) const CALLBACK_TIMEOUT: Duration = Duration::from_secs(180);
+use crate::auth::{exchange_code_for_token, oauth_config, save_credentials};
+use crate::types::Provider;
 
-#[derive(Debug)]
-pub(crate) struct CallbackPayload {
-    pub(crate) code: String,
-    pub(crate) state: String,
+const CALLBACK_TIMEOUT: Duration = Duration::from_secs(180);
+
+pub async fn connect_provider(provider: &Provider) -> Result<()> {
+    match provider {
+        Provider::Claude => connect_claude().await,
+        Provider::ChatGpt | Provider::Gemini => bail!(
+            "OAuth for {} is coming soon. Use local import for now.",
+            provider.display_name()
+        ),
+    }
 }
 
-pub(crate) fn open_browser(url: &str) -> Result<()> {
+async fn connect_claude() -> Result<()> {
+    let oauth = oauth_config(&Provider::Claude);
+    let state = format!("soul-{}", chrono::Utc::now().timestamp_millis());
+    let (port, callback_rx) = spawn_callback_listener()?;
+    let redirect_uri = format!("http://127.0.0.1:{port}/oauth/callback");
+
+    let auth_url = format!(
+        "{}?response_type=code&client_id={}&redirect_uri={}&scope={}&state={}",
+        oauth.auth_url,
+        percent_encode(&oauth.client_id),
+        percent_encode(&redirect_uri),
+        percent_encode(&oauth.scope),
+        percent_encode(&state)
+    );
+
+    open_browser(&auth_url)?;
+    let callback = callback_rx
+        .recv_timeout(CALLBACK_TIMEOUT)
+        .context("Timed out waiting for OAuth callback. Try connecting again.")??;
+
+    if callback.state != state {
+        bail!("OAuth state mismatch. Please retry.");
+    }
+
+    let credentials = exchange_code_for_token(&oauth, &callback.code, &redirect_uri).await?;
+    save_credentials(&credentials)?;
+    Ok(())
+}
+
+#[derive(Debug)]
+struct CallbackPayload {
+    code: String,
+    state: String,
+}
+
+fn open_browser(url: &str) -> Result<()> {
     #[cfg(target_os = "macos")]
     let opener = ("open", vec![url]);
-
     #[cfg(target_os = "linux")]
     let opener = ("xdg-open", vec![url]);
-
     #[cfg(target_os = "windows")]
     let opener = ("cmd", vec!["/C", "start", url]);
-
     #[cfg(not(any(target_os = "macos", target_os = "linux", target_os = "windows")))]
     let opener = ("", Vec::new());
 
     if opener.0.is_empty() {
-        bail!(
-            "Automatic browser opening is not supported on this OS. Open this URL manually: {url}"
-        );
+        bail!("Automatic browser opening is not supported on this OS.");
     }
 
     let status = Command::new(opener.0)
         .args(opener.1)
         .status()
-        .with_context(|| format!("Failed to launch browser opener command for URL: {url}"))?;
+        .with_context(|| format!("Failed to launch browser for URL: {url}"))?;
 
     if !status.success() {
-        bail!("Failed to open browser automatically. Open this URL manually: {url}");
+        bail!("Failed to open browser automatically.");
     }
-
     Ok(())
 }
 
-pub(crate) fn percent_encode(raw: &str) -> String {
+fn percent_encode(raw: &str) -> String {
     let mut out = String::new();
     for b in raw.bytes() {
         let is_unreserved =
@@ -60,7 +96,7 @@ pub(crate) fn percent_encode(raw: &str) -> String {
     out
 }
 
-pub(crate) fn spawn_callback_listener() -> Result<(u16, mpsc::Receiver<Result<CallbackPayload>>)> {
+fn spawn_callback_listener() -> Result<(u16, mpsc::Receiver<Result<CallbackPayload>>)> {
     let listener =
         TcpListener::bind("127.0.0.1:0").context("Failed to bind local OAuth callback server")?;
     let port = listener.local_addr()?.port();
@@ -91,13 +127,11 @@ fn receive_callback(listener: TcpListener) -> Result<CallbackPayload> {
     let request = String::from_utf8_lossy(&buffer[..bytes_read]);
     let request_line = request.lines().next().unwrap_or_default();
     let target = request_line.split_whitespace().nth(1).unwrap_or("/");
-
     let query = target.split_once('?').map(|(_, q)| q).unwrap_or_default();
 
     let mut code = None;
     let mut state = None;
     let mut error = None;
-
     for pair in query.split('&') {
         if pair.is_empty() {
             continue;
@@ -105,7 +139,6 @@ fn receive_callback(listener: TcpListener) -> Result<CallbackPayload> {
         let (k, v) = pair.split_once('=').unwrap_or((pair, ""));
         let key = percent_decode(k);
         let value = percent_decode(v);
-
         match key.as_str() {
             "code" => code = Some(value),
             "state" => state = Some(value),
@@ -117,7 +150,7 @@ fn receive_callback(listener: TcpListener) -> Result<CallbackPayload> {
     let response_body = if let Some(err) = &error {
         format!("OAuth failed: {err}. You can close this tab.")
     } else {
-        "Soul Vault login complete. You can close this tab.".to_string()
+        "Soul Vault connection complete. You can close this tab.".to_string()
     };
     let response = format!(
         "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}",
@@ -130,10 +163,8 @@ fn receive_callback(listener: TcpListener) -> Result<CallbackPayload> {
     if let Some(err) = error {
         bail!("OAuth provider returned an error: {err}");
     }
-
     let code = code.ok_or_else(|| anyhow::anyhow!("OAuth callback missing code parameter"))?;
     let state = state.ok_or_else(|| anyhow::anyhow!("OAuth callback missing state parameter"))?;
-
     Ok(CallbackPayload { code, state })
 }
 
@@ -141,7 +172,6 @@ fn percent_decode(raw: &str) -> String {
     let bytes = raw.as_bytes();
     let mut out = Vec::with_capacity(bytes.len());
     let mut i = 0;
-
     while i < bytes.len() {
         match bytes[i] {
             b'+' => {
@@ -149,9 +179,7 @@ fn percent_decode(raw: &str) -> String {
                 i += 1;
             }
             b'%' if i + 2 < bytes.len() => {
-                let h1 = bytes[i + 1];
-                let h2 = bytes[i + 2];
-                if let (Some(a), Some(b)) = (hex_val(h1), hex_val(h2)) {
+                if let (Some(a), Some(b)) = (hex_val(bytes[i + 1]), hex_val(bytes[i + 2])) {
                     out.push((a << 4) | b);
                     i += 3;
                 } else {
@@ -165,7 +193,6 @@ fn percent_decode(raw: &str) -> String {
             }
         }
     }
-
     String::from_utf8_lossy(&out).to_string()
 }
 

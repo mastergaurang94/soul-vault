@@ -48,7 +48,7 @@ pub fn run() -> Result<()> {
             Action::Watch => run_watch_prompt()?,
             Action::Export => crate::cli::export::run(None, "context", None, None)?,
             Action::Status => crate::cli::status::run()?,
-            Action::Reset => crate::cli::reset::run(false)?,
+            Action::Reset => crate::cli::reset::run(false, false)?,
             Action::Quit => {}
         }
     }

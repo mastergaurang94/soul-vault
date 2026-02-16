@@ -4,20 +4,17 @@
 //! verifying error messages are helpful, output is correct, and
 //! no panics or ugly stack traces leak through.
 //!
-//! # Architecture note
-//! The vault path is hardcoded to `~/soul-vault/` — there's no `SOUL_VAULT_PATH`
-//! env var or `--vault-path` flag. This means integration tests that need
-//! vault isolation CANNOT fully isolate from the real vault. Tests below
-//! are designed to be safe regardless: they test CLI arg parsing, error
-//! messages, and behaviors that don't mutate the vault.
-//!
-//! **FINDING: Soul Vault should support `SOUL_VAULT_PATH` env var for testability
-//! and multi-vault workflows.**
+//! # Test isolation note
+//! `soul()` below always runs with a hermetic temporary `HOME`, seeded with a
+//! minimal initialized vault. Individual tests can still override `HOME` when
+//! they intentionally need an uninitialized environment.
 
 use assert_cmd::Command;
 use predicates::prelude::*;
 use regex::Regex;
 use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
 use tempfile::tempdir;
 use unicode_width::UnicodeWidthStr;
 
@@ -25,7 +22,71 @@ use unicode_width::UnicodeWidthStr;
 
 #[allow(deprecated)]
 fn soul() -> Command {
-    Command::cargo_bin("soul").expect("binary should exist")
+    let mut cmd = Command::cargo_bin("soul").expect("binary should exist");
+    let home = hermetic_home(true);
+    cmd.env("HOME", home.to_string_lossy().to_string());
+    cmd
+}
+
+fn hermetic_home(initialized: bool) -> PathBuf {
+    static COUNTER: AtomicU64 = AtomicU64::new(0);
+
+    let id = COUNTER.fetch_add(1, Ordering::Relaxed);
+    let base = std::env::temp_dir().join("soul-vault-cli-ux").join(format!(
+        "{}-{}",
+        std::process::id(),
+        id
+    ));
+    fs::create_dir_all(&base).expect("create hermetic HOME");
+
+    if initialized {
+        seed_initialized_vault(&base);
+    }
+
+    base
+}
+
+fn seed_initialized_vault(home: &Path) {
+    let vault = home.join("soul-vault");
+    let config_dir = vault.join(".config");
+    let identity_dir = vault.join("identity");
+    let memories_dir = vault.join("memories");
+    let topics_dir = vault.join("topics");
+    let people_dir = vault.join("people");
+    let sources_dir = vault.join("sources");
+
+    for dir in [
+        &config_dir,
+        &identity_dir,
+        &memories_dir,
+        &topics_dir,
+        &people_dir,
+        &sources_dir,
+    ] {
+        fs::create_dir_all(dir).expect("create vault directories");
+    }
+
+    let config = serde_json::json!({
+        "providers": [
+            { "name": "claude", "enabled": true, "lastImport": null },
+            { "name": "chatgpt", "enabled": true, "lastImport": null },
+            { "name": "gemini", "enabled": true, "lastImport": null }
+        ],
+        "processingLlm": "claude",
+        "vaultPath": vault.to_string_lossy(),
+        "createdAt": "2026-01-01T00:00:00Z",
+        "lastSync": null
+    });
+    fs::write(
+        config_dir.join("config.json"),
+        serde_json::to_string_pretty(&config).expect("serialize config"),
+    )
+    .expect("write config.json");
+    fs::write(config_dir.join("keys.json"), "{}\n").expect("write keys.json");
+
+    fs::write(identity_dir.join("profile.md"), "# Profile\n").expect("write profile.md");
+    fs::write(identity_dir.join("preferences.md"), "# Preferences\n")
+        .expect("write preferences.md");
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -356,8 +417,7 @@ fn pull_command_is_rejected() {
 // 4. EXPORT COMMAND
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Note: These tests run against the REAL ~/soul-vault/ vault since there's no
-// isolation mechanism. They test behavior, not content.
+// These tests run against the hermetic test vault seeded by `soul()`.
 
 #[test]
 fn export_default_format_is_markdown() {
@@ -516,7 +576,7 @@ fn export_topic_filter_excludes_unmatched() {
 // 5. STATUS COMMAND
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// Note: status reads from ~/soul-vault/ — these tests verify structure, not values.
+// Status tests verify structure/copy against hermetic test vault data.
 
 #[test]
 fn status_shows_vault_overview() {
@@ -1810,7 +1870,8 @@ fn help_reset_subcommand() {
         .assert()
         .success()
         .stdout(predicate::str::contains("Reset vault"))
-        .stdout(predicate::str::contains("--force"));
+        .stdout(predicate::str::contains("--force"))
+        .stdout(predicate::str::contains("--permanent"));
 }
 
 #[test]
@@ -1820,6 +1881,7 @@ fn reset_dash_dash_help() {
         .assert()
         .success()
         .stdout(predicate::str::contains("--force"))
+        .stdout(predicate::str::contains("--permanent"))
         .stdout(predicate::str::contains("Skip confirmation"));
 }
 
@@ -1856,7 +1918,7 @@ fn reset_force_without_vault_shows_nothing_to_reset() {
 }
 
 #[test]
-fn reset_force_with_temp_vault_deletes_vault() {
+fn reset_force_with_temp_vault_moves_vault_out_of_home() {
     // Create a fake vault in a temp home directory
     let tmp_home = tempdir().unwrap();
     let vault_root = tmp_home.path().join("soul-vault");
@@ -1890,12 +1952,12 @@ fn reset_force_with_temp_vault_deletes_vault() {
         .args(["reset", "--force"])
         .assert()
         .success()
-        .stdout(predicate::str::contains("Vault reset"));
+        .stdout(predicate::str::contains("moved to Trash"));
 
     // Verify vault is deleted
     assert!(
         !vault_root.exists(),
-        "Vault directory should be deleted after reset --force"
+        "Vault directory should be removed from HOME after reset --force"
     );
 }
 
@@ -1927,6 +1989,61 @@ fn reset_without_force_in_non_tty_fails() {
         .stderr(
             predicate::str::contains("--force").or(predicate::str::contains("non-interactive")),
         );
+}
+
+#[test]
+fn reset_permanent_without_force_in_non_tty_fails() {
+    let tmp_home = tempdir().unwrap();
+    let vault_root = tmp_home.path().join("soul-vault");
+    let config_dir = vault_root.join(".config");
+    fs::create_dir_all(&config_dir).unwrap();
+
+    let config = r#"{
+        "providers": [],
+        "processingLlm": "claude",
+        "vaultPath": "/tmp/soul-vault",
+        "createdAt": "2026-02-14T00:00:00Z"
+    }"#;
+    fs::write(config_dir.join("config.json"), config).unwrap();
+
+    soul()
+        .env("HOME", tmp_home.path().to_str().unwrap())
+        .args(["reset", "--permanent"])
+        .assert()
+        .failure()
+        .stderr(
+            predicate::str::contains("--force").or(predicate::str::contains("non-interactive")),
+        );
+}
+
+#[test]
+fn reset_force_permanent_deletes_vault() {
+    let tmp_home = tempdir().unwrap();
+    let vault_root = tmp_home.path().join("soul-vault");
+    let config_dir = vault_root.join(".config");
+    fs::create_dir_all(&config_dir).unwrap();
+    fs::create_dir_all(vault_root.join("memories")).unwrap();
+
+    let config = r#"{
+        "providers": [],
+        "processingLlm": "claude",
+        "vaultPath": "/tmp/soul-vault",
+        "createdAt": "2026-02-14T00:00:00Z"
+    }"#;
+    fs::write(config_dir.join("config.json"), config).unwrap();
+    fs::write(vault_root.join("memories").join("test.md"), "# Memory").unwrap();
+
+    soul()
+        .env("HOME", tmp_home.path().to_str().unwrap())
+        .args(["reset", "--force", "--permanent"])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("permanently deleted"));
+
+    assert!(
+        !vault_root.exists(),
+        "Vault directory should be deleted after reset --force --permanent"
+    );
 }
 
 #[test]

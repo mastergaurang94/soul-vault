@@ -21,6 +21,7 @@ use crossterm::event::KeyEvent;
 use ratatui::{buffer::Buffer, layout::Rect};
 
 use crate::tui::app::App;
+use crate::types::Provider;
 
 // ─── Page Action ──────────────────────────────────────────────────────────────
 
@@ -40,6 +41,8 @@ pub enum PageAction {
     StopWatch,
     /// Start provider auto-discovery import.
     StartProviderImport,
+    /// Start OAuth connect flow for provider.
+    StartOAuthConnect(Provider),
 }
 
 // ─── Page Trait ───────────────────────────────────────────────────────────────

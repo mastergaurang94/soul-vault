@@ -7,6 +7,53 @@ Agents: append entries here after completing work.
 
 ---
 
+## 2026-02-16 — Init Flow Redesign: Provider-By-Provider Setup
+
+### Onboarding flow updates
+- Reworked `soul init` from per-provider yes/no prompts to a looped provider picker:
+  - `Claude`, `ChatGPT`, `Gemini`, `Done`
+- Added per-provider auth method menu:
+  - `API key`, `OAuth`, `Back`
+- Provider setup now happens one at a time and returns to the picker after each selection.
+- Users can finish explicitly by selecting `Done`.
+- Added a final setup summary screen before config save confirmation.
+
+### Credential handling
+- API key path still validates immediately and saves key health state.
+- OAuth path is now available during init for supported providers (currently Claude).
+- If selected processing LLM has no credentials at the end, init prompts to configure it before finish.
+- Summary uses credential-aware labels per provider: `Connected`, `API key set`, `Skipped`.
+
+### Implementation details
+- Updated `src/cli/init.rs` setup orchestration and helper functions:
+  - provider setup loop
+  - auth-method selection
+  - provider enablement tracking and status display
+- Added/updated init unit tests for provider config defaults and enablement helpers.
+
+## 2026-02-16 — Settings Connections Actions (Arrow Keys + Enter)
+
+### In-TUI OAuth actions
+- Added interactive provider selection in `Settings > Connections`:
+  - Up/Down selects provider row
+  - Enter runs the valid action for that provider
+- Added direct in-page actions:
+  - `Connect via OAuth` for ready providers
+  - `Disconnect` for connected providers
+- Added in-page status feedback for pending OAuth, success, and errors.
+- Added focus navigation keys for split-pane TUI:
+  - `Right` moves focus from sidebar to content
+  - `Left` moves focus from content back to sidebar where safe (keeps Import text cursor controls intact)
+
+### Runtime/auth wiring
+- Added async OAuth action path from TUI:
+  - `PageAction::StartOAuthConnect(Provider)` in `src/tui/pages/mod.rs`
+  - OAuth task channel plumbing in `src/tui/runtime_tasks.rs`
+  - runtime drain/dispatch integration in `src/tui/runtime.rs`
+- Added shared auth connector in `src/auth/connect.rs` and exported via `src/auth/mod.rs`.
+- Refactored `src/cli/login.rs` to use shared `auth::connect_provider`.
+- Removed now-redundant `src/cli/login_oauth.rs`.
+
 ## 2026-02-16 — TUI Auth UX Consolidation Under Settings Connections
 
 ### Sidebar and page model
@@ -64,6 +111,20 @@ Agents: append entries here after completing work.
 - Updated Reset page behavior in `src/tui/pages/reset.rs`:
   - after successful vault deletion, TUI now exits immediately
   - avoids leaving users inside a now-uninitialized vault session
+
+### Reset safety redesign
+- Updated CLI reset behavior in `src/cli/reset.rs` and `src/main.rs`:
+  - default `soul reset` now moves vault to Trash instead of hard-deleting
+  - added explicit `--permanent` mode for irreversible deletion
+  - retained `--force` for non-interactive use; permanent non-interactive resets now require `--force --permanent`
+- Updated TUI reset flow in `src/tui/pages/reset.rs`:
+  - added second-step typed confirmation (`RESET`) before reset executes
+  - TUI reset now uses trash-by-default behavior
+- Expanded CLI reset test coverage in `tests/cli_ux_test.rs` for:
+  - help text surfacing `--permanent`
+  - force+trash default behavior
+  - non-interactive permanent reset rejection without `--force`
+  - force+permanent irreversible delete path
 
 ### Runtime wiring
 - Converted `cli::init::run` to async and updated call sites:
