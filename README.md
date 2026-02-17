@@ -42,13 +42,12 @@ Download prebuilt binaries from:
 soul
 ```
 
-The no-args TUI has 7 pages:
+The no-args TUI has 6 pages:
 - Status
 - Import
 - Browse
 - Export
 - Watch
-- Reset
 - Settings
 
 ### Commands

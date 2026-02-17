@@ -58,6 +58,14 @@ Agents: append entries here after completing work.
   - source tracking is updated
   - no memory files are written
 
+## 2026-02-17 — TUI Reset Moved Under Settings (Danger Zone)
+
+### Navigation safety update
+- Removed `Reset` from the primary sidebar page list.
+- Added reset under `Settings` as a `Danger zone` action (`X`).
+- Kept typed confirmation (`RESET`) and trash-first behavior.
+- Successful reset still exits the TUI immediately to avoid a broken post-reset session.
+
 ## 2026-02-16 — Init Flow Redesign: Provider-By-Provider Setup
 
 ### Onboarding flow updates

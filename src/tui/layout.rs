@@ -19,7 +19,6 @@ use super::app::Page;
 use super::pages::browse::BrowsePage;
 use super::pages::export::ExportPage;
 use super::pages::import::ImportPage;
-use super::pages::reset::ResetPage;
 use super::pages::settings::SettingsPage;
 use super::pages::status::StatusPage;
 use super::pages::watch::WatchPage;
@@ -30,7 +29,6 @@ pub struct PageSet {
     pub browse: BrowsePage,
     pub export: ExportPage,
     pub watch: WatchPage,
-    pub reset: ResetPage,
     pub settings: SettingsPage,
 }
 
@@ -42,7 +40,6 @@ impl PageSet {
             browse: BrowsePage::default(),
             export: ExportPage::default(),
             watch: WatchPage::default(),
-            reset: ResetPage::default(),
             settings: SettingsPage::default(),
         }
     }
@@ -54,7 +51,6 @@ impl PageSet {
             Page::Browse => &self.browse,
             Page::Export => &self.export,
             Page::Watch => &self.watch,
-            Page::Reset => &self.reset,
             Page::Settings => &self.settings,
         }
     }
@@ -66,7 +62,6 @@ impl PageSet {
             Page::Browse => &mut self.browse,
             Page::Export => &mut self.export,
             Page::Watch => &mut self.watch,
-            Page::Reset => &mut self.reset,
             Page::Settings => &mut self.settings,
         }
     }

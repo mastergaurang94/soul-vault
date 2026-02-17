@@ -74,14 +74,13 @@ src/
 
 ## TUI Page Model
 
-The TUI currently has **7 pages** in this order:
+The TUI currently has **6 pages** in this order:
 1. Status
 2. Import
 3. Browse
 4. Export
 5. Watch
-6. Reset
-7. Settings
+6. Settings
 
 ## Dependency Direction
 

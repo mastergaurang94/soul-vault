@@ -7,8 +7,8 @@ Last updated: 2026-02-17
 - [x] Current command set is live in `src/main.rs`:
   - `init`, `import`, `export`, `status`, `watch`, `reset`, `login`, `logout`
   - No-args launch (`soul`) opens the full-screen TUI
-- [x] TUI navigation currently has 7 pages:
-  - Status, Import, Browse, Export, Watch, Reset, Settings
+- [x] TUI navigation currently has 6 pages:
+  - Status, Import, Browse, Export, Watch, Settings
 - [x] OAuth controls moved under Settings > Connections:
   - sidebar is stable (no separate Login/Logout pages)
   - connections copy now uses provider-scoped language (`Connect`/`Disconnect`) instead of product login framing
@@ -67,7 +67,7 @@ Last updated: 2026-02-17
   - green `+` appears only when provider credentials are truly ready (OAuth or verified key)
   - failed/unverified key states now show amber/red status instead of a misleading ready import state
 - [x] TUI reset now exits after successful vault deletion:
-  - resetting from the Reset page now closes the TUI immediately
+  - resetting from the TUI flow now closes the TUI immediately
   - prevents staying in an uninitialized post-reset UI session
 - [x] Reset safety flow hardened:
   - `soul reset` now moves the vault to Trash by default (safer rollback)
@@ -90,6 +90,10 @@ Last updated: 2026-02-17
 - [x] Soul Vault Cloud placeholder is visible in Settings processing options:
   - `5. Soul Vault Cloud (coming soon)` is shown in the processing list
   - selecting it is non-blocking and keeps current processing mode unchanged
+- [x] TUI reset action moved into Settings:
+  - Reset is no longer a primary sidebar page
+  - Settings now includes a `Danger zone` reset action (`X`) with typed confirmation (`RESET`)
+  - successful reset still exits TUI immediately
 
 ## 🔨 In Progress
 
@@ -99,6 +103,8 @@ Last updated: 2026-02-17
 
 - [ ] Cloud API conversation fetch implementation for `soul import --cloud`
 - [ ] Managed `Soul Vault Cloud` processing option in onboarding (default processor path)
+- [ ] OAuth support for ChatGPT and Gemini providers in init/settings
+- [ ] Add OpenClaw as a first-class configurable provider in init/settings/status
 - [ ] `soul search` — full-text vault search
 - [ ] `soul diff` — show changes since last import
 - [ ] `SOUL_VAULT_VAULT_PATH` env var for multi-vault/test workflows

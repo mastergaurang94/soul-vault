@@ -25,6 +25,7 @@ pub struct SettingsPage {
     pending_oauth: bool,
     status_message: Option<(bool, String)>,
     setup_flow: Option<SetupFlow>,
+    reset_flow: Option<ResetFlow>,
     pending_processing_provider: Option<Provider>,
 }
 
@@ -40,6 +41,12 @@ enum SetupFlow {
         cursor: usize,
         submitting: bool,
     },
+}
+
+#[derive(Debug, Clone)]
+enum ResetFlow {
+    Confirm { selected: usize }, // 0 = Cancel, 1 = Reset vault
+    TypeConfirm { input: String },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,7 +73,11 @@ impl PageWidget for SettingsPage {
         render_settings(area, buf, self);
     }
 
-    fn handle_key(&mut self, key: KeyEvent, _app: &mut App) -> PageAction {
+    fn handle_key(&mut self, key: KeyEvent, app: &mut App) -> PageAction {
+        if self.reset_flow.is_some() {
+            return self.handle_reset_flow_key(key, app);
+        }
+
         if self.setup_flow.is_some() {
             return self.handle_setup_flow_key(key);
         }
@@ -88,6 +99,11 @@ impl PageWidget for SettingsPage {
                     false,
                     "Soul Vault Cloud processing is coming soon. Choose 1-4 for now.".to_string(),
                 ));
+                PageAction::Consumed
+            }
+            KeyCode::Char('x') | KeyCode::Char('X') => {
+                self.reset_flow = Some(ResetFlow::Confirm { selected: 0 });
+                self.status_message = None;
                 PageAction::Consumed
             }
             KeyCode::Char('j') | KeyCode::Down => {
@@ -436,6 +452,84 @@ impl SettingsPage {
             }
         }
     }
+
+    fn handle_reset_flow_key(&mut self, key: KeyEvent, app: &mut App) -> PageAction {
+        match self.reset_flow.clone() {
+            Some(ResetFlow::Confirm { mut selected }) => match key.code {
+                KeyCode::Char('j') | KeyCode::Down => {
+                    selected = 1;
+                    self.reset_flow = Some(ResetFlow::Confirm { selected });
+                    PageAction::Consumed
+                }
+                KeyCode::Char('k') | KeyCode::Up => {
+                    selected = 0;
+                    self.reset_flow = Some(ResetFlow::Confirm { selected });
+                    PageAction::Consumed
+                }
+                KeyCode::Enter => {
+                    if selected == 0 {
+                        self.reset_flow = None;
+                        self.status_message = Some((false, "Reset cancelled.".to_string()));
+                    } else {
+                        self.reset_flow = Some(ResetFlow::TypeConfirm {
+                            input: String::new(),
+                        });
+                    }
+                    PageAction::Consumed
+                }
+                KeyCode::Esc => {
+                    self.reset_flow = None;
+                    self.status_message = Some((false, "Reset cancelled.".to_string()));
+                    PageAction::Consumed
+                }
+                _ => PageAction::Ignored,
+            },
+            Some(ResetFlow::TypeConfirm { mut input }) => match key.code {
+                KeyCode::Esc => {
+                    self.reset_flow = None;
+                    self.status_message = Some((false, "Reset cancelled.".to_string()));
+                    PageAction::Consumed
+                }
+                KeyCode::Backspace => {
+                    input.pop();
+                    self.reset_flow = Some(ResetFlow::TypeConfirm { input });
+                    PageAction::Consumed
+                }
+                KeyCode::Char(c) => {
+                    if c.is_ascii_alphabetic() {
+                        input.push(c.to_ascii_uppercase());
+                    }
+                    self.reset_flow = Some(ResetFlow::TypeConfirm { input });
+                    PageAction::Consumed
+                }
+                KeyCode::Enter => {
+                    if input.trim() != "RESET" {
+                        self.status_message = Some((
+                            false,
+                            "Confirmation mismatch. Type RESET exactly.".to_string(),
+                        ));
+                        return PageAction::Consumed;
+                    }
+
+                    match crate::cli::reset::move_vault_to_trash() {
+                        Ok(_) => {
+                            app.vault_initialized = false;
+                            app.should_quit = true;
+                            self.reset_flow = None;
+                            self.status_message =
+                                Some((true, "Vault moved to Trash successfully.".to_string()));
+                        }
+                        Err(e) => {
+                            self.status_message = Some((false, format!("Reset failed: {e}")));
+                        }
+                    }
+                    PageAction::Consumed
+                }
+                _ => PageAction::Ignored,
+            },
+            None => PageAction::Ignored,
+        }
+    }
 }
 
 fn render_not_init(area: Rect, buf: &mut Buffer) {
@@ -512,11 +606,23 @@ fn render_settings(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
     lines.push(Line::from(""));
     lines.extend(connection_lines(&config, page.selected_connection));
     lines.push(Line::from(""));
+    lines.push(section_header("  Danger zone"));
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "    Press X to reset vault (typed confirmation required)",
+        Style::default().fg(rat::RED),
+    )));
+    lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         "  Processing: 1 Disabled · 2 Claude · 3 ChatGPT · 4 Gemini · 5 Cloud (coming soon)",
         Style::default().fg(rat::DIM),
     )));
-    if page.setup_flow.is_some() {
+    if page.reset_flow.is_some() {
+        lines.push(Line::from(Span::styled(
+            "  Reset: j/k choose · Enter confirm · Esc cancel",
+            Style::default().fg(rat::DIM),
+        )));
+    } else if page.setup_flow.is_some() {
         lines.push(Line::from(Span::styled(
             "  Setup: Up/Down choose · Enter confirm · Esc cancel",
             Style::default().fg(rat::DIM),
@@ -528,6 +634,7 @@ fn render_settings(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
         )));
     }
     lines.extend(setup_flow_lines(page));
+    lines.extend(reset_flow_lines(page));
     if page.pending_oauth {
         lines.push(Line::from(Span::styled(
             "  Waiting for OAuth callback in your browser...",
@@ -717,6 +824,49 @@ fn setup_flow_lines(page: &SettingsPage) -> Vec<Line<'static>> {
                     Style::default().fg(rat::DIM),
                 )));
             }
+        }
+        None => {}
+    }
+    lines
+}
+
+fn reset_flow_lines(page: &SettingsPage) -> Vec<Line<'static>> {
+    let mut lines = Vec::new();
+    match &page.reset_flow {
+        Some(ResetFlow::Confirm { selected }) => {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "  Reset vault?",
+                Style::default().fg(rat::RED).add_modifier(Modifier::BOLD),
+            )));
+            let options = ["Cancel", "Yes, move vault to Trash"];
+            for (idx, option) in options.iter().enumerate() {
+                let prefix = if idx == *selected { "  > " } else { "    " };
+                let color = if idx == *selected {
+                    if idx == 1 {
+                        rat::RED
+                    } else {
+                        rat::GOLD
+                    }
+                } else {
+                    rat::DIM
+                };
+                lines.push(Line::from(Span::styled(
+                    format!("{prefix}{option}"),
+                    Style::default().fg(color),
+                )));
+            }
+        }
+        Some(ResetFlow::TypeConfirm { input }) => {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "  Type RESET to confirm:",
+                Style::default().fg(rat::RED).add_modifier(Modifier::BOLD),
+            )));
+            lines.push(Line::from(Span::styled(
+                format!("    {}", input),
+                Style::default().fg(rat::CYAN),
+            )));
         }
         None => {}
     }

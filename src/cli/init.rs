@@ -521,7 +521,10 @@ fn render_setup_summary(providers: &[ProviderConfig], processing_mode: &Processi
     );
 }
 
-fn render_finalize_screen(providers: &[ProviderConfig], processing_mode: &ProcessingMode) -> Result<()> {
+fn render_finalize_screen(
+    providers: &[ProviderConfig],
+    processing_mode: &ProcessingMode,
+) -> Result<()> {
     clear_screen_if_tty()?;
     println!("{}", banner());
     println!("{}", dim("  First-time setup wizard"));

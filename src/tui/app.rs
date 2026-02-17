@@ -11,7 +11,6 @@ pub enum Page {
     Browse,
     Export,
     Watch,
-    Reset,
     Settings,
 }
 
@@ -22,7 +21,6 @@ impl Page {
         Page::Browse,
         Page::Export,
         Page::Watch,
-        Page::Reset,
         Page::Settings,
     ];
 
@@ -33,7 +31,6 @@ impl Page {
             Page::Browse => "Browse",
             Page::Export => "Export",
             Page::Watch => "Watch",
-            Page::Reset => "Reset",
             Page::Settings => "Settings",
         }
     }
@@ -45,7 +42,6 @@ impl Page {
             Page::Browse => "",
             Page::Export => "",
             Page::Watch => "",
-            Page::Reset => "",
             Page::Settings => "",
         }
     }
@@ -131,7 +127,6 @@ mod tests {
         assert_eq!(Page::Browse.label(), "Browse");
         assert_eq!(Page::Export.label(), "Export");
         assert_eq!(Page::Watch.label(), "Watch");
-        assert_eq!(Page::Reset.label(), "Reset");
         assert_eq!(Page::Settings.label(), "Settings");
     }
 
@@ -172,7 +167,6 @@ mod tests {
             Page::Browse,
             Page::Export,
             Page::Watch,
-            Page::Reset,
             Page::Settings,
         ];
 
