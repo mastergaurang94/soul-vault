@@ -28,7 +28,12 @@ Last updated: 2026-02-17
 - [x] Import/auth updates landed:
   - providers mode (`soul import`) preflight API key validation
   - `soul login [provider]` / `soul logout [provider]`
-  - cloud scaffold via `soul import --cloud [--provider ...]`
+  - real cloud import via `soul import --cloud --provider chatgpt|gemini`
+  - `soul import --cloud --provider claude` now gives explicit export-based fallback guidance (no documented cloud history API)
+  - cloud import now reuses provider-scoped OAuth tokens, retries rate-limited/temporary failures, and returns provider-specific remediation errors
+  - TUI Import now has a dedicated Cloud mode with explicit provider selection, async job-state progress, and cancellation (`x`)
+  - cloud source tracking now stores provider conversation IDs + markers/hashes to skip unchanged imports
+  - init/settings/login now treat OAuth readiness as provider-scoped configuration (`configured` vs `not configured`) instead of ChatGPT/Gemini "coming soon" placeholders
 - [x] Vault reset safety command landed:
   - `soul reset` with confirmation flow
   - `soul reset --force` for non-interactive use
@@ -101,18 +106,17 @@ Last updated: 2026-02-17
 
 ## 📋 Backlog
 
-- [ ] Cloud API conversation fetch implementation for `soul import --cloud`
-- [ ] Managed `Soul Vault Cloud` processing option in onboarding (default processor path)
-- [ ] OAuth support for ChatGPT and Gemini providers in init/settings
 - [ ] Add OpenClaw as a first-class configurable provider in init/settings/status
+- [ ] Provider-cloud integration tests with mocked API pagination/retry/refresh coverage
+- [ ] Managed `Soul Vault Cloud` processing option in onboarding (default processor path)
+- [ ] `SOUL_VAULT_VAULT_PATH` env var for multi-vault/test workflows
 - [ ] `soul search` — full-text vault search
 - [ ] `soul diff` — show changes since last import
-- [ ] `SOUL_VAULT_VAULT_PATH` env var for multi-vault/test workflows
-- [ ] Onchain backup (Arweave)
-- [ ] SDK for other agents
-- [ ] Chrome extension
 - [ ] Multi-vault support
 - [ ] Homebrew tap publishing
+- [ ] SDK for other agents
+- [ ] Chrome extension
+- [ ] Onchain backup (Arweave)
 
 ## Architecture Quick Reference
 

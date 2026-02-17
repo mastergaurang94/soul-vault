@@ -7,23 +7,21 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use crate::auth::{exchange_code_for_token, oauth_config, save_credentials};
+use crate::auth::{exchange_code_for_token, oauth_config, oauth_is_configured, save_credentials};
 use crate::types::Provider;
 
 const CALLBACK_TIMEOUT: Duration = Duration::from_secs(180);
 
 pub async fn connect_provider(provider: &Provider) -> Result<()> {
-    match provider {
-        Provider::Claude => connect_claude().await,
-        Provider::ChatGpt | Provider::Gemini => bail!(
-            "OAuth for {} is coming soon. Use local import for now.",
-            provider.display_name()
-        ),
+    if !oauth_is_configured(provider) {
+        bail!(
+            "OAuth for {} is not configured yet.\n      → Set provider OAuth env vars, then run `soul login {}`.",
+            provider.display_name(),
+            provider
+        );
     }
-}
 
-async fn connect_claude() -> Result<()> {
-    let oauth = oauth_config(&Provider::Claude);
+    let oauth = oauth_config(provider);
     let state = format!("soul-{}", chrono::Utc::now().timestamp_millis());
     let (port, callback_rx) = spawn_callback_listener()?;
     let redirect_uri = format!("http://127.0.0.1:{port}/oauth/callback");

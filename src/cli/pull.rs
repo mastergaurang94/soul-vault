@@ -6,7 +6,9 @@
 use anyhow::Result;
 
 use crate::adapters::AdapterRegistry;
-use crate::auth::{ensure_valid_credentials, is_logged_in};
+use crate::auth::is_logged_in;
+use crate::cli::cloud_import::run_cloud_import;
+use crate::cli::cloud_types::ImportJobState;
 use crate::cli::pull_pipeline::{discover_sessions, parse_sessions_to_chunks, process_chunks};
 use crate::cli::pull_summary::print_summary;
 use crate::cli::pull_tracking::{
@@ -22,7 +24,7 @@ use crate::vault::write::write_memories_to_vault;
 
 pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()> {
     if cloud {
-        return run_cloud(provider).await;
+        return run_cloud(provider, force).await;
     }
 
     println!("{}", banner());
@@ -176,7 +178,7 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
     Ok(())
 }
 
-async fn run_cloud(provider: Option<&str>) -> Result<()> {
+async fn run_cloud(provider: Option<&str>, force: bool) -> Result<()> {
     println!("{}", banner());
     assert_initialized()?;
 
@@ -184,6 +186,13 @@ async fn run_cloud(provider: Option<&str>) -> Result<()> {
         Some(raw) => raw.parse::<Provider>().map_err(anyhow::Error::msg)?,
         None => Provider::Claude,
     };
+
+    if matches!(provider, Provider::Claude) {
+        anyhow::bail!(
+            "Claude cloud history import is not available via documented API.\n      \
+             → Export from Claude settings and run `soul import <export-folder>`."
+        );
+    }
 
     if !is_logged_in(&provider)? {
         anyhow::bail!(
@@ -193,25 +202,55 @@ async fn run_cloud(provider: Option<&str>) -> Result<()> {
         );
     }
 
-    let creds = ensure_valid_credentials(&provider).await?;
-    if creds.is_none() {
-        anyhow::bail!(
-            "No valid OAuth credentials for {}.\n      → Run `soul login {}` and try again.",
-            provider.display_name(),
-            provider
-        );
-    }
+    let summary = run_cloud_import(provider.clone(), force, None, |event| {
+        let state = match event.state {
+            ImportJobState::Queued => "queued",
+            ImportJobState::Fetching => "fetching",
+            ImportJobState::Normalizing => "normalizing",
+            ImportJobState::Processing => "processing",
+            ImportJobState::Writing => "writing",
+            ImportJobState::Done => "done",
+            ImportJobState::Failed => "failed",
+            ImportJobState::Cancelled => "cancelled",
+        };
 
+        let scope = event
+            .conversation_id
+            .as_deref()
+            .map(|id| format!(" ({id})"))
+            .unwrap_or_default();
+        if event.total > 0 {
+            println!(
+                "  {} [{}] {}/{} {}{}",
+                dim(ICON_DOT),
+                state,
+                event.current,
+                event.total,
+                event.message,
+                scope
+            );
+        } else {
+            println!("  {} [{}] {}{}", dim(ICON_DOT), state, event.message, scope);
+        }
+    })
+    .await?;
+
+    println!("{}", line());
     println!(
-        "  {} Authenticated with {} cloud.",
+        "  {} {} cloud import complete",
         emerald(ICON_CHECK),
-        bold_white(provider.display_name())
+        bold_white(summary.provider.display_name())
     );
-    println!(
-        "  {} Coming soon — use {} with your exported data.\n",
-        amber(ICON_STAR),
-        cyan("soul import")
-    );
+    for line in summary.to_lines() {
+        println!("  {}", line);
+    }
+    if !summary.errors.is_empty() {
+        println!("  {} {} warnings", amber("!"), summary.errors.len());
+        for err in summary.errors.iter().take(8) {
+            println!("    {} {}", dim("-"), dim(err));
+        }
+    }
+    println!();
 
     Ok(())
 }

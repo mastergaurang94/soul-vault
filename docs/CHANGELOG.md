@@ -7,6 +7,47 @@ Agents: append entries here after completing work.
 
 ---
 
+## 2026-02-17 — Cloud Import Across Claude, ChatGPT, and Gemini
+
+### Cloud import foundation
+- Added provider-agnostic cloud domain models and trait-based client contract:
+  - `src/cli/cloud_types.rs`
+  - `src/cli/cloud_client.rs`
+  - `src/cli/cloud_import.rs`
+- Added shared pagination parsing, token-backed auth requests, and retry with exponential backoff for rate-limit/temporary failures.
+- Added provider-specific actionable error mapping (auth revoked, rate limited, quota/service issues).
+- Added unit coverage for cloud parser/retry/error/token-path behavior in `src/cli/cloud_client.rs`.
+
+### Real CLI cloud path
+- Replaced cloud scaffold in `src/cli/pull.rs` with real cloud import execution:
+  - `soul import --cloud --provider chatgpt|gemini` now fetches list/detail conversation payloads
+  - `soul import --cloud --provider claude` now returns explicit export/local-import fallback guidance
+  - normalizes messages to import text and runs existing processing/writing pipeline
+  - streams import job-state progress in CLI output
+
+### Cloud dedup/source tracking
+- Extended source tracking in `src/cli/pull_tracking.rs` for cloud IDs:
+  - stores per-provider conversation markers (`meta`) and content hashes (`body`)
+  - skips unchanged cloud conversations by default across runs
+
+### TUI async cloud UX
+- Added explicit Cloud mode to TUI Import page (`src/tui/pages/import.rs`):
+  - users must choose provider explicitly (`Claude`, `ChatGPT`, `Gemini`)
+  - no implicit interactive default to Claude
+- Added async runtime orchestration for cloud imports (`src/tui/runtime_tasks.rs`):
+  - structured job-state progress (`queued`, `fetching`, `normalizing`, `processing`, `writing`, `done`, `failed`, `cancelled`)
+  - cancellation support via `x` during running imports
+- Wired new page actions in `src/tui/pages/mod.rs` and `src/tui/runtime.rs`.
+
+### Provider-scoped OAuth UX alignment
+- Updated OAuth config/connect behavior to be provider-scoped for Claude, ChatGPT, and Gemini:
+  - `src/auth/oauth.rs` now supports provider env-var configuration for OAuth client/endpoint/scope values.
+  - `src/auth/connect.rs` now uses generic provider OAuth flow and returns actionable "not configured" guidance when env values are placeholders.
+- Updated init/settings/login copy and logic to remove ChatGPT/Gemini "coming soon" OAuth framing:
+  - `src/cli/init.rs`
+  - `src/tui/pages/settings.rs`
+  - `src/cli/login.rs`
+
 ## 2026-02-17 — Phase 1: Optional Processing Mode (Raw Import Supported)
 
 ### Config and onboarding

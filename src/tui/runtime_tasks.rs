@@ -1,11 +1,16 @@
 //! Async channel draining and task spawners used by the TUI runtime loop.
 
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
 use tokio::sync::mpsc;
 
-use super::pages::import::ImportPage;
+use super::pages::import::{CloudPhase, ImportPage};
 use super::pages::settings::SettingsPage;
 use super::pages::watch::{WatchEvent, WatchPage};
 use super::watcher;
+use crate::cli::cloud_import::run_cloud_import;
+use crate::cli::cloud_types::ImportJobState;
 use crate::core::pipeline::ImportProgress;
 use crate::types::Provider;
 
@@ -17,6 +22,8 @@ pub(super) struct Channels {
     pub(super) watch_event_rx: Option<mpsc::Receiver<WatchEvent>>,
     pub(super) watch_stop_tx: Option<mpsc::Sender<()>>,
     pub(super) pull_rx: Option<mpsc::Receiver<String>>,
+    pub(super) cloud_rx: Option<mpsc::Receiver<CloudRuntimeEvent>>,
+    pub(super) cloud_cancel: Option<Arc<AtomicBool>>,
     pub(super) oauth_rx: Option<mpsc::Receiver<SettingsUpdate>>,
 }
 
@@ -25,6 +32,18 @@ pub(super) enum SettingsUpdate {
     OAuthError(String),
     ApiKeySuccess { provider: Provider, message: String },
     ApiKeyError(String),
+}
+
+pub(super) enum CloudRuntimeEvent {
+    Progress {
+        provider: Provider,
+        state: ImportJobState,
+        current: usize,
+        total: usize,
+        message: String,
+    },
+    Done(Vec<String>),
+    Error(String),
 }
 
 pub(super) fn shutdown_watcher(channels: &mut Channels) {
@@ -100,6 +119,42 @@ pub(super) fn drain_oauth_updates(settings: &mut SettingsPage, channels: &mut Ch
         }
         if should_clear {
             channels.oauth_rx = None;
+        }
+    }
+}
+
+pub(super) fn drain_cloud_updates(import: &mut ImportPage, channels: &mut Channels) {
+    if let Some(rx) = &mut channels.cloud_rx {
+        while let Ok(event) = rx.try_recv() {
+            match event {
+                CloudRuntimeEvent::Progress {
+                    provider,
+                    state,
+                    current,
+                    total,
+                    message,
+                } => {
+                    import.on_cloud_progress(
+                        provider,
+                        cloud_state_label(state).to_string(),
+                        current,
+                        total,
+                        message,
+                    );
+                }
+                CloudRuntimeEvent::Done(summary) => {
+                    import.on_cloud_done(summary);
+                    channels.cloud_cancel = None;
+                    channels.cloud_rx = None;
+                    return;
+                }
+                CloudRuntimeEvent::Error(msg) => {
+                    import.on_cloud_error(msg);
+                    channels.cloud_cancel = None;
+                    channels.cloud_rx = None;
+                    return;
+                }
+            }
         }
     }
 }
@@ -315,6 +370,63 @@ pub(super) fn start_provider_import(import_page: &mut ImportPage, channels: &mut
     });
 }
 
+pub(super) fn start_cloud_import(
+    provider: Provider,
+    import_page: &mut ImportPage,
+    channels: &mut Channels,
+) {
+    let (tx, rx) = mpsc::channel(128);
+    channels.cloud_rx = Some(rx);
+    let cancel_flag = Arc::new(AtomicBool::new(false));
+    channels.cloud_cancel = Some(cancel_flag.clone());
+
+    import_page.cloud_phase = CloudPhase::Running {
+        provider: provider.clone(),
+        state_label: "queued".to_string(),
+        current: 0,
+        total: 0,
+        progress: vec!["Queued cloud import...".to_string()],
+    };
+
+    tokio::spawn(async move {
+        let tx_progress = tx.clone();
+        let summary = run_cloud_import(provider.clone(), false, Some(cancel_flag), |event| {
+            let _ = tx_progress.blocking_send(CloudRuntimeEvent::Progress {
+                provider: event.provider,
+                state: event.state,
+                current: event.current,
+                total: event.total,
+                message: event.message,
+            });
+        })
+        .await;
+
+        match summary {
+            Ok(summary) => {
+                let _ = tx.send(CloudRuntimeEvent::Done(summary.to_lines())).await;
+            }
+            Err(e) => {
+                let _ = tx
+                    .send(CloudRuntimeEvent::Progress {
+                        provider: provider.clone(),
+                        state: ImportJobState::Failed,
+                        current: 0,
+                        total: 0,
+                        message: "Cloud import failed".to_string(),
+                    })
+                    .await;
+                let _ = tx.send(CloudRuntimeEvent::Error(e.to_string())).await;
+            }
+        }
+    });
+}
+
+pub(super) fn cancel_cloud_import(channels: &mut Channels) {
+    if let Some(flag) = &channels.cloud_cancel {
+        flag.store(true, Ordering::Relaxed);
+    }
+}
+
 pub(super) fn stop_watch(watch_page: &mut WatchPage, channels: &mut Channels) {
     shutdown_watcher(channels);
     channels.watch_event_rx = None;
@@ -411,4 +523,17 @@ pub(super) fn start_api_key_setup(provider: Provider, key: String, channels: &mu
             }
         }
     });
+}
+
+fn cloud_state_label(state: ImportJobState) -> &'static str {
+    match state {
+        ImportJobState::Queued => "queued",
+        ImportJobState::Fetching => "fetching",
+        ImportJobState::Normalizing => "normalizing",
+        ImportJobState::Processing => "processing",
+        ImportJobState::Writing => "writing",
+        ImportJobState::Done => "done",
+        ImportJobState::Failed => "failed",
+        ImportJobState::Cancelled => "cancelled",
+    }
 }

@@ -67,6 +67,10 @@ Flags:
 - `--cloud`: use provider cloud mode instead of local session files (provider mode only)
 - `--provider <claude|chatgpt|gemini>`: cloud provider to use (provider mode only)
 
+Cloud provider behavior:
+- `chatgpt`, `gemini`: documented cloud API import path.
+- `claude`: no documented cloud history API; command provides export/local-import guidance.
+
 #### `soul export [-o|--output <path>] [-f|--format <context|json|bundle>] [--topic <topic>] [--sections <csv>]`
 
 Exports vault data.
@@ -113,12 +117,14 @@ Flags:
 
 #### `soul login [provider]`
 
-Starts OAuth login (default provider: `claude`).
+Starts provider-scoped OAuth login (defaults to `claude` if omitted).
 
 Supported provider values:
 - `claude`
 - `chatgpt`
 - `gemini`
+
+Note: ChatGPT/Gemini OAuth requires provider OAuth env vars to be configured.
 
 #### `soul logout [provider]`
 

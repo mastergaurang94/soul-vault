@@ -51,7 +51,7 @@ enum Commands {
         #[arg(long)]
         cloud: bool,
 
-        /// Cloud provider to use: claude, chatgpt, gemini (default: claude)
+        /// Cloud provider to use: claude, chatgpt, gemini (defaults to claude for CLI compatibility)
         #[arg(long)]
         provider: Option<String>,
     },
@@ -84,7 +84,7 @@ enum Commands {
     /// Show vault summary and imported sources
     Status,
 
-    /// Login to a cloud provider via OAuth (default: claude)
+    /// Login to a cloud provider via OAuth (defaults to claude when omitted)
     Login {
         /// Provider to authenticate: claude, chatgpt, gemini
         provider: Option<String>,

@@ -53,6 +53,7 @@ fn run_app(
         runtime_tasks::drain_folder_import_progress(&mut pages.import, &mut channels);
         runtime_tasks::drain_watch_events(&mut pages.watch, &mut channels);
         runtime_tasks::drain_provider_import_progress(&mut pages.import, &mut channels);
+        runtime_tasks::drain_cloud_updates(&mut pages.import, &mut channels);
         runtime_tasks::drain_oauth_updates(&mut pages.settings, &mut channels);
 
         terminal.draw(|frame| {
@@ -151,6 +152,12 @@ fn handle_key(
         }
         pages::PageAction::StartProviderImport => {
             runtime_tasks::start_provider_import(&mut pages.import, channels);
+        }
+        pages::PageAction::StartCloudImport(provider) => {
+            runtime_tasks::start_cloud_import(provider, &mut pages.import, channels);
+        }
+        pages::PageAction::CancelCloudImport => {
+            runtime_tasks::cancel_cloud_import(channels);
         }
         pages::PageAction::StartOAuthConnect(provider) => {
             runtime_tasks::start_oauth_connect(provider, channels);

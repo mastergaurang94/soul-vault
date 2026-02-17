@@ -9,7 +9,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Widget},
 };
 
-use crate::auth::{is_logged_in, remove_credentials};
+use crate::auth::{is_logged_in, oauth_is_configured, remove_credentials};
 use crate::tui::app::App;
 use crate::tui::pages::{PageAction, PageWidget};
 use crate::types::{ProcessingMode, Provider, SoulVaultConfig};
@@ -67,7 +67,7 @@ enum ConnectionAction {
     Connect,
     Disconnect,
     Setup,
-    None,
+    ConfigureOAuth,
 }
 
 struct ConnectionState {
@@ -267,10 +267,13 @@ impl SettingsPage {
                 ));
                 PageAction::Consumed
             }
-            ConnectionAction::None => {
+            ConnectionAction::ConfigureOAuth => {
                 self.status_message = Some((
                     false,
-                    format!("OAuth for {} is coming soon.", provider.display_name()),
+                    format!(
+                        "OAuth for {} is not configured. Set provider OAuth env vars first.",
+                        provider.display_name()
+                    ),
                 ));
                 PageAction::Consumed
             }
@@ -390,7 +393,7 @@ impl SettingsPage {
                                     self.status_message = Some((
                                         false,
                                         format!(
-                                            "OAuth for {} is coming soon. Use API key for now.",
+                                            "OAuth for {} is not configured. Set provider OAuth env vars or use API key.",
                                             provider.display_name()
                                         ),
                                     ));
@@ -789,10 +792,10 @@ fn connection_lines(config: &SoulVaultConfig, selected_item: SettingsItem) -> Ve
 fn connection_state(config: &SoulVaultConfig, provider: &Provider) -> ConnectionState {
     if !oauth_supported(provider) {
         return ConnectionState {
-            label: "coming soon",
+            label: "oauth not configured",
             color: rat::DIM,
-            action: ConnectionAction::None,
-            action_label: None,
+            action: ConnectionAction::ConfigureOAuth,
+            action_label: Some("Set OAuth env vars"),
         };
     }
 
@@ -977,7 +980,7 @@ fn reset_flow_lines(page: &SettingsPage) -> Vec<Line<'static>> {
 }
 
 fn oauth_supported(provider: &Provider) -> bool {
-    matches!(provider, Provider::Claude)
+    oauth_is_configured(provider)
 }
 
 fn provider_has_credentials(provider: &Provider) -> bool {

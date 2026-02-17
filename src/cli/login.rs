@@ -19,34 +19,17 @@ pub async fn run(provider: Option<&str>) -> Result<()> {
     );
     println!("{}", line());
 
-    match provider {
-        Provider::Claude => {
-            connect_provider(&Provider::Claude).await?;
-            println!(
-                "{}",
-                check("OAuth login successful. Credentials saved to ~/soul-vault/auth.yaml")
-            );
-            println!(
-                "  {} Use {} to test cloud import scaffolding.\n",
-                dim(ICON_DOT),
-                cyan("soul import --cloud")
-            );
-            Ok(())
-        }
-        Provider::ChatGpt | Provider::Gemini => {
-            println!(
-                "  {} OAuth scaffold for {} is in place but provider wiring is pending.",
-                amber(ICON_STAR),
-                provider.display_name()
-            );
-            println!(
-                "  {} Coming soon — for now use {}.\n",
-                dim(ICON_DOT),
-                cyan("soul import <your-export-folder>")
-            );
-            Ok(())
-        }
-    }
+    connect_provider(&provider).await?;
+    println!(
+        "{}",
+        check("OAuth login successful. Credentials saved to ~/soul-vault/auth.yaml")
+    );
+    println!(
+        "  {} Use {} to import cloud conversations.\n",
+        dim(ICON_DOT),
+        cyan(&format!("soul import --cloud --provider {}", provider))
+    );
+    Ok(())
 }
 
 fn parse_provider(raw: Option<&str>) -> Result<Provider> {

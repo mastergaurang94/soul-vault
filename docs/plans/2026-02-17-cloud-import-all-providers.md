@@ -3,7 +3,7 @@ Last updated: 2026-02-17
 
 ## Status
 
-- `planned`
+- `in_progress`
 
 ## Goal
 
@@ -11,12 +11,12 @@ Last updated: 2026-02-17
 
 ## Acceptance Criteria
 
-- [ ] `soul import --cloud --provider claude|chatgpt|gemini` fetches real conversations from provider APIs and imports them into vault.
-- [ ] No implicit provider default for cloud import flows in interactive UX: user explicitly chooses provider.
-- [ ] OAuth in init/settings is provider-scoped and clearly linked to that provider's cloud import capability.
-- [ ] Long-running cloud imports run asynchronously with visible progress and final summary in TUI.
-- [ ] Source tracking prevents duplicate re-imports of unchanged cloud conversations.
-- [ ] Errors are actionable and provider-specific (auth revoked, rate limited, quota, schema mismatch).
+- [x] `soul import --cloud --provider chatgpt|gemini` fetches real conversations from provider APIs and imports them into vault; `claude` returns explicit export-based fallback guidance.
+- [x] No implicit provider default for cloud import flows in interactive UX: user explicitly chooses provider.
+- [x] OAuth in init/settings is provider-scoped and clearly linked to that provider's cloud import capability.
+- [x] Long-running cloud imports run asynchronously with visible progress and final summary in TUI.
+- [x] Source tracking prevents duplicate re-imports of unchanged cloud conversations.
+- [x] Errors are actionable and provider-specific (auth revoked, rate limited, quota, schema mismatch).
 - [ ] Test coverage includes pagination, retries, token refresh, and partial-failure behavior.
 
 ## Scope Boundaries
@@ -54,44 +54,44 @@ Last updated: 2026-02-17
 
 ## Steps
 
-- [ ] Step 1: Cloud domain model + provider client trait
+- [x] Step 1: Cloud domain model + provider client trait
   - Define `CloudProviderClient` trait and normalized cloud conversation/message model.
   - Add shared pagination and retry wrapper APIs.
 
-- [ ] Step 2: Unified auth/token layer for cloud clients
+- [x] Step 2: Unified auth/token layer for cloud clients
   - Reuse existing OAuth store and refresh paths.
   - Add provider-specific token validation and refresh decision helpers.
 
-- [ ] Step 3: Claude cloud client implementation
-  - Implement list/fetch/paginate/normalize.
-  - Wire into `soul import --cloud --provider claude`.
+- [x] Step 3: Claude cloud path decision
+  - Verified no documented Anthropic cloud history/list endpoint in public API docs.
+  - Wire explicit `--provider claude` fallback guidance to export/local import path.
 
-- [ ] Step 4: ChatGPT cloud client implementation
-  - Implement list/fetch/paginate/normalize.
-  - Wire into provider switch + import pipeline.
-
-- [ ] Step 5: Gemini cloud client implementation
+- [x] Step 4: ChatGPT cloud client implementation
   - Implement list/fetch/paginate/normalize.
   - Wire into provider switch + import pipeline.
 
-- [ ] Step 6: Source tracking for cloud IDs and incremental sync
+- [x] Step 5: Gemini cloud client implementation
+  - Implement list/fetch/paginate/normalize.
+  - Wire into provider switch + import pipeline.
+
+- [x] Step 6: Source tracking for cloud IDs and incremental sync
   - Extend source tracking to include provider conversation IDs + content/version/hash markers.
   - Skip unchanged cloud conversations by default.
 
-- [ ] Step 7: Async import orchestration + progress events
+- [x] Step 7: Async import orchestration + progress events
   - Introduce import job state (`queued`, `fetching`, `normalizing`, `processing`, `writing`, `done`, `failed`).
   - Emit progress counters and current conversation/provider context.
 
-- [ ] Step 8: TUI integration
+- [x] Step 8: TUI integration
   - Add provider picker in import flow (explicit selection).
   - Add cloud import progress view and completion summary.
   - Support user cancellation with safe partial commit behavior.
 
-- [ ] Step 9: Init/settings UX alignment
+- [x] Step 9: Init/settings UX alignment
   - Ensure provider OAuth selection maps directly to provider cloud import readiness.
   - Remove or revise copy that implies generic default provider behavior.
 
-- [ ] Step 10: Reliability hardening
+- [x] Step 10: Reliability hardening
   - Rate-limit handling, retries with backoff, partial failure aggregation.
   - Resume-friendly behavior where feasible.
 
@@ -104,6 +104,8 @@ Last updated: 2026-02-17
 - `2026-02-17`: Do not default interactive cloud import to Claude; require explicit provider selection. Rationale: avoids wrong-account assumptions and aligns with provider-scoped OAuth setup.
 - `2026-02-17`: Cloud imports should be async with progress/cancellation in TUI. Rationale: large accounts can take significant time; blocking UX is poor.
 - `2026-02-17`: OAuth completion alone is insufficient; readiness must include provider-specific fetch capability + token validity checks.
+- `2026-02-17`: Cloud clients now use provider-specific endpoints with env-overridable base URLs and shared retry/error mapping. Rationale: allows shipping real network path while preserving flexibility for endpoint drift.
+- `2026-02-17`: Settings/init/login OAuth UX now reports provider-scoped configuration readiness rather than "coming soon" for ChatGPT/Gemini. Rationale: align UI readiness with provider-scoped cloud import behavior.
 
 ## Risks And Blockers
 
@@ -125,16 +127,17 @@ Last updated: 2026-02-17
 
 ## Verification Criteria
 
-- [ ] `cargo build --release`
-- [ ] `cargo test`
-- [ ] `cargo clippy --all-targets -- -D warnings`
+- [x] `cargo build --release`
+- [x] `cargo test`
+- [x] `cargo clippy --all-targets -- -D warnings`
 - [ ] Provider integration tests with mocked APIs for list/fetch/pagination/retry/refresh.
+  - Current blocker in this environment: sandbox prevents binding mock HTTP ports (`Operation not permitted`), so unit coverage was added for parsing/retry/error/token-path logic instead.
 - [ ] Manual TUI validation:
   - explicit provider selection
   - visible progress updates
   - cancellation path
   - clear final summary
-- [ ] Docs updated:
+- [x] Docs updated:
   - `docs/STATUS.md`
   - `docs/CHANGELOG.md`
   - relevant command usage docs.

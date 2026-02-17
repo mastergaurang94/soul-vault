@@ -8,7 +8,7 @@ use crossterm::{
 };
 use std::io::{self, IsTerminal, Write};
 
-use crate::auth::{connect_provider, is_logged_in};
+use crate::auth::{connect_provider, is_logged_in, oauth_is_configured};
 use crate::cli::init_validate::{validate_api_key, ApiKeyValidation};
 use crate::types::{ProcessingMode, Provider, ProviderConfig, SoulVaultConfig};
 use crate::ui::theme::*;
@@ -367,7 +367,7 @@ async fn configure_single_provider(
             println!("    {} OAuth", dim("2."));
             println!("    {} Back", dim("3."));
         } else {
-            println!("    {} OAuth {}", dim("2."), dim("(coming soon)"));
+            println!("    {} OAuth {}", dim("2."), dim("(not configured)"));
             println!("    {} Back", dim("3."));
         }
         println!();
@@ -388,7 +388,7 @@ async fn configure_single_provider(
             2 => {
                 if !supports_oauth(provider) {
                     println!(
-                        "  {} OAuth for {} is coming soon.",
+                        "  {} OAuth for {} is not configured. Set provider OAuth env vars first.",
                         amber(ICON_STAR),
                         provider.display_name()
                     );
@@ -494,7 +494,7 @@ async fn setup_api_key(provider: &Provider) -> Result<bool> {
 }
 
 fn supports_oauth(provider: &Provider) -> bool {
-    matches!(provider, Provider::Claude)
+    oauth_is_configured(provider)
 }
 
 fn provider_has_credentials(provider: &Provider) -> bool {

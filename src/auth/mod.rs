@@ -8,7 +8,7 @@ mod types;
 #[allow(unused_imports)]
 pub use connect::connect_provider;
 #[allow(unused_imports)]
-pub use oauth::{exchange_code_for_token, oauth_config, refresh_access_token};
+pub use oauth::{exchange_code_for_token, oauth_config, oauth_is_configured, refresh_access_token};
 #[allow(unused_imports)]
 pub use store::{
     auth_path, clear_credentials, ensure_valid_credentials, is_logged_in, load_credentials,

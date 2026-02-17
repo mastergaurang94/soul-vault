@@ -40,6 +40,10 @@ pub enum PageAction {
     StopWatch,
     /// Start provider auto-discovery import.
     StartProviderImport,
+    /// Start cloud import for an explicitly selected provider.
+    StartCloudImport(Provider),
+    /// Cancel current cloud import task.
+    CancelCloudImport,
     /// Start OAuth connect flow for provider.
     StartOAuthConnect(Provider),
     /// Validate and save API key for provider.

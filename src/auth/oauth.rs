@@ -21,21 +21,36 @@ pub fn oauth_config(provider: &Provider) -> OAuthConfig {
         },
         Provider::ChatGpt => OAuthConfig {
             provider: Provider::ChatGpt,
-            client_id: "openai-placeholder-client-id".to_string(),
-            client_secret: None,
-            auth_url: "https://auth.openai.com/oauth/authorize".to_string(),
-            token_url: "https://auth.openai.com/oauth/token".to_string(),
-            scope: "conversations.read offline_access".to_string(),
+            client_id: std::env::var("SOUL_OAUTH_CHATGPT_CLIENT_ID")
+                .unwrap_or_else(|_| "openai-placeholder-client-id".to_string()),
+            client_secret: std::env::var("SOUL_OAUTH_CHATGPT_CLIENT_SECRET").ok(),
+            auth_url: std::env::var("SOUL_OAUTH_CHATGPT_AUTH_URL")
+                .unwrap_or_else(|_| "https://auth.openai.com/oauth/authorize".to_string()),
+            token_url: std::env::var("SOUL_OAUTH_CHATGPT_TOKEN_URL")
+                .unwrap_or_else(|_| "https://auth.openai.com/oauth/token".to_string()),
+            scope: std::env::var("SOUL_OAUTH_CHATGPT_SCOPE")
+                .unwrap_or_else(|_| "conversations.read offline_access".to_string()),
         },
         Provider::Gemini => OAuthConfig {
             provider: Provider::Gemini,
-            client_id: "google-placeholder-client-id".to_string(),
-            client_secret: None,
-            auth_url: "https://accounts.google.com/o/oauth2/v2/auth".to_string(),
-            token_url: "https://oauth2.googleapis.com/token".to_string(),
-            scope: "https://www.googleapis.com/auth/userinfo.email".to_string(),
+            client_id: std::env::var("SOUL_OAUTH_GEMINI_CLIENT_ID")
+                .unwrap_or_else(|_| "google-placeholder-client-id".to_string()),
+            client_secret: std::env::var("SOUL_OAUTH_GEMINI_CLIENT_SECRET").ok(),
+            auth_url: std::env::var("SOUL_OAUTH_GEMINI_AUTH_URL")
+                .unwrap_or_else(|_| "https://accounts.google.com/o/oauth2/v2/auth".to_string()),
+            token_url: std::env::var("SOUL_OAUTH_GEMINI_TOKEN_URL")
+                .unwrap_or_else(|_| "https://oauth2.googleapis.com/token".to_string()),
+            scope: std::env::var("SOUL_OAUTH_GEMINI_SCOPE")
+                .unwrap_or_else(|_| "https://www.googleapis.com/auth/userinfo.email".to_string()),
         },
     }
+}
+
+pub fn oauth_is_configured(provider: &Provider) -> bool {
+    let config = oauth_config(provider);
+    !config.client_id.to_lowercase().contains("placeholder")
+        && !config.auth_url.trim().is_empty()
+        && !config.token_url.trim().is_empty()
 }
 
 pub async fn exchange_code_for_token(
@@ -145,5 +160,25 @@ fn resolve_expiry(expires_at: Option<String>, expires_in: Option<i64>) -> Option
             Some((Utc::now() + Duration::seconds(seconds)).to_rfc3339())
         }
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn oauth_is_configured_is_false_for_placeholder_defaults() {
+        std::env::remove_var("SOUL_OAUTH_CHATGPT_CLIENT_ID");
+        std::env::remove_var("SOUL_OAUTH_GEMINI_CLIENT_ID");
+        assert!(!oauth_is_configured(&Provider::ChatGpt));
+        assert!(!oauth_is_configured(&Provider::Gemini));
+    }
+
+    #[test]
+    fn oauth_is_configured_is_true_when_provider_client_id_is_set() {
+        std::env::set_var("SOUL_OAUTH_CHATGPT_CLIENT_ID", "real-client-id");
+        assert!(oauth_is_configured(&Provider::ChatGpt));
+        std::env::remove_var("SOUL_OAUTH_CHATGPT_CLIENT_ID");
     }
 }

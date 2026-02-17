@@ -13,12 +13,14 @@ use super::import_render;
 use crate::core::pipeline::{ImportProgress, ImportResult};
 use crate::tui::app::App;
 use crate::tui::pages::{PageAction, PageWidget};
+use crate::types::Provider;
 use crate::ui::theme::rat;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImportMode {
     Providers,
     Folder,
+    Cloud,
 }
 
 #[derive(Debug, Clone)]
@@ -48,12 +50,31 @@ pub enum FolderPhase {
     Error(String),
 }
 
+#[derive(Debug, Clone)]
+pub enum CloudPhase {
+    Ready {
+        provider_index: usize,
+    },
+    Running {
+        provider: Provider,
+        state_label: String,
+        current: usize,
+        total: usize,
+        progress: Vec<String>,
+    },
+    Done {
+        summary: Vec<String>,
+    },
+    Error(String),
+}
+
 pub struct ImportPage {
     mode: ImportMode,
     input: String,
     cursor: usize,
     pub provider_phase: ProviderPhase,
     pub folder_phase: FolderPhase,
+    pub cloud_phase: CloudPhase,
 }
 
 impl Default for ImportPage {
@@ -64,6 +85,7 @@ impl Default for ImportPage {
             cursor: 0,
             provider_phase: ProviderPhase::Ready,
             folder_phase: FolderPhase::Input,
+            cloud_phase: CloudPhase::Ready { provider_index: 0 },
         }
     }
 }
@@ -115,8 +137,50 @@ impl ImportPage {
     fn switch_mode(&mut self) {
         self.mode = match self.mode {
             ImportMode::Providers => ImportMode::Folder,
-            ImportMode::Folder => ImportMode::Providers,
+            ImportMode::Folder => ImportMode::Cloud,
+            ImportMode::Cloud => ImportMode::Providers,
         };
+    }
+
+    pub fn on_cloud_progress(
+        &mut self,
+        provider: Provider,
+        state_label: String,
+        current: usize,
+        total: usize,
+        msg: String,
+    ) {
+        match &mut self.cloud_phase {
+            CloudPhase::Running {
+                provider: running_provider,
+                progress,
+                state_label: running_state,
+                current: running_current,
+                total: running_total,
+            } if *running_provider == provider => {
+                *running_state = state_label;
+                *running_current = current;
+                *running_total = total;
+                progress.push(msg);
+            }
+            _ => {
+                self.cloud_phase = CloudPhase::Running {
+                    provider,
+                    state_label,
+                    current,
+                    total,
+                    progress: vec![msg],
+                };
+            }
+        }
+    }
+
+    pub fn on_cloud_done(&mut self, summary: Vec<String>) {
+        self.cloud_phase = CloudPhase::Done { summary };
+    }
+
+    pub fn on_cloud_error(&mut self, msg: String) {
+        self.cloud_phase = CloudPhase::Error(msg);
     }
 }
 
@@ -130,6 +194,7 @@ impl PageWidget for ImportPage {
         let mode_label = match self.mode {
             ImportMode::Providers => " Import — Providers ",
             ImportMode::Folder => " Import — Folder ",
+            ImportMode::Cloud => " Import — Cloud ",
         };
 
         let block = Block::default()
@@ -176,6 +241,7 @@ impl PageWidget for ImportPage {
                 }
                 FolderPhase::Error(msg) => import_render::render_error(inner, buf, msg),
             },
+            ImportMode::Cloud => render_cloud(inner, buf, &self.cloud_phase),
         }
     }
 
@@ -193,6 +259,126 @@ impl PageWidget for ImportPage {
                 &mut self.cursor,
                 &mut self.folder_phase,
             ),
+            ImportMode::Cloud => handle_cloud_key(key, &mut self.cloud_phase),
+        }
+    }
+}
+
+fn render_cloud(area: Rect, buf: &mut Buffer, phase: &CloudPhase) {
+    use ratatui::text::{Line, Span};
+    use ratatui::widgets::{Paragraph, Widget};
+
+    match phase {
+        CloudPhase::Ready { provider_index } => {
+            let providers = [Provider::Claude, Provider::ChatGpt, Provider::Gemini];
+            let mut lines = vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    "  Cloud mode — explicit provider selection required",
+                    Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
+                )),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "  Up/Down to choose provider, Enter to start",
+                    Style::default(),
+                )),
+                Line::from(Span::styled(
+                    "  Tab to switch mode, Esc to go back",
+                    Style::default().fg(rat::DIM),
+                )),
+                Line::from(""),
+            ];
+
+            for (i, provider) in providers.iter().enumerate() {
+                let selected = i == *provider_index;
+                let prefix = if selected { ">" } else { " " };
+                let style = if selected {
+                    Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(rat::DIM)
+                };
+                let label = if matches!(provider, Provider::Claude) {
+                    format!("{} (export-only)", provider.display_name())
+                } else {
+                    provider.display_name().to_string()
+                };
+                lines.push(Line::from(Span::styled(
+                    format!("  {} {}", prefix, label),
+                    style,
+                )));
+            }
+
+            Paragraph::new(lines).render(area, buf);
+        }
+        CloudPhase::Running {
+            provider,
+            state_label,
+            current,
+            total,
+            progress,
+        } => {
+            let mut lines = vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    format!("  {} cloud import running", provider.display_name()),
+                    Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
+                )),
+                Line::from(Span::styled(
+                    format!("  State: {} ({}/{})", state_label, current, total),
+                    Style::default().fg(rat::DIM),
+                )),
+                Line::from(Span::styled(
+                    "  Press x to cancel",
+                    Style::default().fg(rat::DIM),
+                )),
+                Line::from(""),
+            ];
+
+            let max_lines = area.height.saturating_sub(lines.len() as u16) as usize;
+            let start = progress.len().saturating_sub(max_lines);
+            for line in progress.iter().skip(start) {
+                lines.push(Line::from(Span::styled(
+                    format!("  {}", line),
+                    Style::default().fg(rat::DIM),
+                )));
+            }
+            Paragraph::new(lines).render(area, buf);
+        }
+        CloudPhase::Done { summary } => {
+            let mut lines = vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    "  + Cloud import complete!",
+                    Style::default()
+                        .fg(rat::EMERALD)
+                        .add_modifier(Modifier::BOLD),
+                )),
+                Line::from(""),
+            ];
+            for msg in summary {
+                lines.push(Line::from(format!("  {}", msg)));
+            }
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "  Enter to run again, Tab to switch mode, Esc to go back",
+                Style::default().fg(rat::DIM),
+            )));
+            Paragraph::new(lines).render(area, buf);
+        }
+        CloudPhase::Error(msg) => {
+            let lines = vec![
+                Line::from(""),
+                Line::from(Span::styled(
+                    format!("  x {}", msg),
+                    Style::default().fg(rat::RED),
+                )),
+                Line::from(""),
+                Line::from(Span::styled(
+                    "  Enter to try again, Tab to switch mode, Esc to go back",
+                    Style::default().fg(rat::DIM),
+                )),
+            ];
+            Paragraph::new(lines).render(area, buf);
         }
     }
 }
@@ -257,5 +443,47 @@ fn handle_folder_key(
                 _ => PageAction::Ignored,
             }
         }
+    }
+}
+
+fn handle_cloud_key(key: KeyEvent, phase: &mut CloudPhase) -> PageAction {
+    match phase {
+        CloudPhase::Ready { provider_index } => match key.code {
+            KeyCode::Left | KeyCode::Esc => PageAction::BackToSidebar,
+            KeyCode::Up => {
+                *provider_index = provider_index.saturating_sub(1);
+                PageAction::Consumed
+            }
+            KeyCode::Down => {
+                *provider_index = (*provider_index + 1).min(2);
+                PageAction::Consumed
+            }
+            KeyCode::Enter => {
+                let provider = match *provider_index {
+                    0 => Provider::Claude,
+                    1 => Provider::ChatGpt,
+                    _ => Provider::Gemini,
+                };
+                PageAction::StartCloudImport(provider)
+            }
+            _ => PageAction::Ignored,
+        },
+        CloudPhase::Running { .. } => match key.code {
+            KeyCode::Left => PageAction::BackToSidebar,
+            KeyCode::Char('x') => PageAction::CancelCloudImport,
+            _ => PageAction::Consumed,
+        },
+        CloudPhase::Done { .. } | CloudPhase::Error(_) => match key.code {
+            KeyCode::Left => PageAction::BackToSidebar,
+            KeyCode::Enter | KeyCode::Char('r') => {
+                *phase = CloudPhase::Ready { provider_index: 0 };
+                PageAction::Consumed
+            }
+            KeyCode::Esc => {
+                *phase = CloudPhase::Ready { provider_index: 0 };
+                PageAction::BackToSidebar
+            }
+            _ => PageAction::Ignored,
+        },
     }
 }
