@@ -21,12 +21,25 @@ use crate::vault::config::{
 
 #[derive(Default)]
 pub struct SettingsPage {
-    selected_connection: usize,
+    selected_item: usize,
     pending_oauth: bool,
     status_message: Option<(bool, String)>,
     setup_flow: Option<SetupFlow>,
     reset_flow: Option<ResetFlow>,
     pending_processing_provider: Option<Provider>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum SettingsItem {
+    ProcessingDisabled,
+    ProcessingClaude,
+    ProcessingChatGpt,
+    ProcessingGemini,
+    ProcessingCloud,
+    ConnectionClaude,
+    ConnectionChatGpt,
+    ConnectionGemini,
+    DangerReset,
 }
 
 #[derive(Debug, Clone)]
@@ -107,16 +120,14 @@ impl PageWidget for SettingsPage {
                 PageAction::Consumed
             }
             KeyCode::Char('j') | KeyCode::Down => {
-                self.selected_connection =
-                    (self.selected_connection + 1) % connection_providers().len();
+                self.move_selection_down();
                 PageAction::Consumed
             }
             KeyCode::Char('k') | KeyCode::Up => {
-                let len = connection_providers().len();
-                self.selected_connection = (self.selected_connection + len - 1) % len;
+                self.move_selection_up();
                 PageAction::Consumed
             }
-            KeyCode::Enter => self.select_connection_action(),
+            KeyCode::Enter => self.activate_selected_item(),
             KeyCode::Esc => PageAction::BackToSidebar,
             _ => PageAction::Ignored,
         }
@@ -155,11 +166,64 @@ impl SettingsPage {
         self.status_message = Some((false, message));
     }
 
-    fn selected_provider(&self) -> Provider {
-        connection_providers()[self.selected_connection].clone()
+    fn selectable_items() -> &'static [SettingsItem] {
+        &[
+            SettingsItem::ProcessingDisabled,
+            SettingsItem::ProcessingClaude,
+            SettingsItem::ProcessingChatGpt,
+            SettingsItem::ProcessingGemini,
+            SettingsItem::ProcessingCloud,
+            SettingsItem::ConnectionClaude,
+            SettingsItem::ConnectionChatGpt,
+            SettingsItem::ConnectionGemini,
+            SettingsItem::DangerReset,
+        ]
     }
 
-    fn select_connection_action(&mut self) -> PageAction {
+    fn current_item(&self) -> SettingsItem {
+        Self::selectable_items()
+            .get(self.selected_item)
+            .copied()
+            .unwrap_or(SettingsItem::ProcessingDisabled)
+    }
+
+    fn move_selection_down(&mut self) {
+        let len = Self::selectable_items().len();
+        self.selected_item = (self.selected_item + 1) % len;
+    }
+
+    fn move_selection_up(&mut self) {
+        let len = Self::selectable_items().len();
+        self.selected_item = (self.selected_item + len - 1) % len;
+    }
+
+    fn activate_selected_item(&mut self) -> PageAction {
+        match self.current_item() {
+            SettingsItem::ProcessingDisabled => {
+                self.apply_processing_mode(ProcessingMode::Disabled)
+            }
+            SettingsItem::ProcessingClaude => self.apply_processing_mode(ProcessingMode::Claude),
+            SettingsItem::ProcessingChatGpt => self.apply_processing_mode(ProcessingMode::ChatGpt),
+            SettingsItem::ProcessingGemini => self.apply_processing_mode(ProcessingMode::Gemini),
+            SettingsItem::ProcessingCloud => {
+                self.status_message = Some((
+                    false,
+                    "Soul Vault Cloud processing is coming soon. Choose 1-4 for now.".to_string(),
+                ));
+                PageAction::Consumed
+            }
+            SettingsItem::ConnectionClaude => self.select_connection_action_for(Provider::Claude),
+            SettingsItem::ConnectionChatGpt => self.select_connection_action_for(Provider::ChatGpt),
+            SettingsItem::ConnectionGemini => self.select_connection_action_for(Provider::Gemini),
+            SettingsItem::DangerReset => {
+                self.reset_flow = Some(ResetFlow::Confirm { selected: 0 });
+                self.status_message = None;
+                PageAction::Consumed
+            }
+        }
+    }
+
+    fn select_connection_action_for(&mut self, provider: Provider) -> PageAction {
         let config = match read_config() {
             Ok(cfg) => cfg,
             Err(e) => {
@@ -168,7 +232,6 @@ impl SettingsPage {
             }
         };
 
-        let provider = self.selected_provider();
         let state = connection_state(&config, &provider);
         match state.action {
             ConnectionAction::Connect => {
@@ -577,7 +640,10 @@ fn render_settings(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
         Line::from(""),
     ];
 
-    lines.extend(processing_mode_lines(&config.processing_mode));
+    lines.extend(processing_mode_lines(
+        &config.processing_mode,
+        page.current_item(),
+    ));
     lines.extend([
         Line::from(""),
         section_header("  Providers"),
@@ -604,7 +670,7 @@ fn render_settings(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
     lines.push(Line::from(""));
     lines.push(section_header("  Connections"));
     lines.push(Line::from(""));
-    lines.extend(connection_lines(&config, page.selected_connection));
+    lines.extend(connection_lines(&config, page.current_item()));
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         "  Danger zone",
@@ -615,9 +681,19 @@ fn render_settings(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
         "    Reset will move your vault to Trash.",
         Style::default().fg(rat::DIM),
     )));
+    let danger_style = if page.current_item() == SettingsItem::DangerReset {
+        Style::default().fg(rat::RED).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(rat::RED)
+    };
+    let danger_prefix = if page.current_item() == SettingsItem::DangerReset {
+        "  >"
+    } else {
+        "   "
+    };
     lines.push(Line::from(Span::styled(
-        "    Press X to reset vault (typed confirmation required)",
-        Style::default().fg(rat::RED),
+        format!("{danger_prefix} Press X to reset vault (typed confirmation required)"),
+        danger_style,
     )));
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
@@ -678,13 +754,18 @@ fn connection_providers() -> Vec<Provider> {
     vec![Provider::Claude, Provider::ChatGpt, Provider::Gemini]
 }
 
-fn connection_lines(config: &SoulVaultConfig, selected_idx: usize) -> Vec<Line<'static>> {
+fn connection_lines(config: &SoulVaultConfig, selected_item: SettingsItem) -> Vec<Line<'static>> {
     connection_providers()
         .into_iter()
         .enumerate()
         .map(|(idx, provider)| {
             let state = connection_state(config, &provider);
-            let selected = idx == selected_idx;
+            let selected = matches!(
+                (idx, selected_item),
+                (0, SettingsItem::ConnectionClaude)
+                    | (1, SettingsItem::ConnectionChatGpt)
+                    | (2, SettingsItem::ConnectionGemini)
+            );
             let prefix = if selected { "  > " } else { "    " };
             let name_style = if selected {
                 Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD)
@@ -741,7 +822,7 @@ fn connection_state(config: &SoulVaultConfig, provider: &Provider) -> Connection
     }
 }
 
-fn processing_mode_lines(mode: &ProcessingMode) -> Vec<Line<'static>> {
+fn processing_mode_lines(mode: &ProcessingMode, selected_item: SettingsItem) -> Vec<Line<'static>> {
     let options = [
         (
             1usize,
@@ -757,23 +838,38 @@ fn processing_mode_lines(mode: &ProcessingMode) -> Vec<Line<'static>> {
         .iter()
         .map(|(idx, candidate, label)| {
             let selected = *mode == *candidate;
+            let option_selected = matches!(
+                (idx, selected_item),
+                (1, SettingsItem::ProcessingDisabled)
+                    | (2, SettingsItem::ProcessingClaude)
+                    | (3, SettingsItem::ProcessingChatGpt)
+                    | (4, SettingsItem::ProcessingGemini)
+            );
             let marker = if selected { "•" } else { " " };
-            let color = if selected { rat::EMERALD } else { rat::DIM };
+            let color = if option_selected {
+                rat::GOLD
+            } else if selected {
+                rat::EMERALD
+            } else {
+                rat::DIM
+            };
+            let prefix = if option_selected { "  >" } else { "   " };
             Line::from(vec![
-                Span::raw("    "),
+                Span::raw(prefix),
                 Span::styled(
-                    format!("{} {}. {}", marker, idx, label),
+                    format!(" {} {}. {}", marker, idx, label),
                     Style::default().fg(color),
                 ),
             ])
         })
         .collect();
 
+    let cloud_selected = selected_item == SettingsItem::ProcessingCloud;
     lines.push(Line::from(vec![
-        Span::raw("    "),
+        Span::raw(if cloud_selected { "  >" } else { "   " }),
         Span::styled(
             "  5. Soul Vault Cloud (coming soon)",
-            Style::default().fg(rat::DIM),
+            Style::default().fg(if cloud_selected { rat::GOLD } else { rat::DIM }),
         ),
     ]));
     lines
