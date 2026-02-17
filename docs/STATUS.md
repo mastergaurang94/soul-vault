@@ -34,6 +34,14 @@ Last updated: 2026-02-17
   - TUI Import now has a dedicated Cloud mode with explicit provider selection, async job-state progress, and cancellation (`x`)
   - cloud source tracking now stores provider conversation IDs + markers/hashes to skip unchanged imports
   - init/settings/login now treat OAuth readiness as provider-scoped configuration (`configured` vs `not configured`) instead of ChatGPT/Gemini "coming soon" placeholders
+  - provider-native OAuth handoff now works for ChatGPT/Gemini via installed CLIs:
+    - ChatGPT OAuth runs through Codex CLI login and imports credentials into Soul Vault auth store
+    - Gemini OAuth imports Gemini CLI credentials (and can launch Gemini CLI for first-time login)
+    - imported OAuth credentials are now verified against provider cloud API before connection is marked successful
+    - if provider CLI is missing, init/settings show actionable install guidance and keep API key path available
+  - Claude now follows OpenClaw-style subscription auth in UX:
+    - Settings/init expose `setup-token` entry for Claude (alongside API key)
+    - setup-token is saved into Soul Vault auth store for provider-scoped cloud access
 - [x] Vault reset safety command landed:
   - `soul reset` with confirmation flow
   - `soul reset --force` for non-interactive use
@@ -107,7 +115,7 @@ Last updated: 2026-02-17
 ## 📋 Backlog
 
 - [ ] Add OpenClaw as a first-class configurable provider in init/settings/status
-- [ ] Provider-cloud integration tests with mocked API pagination/retry/refresh coverage
+- [x] Provider-cloud integration tests with mocked API pagination/retry/refresh coverage
 - [ ] Managed `Soul Vault Cloud` processing option in onboarding (default processor path)
 - [ ] `SOUL_VAULT_VAULT_PATH` env var for multi-vault/test workflows
 - [ ] `soul search` — full-text vault search

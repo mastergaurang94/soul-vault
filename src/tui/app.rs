@@ -17,8 +17,8 @@ pub enum Page {
 impl Page {
     pub const ALL: &[Page] = &[
         Page::Status,
-        Page::Import,
         Page::Browse,
+        Page::Import,
         Page::Export,
         Page::Watch,
         Page::Settings,
@@ -123,8 +123,8 @@ mod tests {
     #[test]
     fn test_page_labels() {
         assert_eq!(Page::Status.label(), "Status");
-        assert_eq!(Page::Import.label(), "Import");
         assert_eq!(Page::Browse.label(), "Browse");
+        assert_eq!(Page::Import.label(), "Import");
         assert_eq!(Page::Export.label(), "Export");
         assert_eq!(Page::Watch.label(), "Watch");
         assert_eq!(Page::Settings.label(), "Settings");
@@ -154,7 +154,7 @@ mod tests {
         let mut app = App::new();
         app.sidebar_selected = 2;
         app.confirm_sidebar();
-        assert_eq!(app.current_page, Page::Browse);
+        assert_eq!(app.current_page, Page::Import);
         assert_eq!(app.focus, Focus::Content);
     }
 
@@ -163,8 +163,8 @@ mod tests {
         let mut app = App::new();
         let expected = [
             Page::Status,
-            Page::Import,
             Page::Browse,
+            Page::Import,
             Page::Export,
             Page::Watch,
             Page::Settings,

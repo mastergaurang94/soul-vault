@@ -1,4 +1,4 @@
-//! Settings page — vault config overview with provider connections.
+//! Settings page — vault config overview with provider credential and processing controls.
 
 use crossterm::event::{KeyCode, KeyEvent};
 use ratatui::{
@@ -9,7 +9,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph, Widget},
 };
 
-use crate::auth::{is_logged_in, oauth_is_configured, remove_credentials};
+use crate::auth::{is_logged_in, oauth_connect_available, remove_credentials, save_setup_token};
 use crate::tui::app::App;
 use crate::tui::pages::{PageAction, PageWidget};
 use crate::types::{ProcessingMode, Provider, SoulVaultConfig};
@@ -24,57 +24,62 @@ pub struct SettingsPage {
     selected_item: usize,
     pending_oauth: bool,
     status_message: Option<(bool, String)>,
+    status_from_subflow: bool,
     setup_flow: Option<SetupFlow>,
     reset_flow: Option<ResetFlow>,
     pending_processing_provider: Option<Provider>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SettingsItem {
-    ProcessingDisabled,
-    ProcessingClaude,
-    ProcessingChatGpt,
-    ProcessingGemini,
-    ProcessingCloud,
-    ConnectionClaude,
-    ConnectionChatGpt,
-    ConnectionGemini,
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum SelectableItem {
+    Credential(Provider),
+    Processing(ProcessingChoice),
     DangerReset,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ProcessingChoice {
+    Disabled,
+    Claude,
+    ChatGpt,
+    Gemini,
+    Cloud,
 }
 
 #[derive(Debug, Clone)]
 enum SetupFlow {
-    ChooseAuth {
+    AuthMenu {
         provider: Provider,
         selected: usize,
+        set_processing_on_success: bool,
     },
     EnterApiKey {
         provider: Provider,
         input: String,
         cursor: usize,
         submitting: bool,
+        set_processing_on_success: bool,
     },
+    EnterSetupToken {
+        provider: Provider,
+        input: String,
+        cursor: usize,
+        set_processing_on_success: bool,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AuthAction {
+    ApiKey,
+    ClaudeSetupToken,
+    OAuth,
+    Back,
 }
 
 #[derive(Debug, Clone)]
 enum ResetFlow {
-    Confirm { selected: usize }, // 0 = Cancel, 1 = Reset vault
+    Confirm { selected: usize },
     TypeConfirm { input: String },
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum ConnectionAction {
-    Connect,
-    Disconnect,
-    Setup,
-    ConfigureOAuth,
-}
-
-struct ConnectionState {
-    label: &'static str,
-    color: ratatui::style::Color,
-    action: ConnectionAction,
-    action_label: Option<&'static str>,
 }
 
 impl PageWidget for SettingsPage {
@@ -83,18 +88,27 @@ impl PageWidget for SettingsPage {
             render_not_init(area, buf);
             return;
         }
-        render_settings(area, buf, self);
+
+        if let Some(flow) = &self.setup_flow {
+            render_setup_flow(area, buf, flow, self.status_message.as_ref());
+            return;
+        }
+
+        if let Some(flow) = &self.reset_flow {
+            render_reset_flow(area, buf, flow, self.status_message.as_ref());
+            return;
+        }
+
+        render_settings_main(area, buf, self);
     }
 
     fn handle_key(&mut self, key: KeyEvent, app: &mut App) -> PageAction {
         if self.reset_flow.is_some() {
             return self.handle_reset_flow_key(key, app);
         }
-
         if self.setup_flow.is_some() {
             return self.handle_setup_flow_key(key);
         }
-
         if self.pending_oauth {
             return match key.code {
                 KeyCode::Esc => PageAction::BackToSidebar,
@@ -103,22 +117,6 @@ impl PageWidget for SettingsPage {
         }
 
         match key.code {
-            KeyCode::Char('1') => self.apply_processing_mode(ProcessingMode::Disabled),
-            KeyCode::Char('2') => self.apply_processing_mode(ProcessingMode::Claude),
-            KeyCode::Char('3') => self.apply_processing_mode(ProcessingMode::ChatGpt),
-            KeyCode::Char('4') => self.apply_processing_mode(ProcessingMode::Gemini),
-            KeyCode::Char('5') => {
-                self.status_message = Some((
-                    false,
-                    "Soul Vault Cloud processing is coming soon. Choose 1-4 for now.".to_string(),
-                ));
-                PageAction::Consumed
-            }
-            KeyCode::Char('x') | KeyCode::Char('X') => {
-                self.reset_flow = Some(ResetFlow::Confirm { selected: 0 });
-                self.status_message = None;
-                PageAction::Consumed
-            }
             KeyCode::Char('j') | KeyCode::Down => {
                 self.move_selection_down();
                 PageAction::Consumed
@@ -128,6 +126,11 @@ impl PageWidget for SettingsPage {
                 PageAction::Consumed
             }
             KeyCode::Enter => self.activate_selected_item(),
+            KeyCode::Char('x') | KeyCode::Char('X') => {
+                self.reset_flow = Some(ResetFlow::Confirm { selected: 0 });
+                self.clear_status();
+                PageAction::Consumed
+            }
             KeyCode::Esc => PageAction::BackToSidebar,
             _ => PageAction::Ignored,
         }
@@ -135,6 +138,21 @@ impl PageWidget for SettingsPage {
 }
 
 impl SettingsPage {
+    fn clear_status(&mut self) {
+        self.status_message = None;
+        self.status_from_subflow = false;
+    }
+
+    fn set_status_main(&mut self, ok: bool, message: impl Into<String>) {
+        self.status_message = Some((ok, message.into()));
+        self.status_from_subflow = false;
+    }
+
+    fn set_status_subflow(&mut self, ok: bool, message: impl Into<String>) {
+        self.status_message = Some((ok, message.into()));
+        self.status_from_subflow = true;
+    }
+
     pub fn on_oauth_complete(&mut self, ok: bool, message: String) {
         self.pending_oauth = false;
         if ok {
@@ -146,45 +164,51 @@ impl SettingsPage {
         } else {
             self.pending_processing_provider = None;
         }
-        self.status_message = Some((ok, message));
+        self.set_status_subflow(ok, message);
     }
 
     pub fn on_api_key_complete(&mut self, ok: bool, provider: Provider, message: String) {
         if ok {
-            self.finalize_processing_provider(provider);
+            if self.pending_processing_provider.as_ref() == Some(&provider) {
+                self.finalize_processing_provider(provider);
+                self.pending_processing_provider = None;
+                self.setup_flow = None;
+                self.set_status_subflow(true, message);
+                return;
+            }
             self.setup_flow = None;
-            self.status_message = Some((true, message));
+            self.set_status_subflow(true, message);
             return;
         }
-        self.status_message = Some((false, message));
+        self.set_status_subflow(false, message);
     }
 
     pub fn on_api_key_error(&mut self, message: String) {
         if let Some(SetupFlow::EnterApiKey { submitting, .. }) = &mut self.setup_flow {
             *submitting = false;
         }
-        self.status_message = Some((false, message));
+        self.set_status_subflow(false, message);
     }
 
-    fn selectable_items() -> &'static [SettingsItem] {
-        &[
-            SettingsItem::ProcessingDisabled,
-            SettingsItem::ProcessingClaude,
-            SettingsItem::ProcessingChatGpt,
-            SettingsItem::ProcessingGemini,
-            SettingsItem::ProcessingCloud,
-            SettingsItem::ConnectionClaude,
-            SettingsItem::ConnectionChatGpt,
-            SettingsItem::ConnectionGemini,
-            SettingsItem::DangerReset,
+    fn selectable_items() -> Vec<SelectableItem> {
+        vec![
+            SelectableItem::Credential(Provider::Claude),
+            SelectableItem::Credential(Provider::ChatGpt),
+            SelectableItem::Credential(Provider::Gemini),
+            SelectableItem::Processing(ProcessingChoice::Disabled),
+            SelectableItem::Processing(ProcessingChoice::Claude),
+            SelectableItem::Processing(ProcessingChoice::ChatGpt),
+            SelectableItem::Processing(ProcessingChoice::Gemini),
+            SelectableItem::Processing(ProcessingChoice::Cloud),
+            SelectableItem::DangerReset,
         ]
     }
 
-    fn current_item(&self) -> SettingsItem {
+    fn current_item(&self) -> SelectableItem {
         Self::selectable_items()
             .get(self.selected_item)
-            .copied()
-            .unwrap_or(SettingsItem::ProcessingDisabled)
+            .cloned()
+            .unwrap_or(SelectableItem::Credential(Provider::Claude))
     }
 
     fn move_selection_down(&mut self) {
@@ -199,132 +223,79 @@ impl SettingsPage {
 
     fn activate_selected_item(&mut self) -> PageAction {
         match self.current_item() {
-            SettingsItem::ProcessingDisabled => {
-                self.apply_processing_mode(ProcessingMode::Disabled)
-            }
-            SettingsItem::ProcessingClaude => self.apply_processing_mode(ProcessingMode::Claude),
-            SettingsItem::ProcessingChatGpt => self.apply_processing_mode(ProcessingMode::ChatGpt),
-            SettingsItem::ProcessingGemini => self.apply_processing_mode(ProcessingMode::Gemini),
-            SettingsItem::ProcessingCloud => {
-                self.status_message = Some((
-                    false,
-                    "Soul Vault Cloud processing is coming soon. Choose 1-4 for now.".to_string(),
-                ));
+            SelectableItem::Credential(provider) => {
+                self.open_auth_menu(provider, false);
                 PageAction::Consumed
             }
-            SettingsItem::ConnectionClaude => self.select_connection_action_for(Provider::Claude),
-            SettingsItem::ConnectionChatGpt => self.select_connection_action_for(Provider::ChatGpt),
-            SettingsItem::ConnectionGemini => self.select_connection_action_for(Provider::Gemini),
-            SettingsItem::DangerReset => {
+            SelectableItem::Processing(choice) => self.apply_processing_choice(choice),
+            SelectableItem::DangerReset => {
                 self.reset_flow = Some(ResetFlow::Confirm { selected: 0 });
-                self.status_message = None;
+                self.clear_status();
                 PageAction::Consumed
             }
         }
     }
 
-    fn select_connection_action_for(&mut self, provider: Provider) -> PageAction {
-        let config = match read_config() {
-            Ok(cfg) => cfg,
-            Err(e) => {
-                self.status_message = Some((false, format!("Failed to read config: {e}")));
-                return PageAction::Consumed;
-            }
-        };
-
-        let state = connection_state(&config, &provider);
-        match state.action {
-            ConnectionAction::Connect => {
-                self.pending_oauth = true;
-                self.status_message = Some((
-                    true,
-                    format!("Starting OAuth for {}...", provider.display_name()),
-                ));
-                PageAction::StartOAuthConnect(provider)
-            }
-            ConnectionAction::Disconnect => {
-                match remove_credentials(&provider) {
-                    Ok(true) => {
-                        self.status_message =
-                            Some((true, format!("Disconnected {}.", provider.display_name())))
-                    }
-                    Ok(false) => {
-                        self.status_message = Some((
-                            false,
-                            format!("No active {} connection.", provider.display_name()),
-                        ))
-                    }
-                    Err(e) => {
-                        self.status_message = Some((false, format!("Disconnect failed: {e}")));
-                    }
-                }
-                PageAction::Consumed
-            }
-            ConnectionAction::Setup => {
-                self.status_message = Some((
-                    false,
-                    format!("Set up {} in `soul init` first.", provider.display_name()),
-                ));
-                PageAction::Consumed
-            }
-            ConnectionAction::ConfigureOAuth => {
-                self.status_message = Some((
-                    false,
-                    format!(
-                        "OAuth for {} is not configured. Set provider OAuth env vars first.",
-                        provider.display_name()
-                    ),
-                ));
-                PageAction::Consumed
-            }
-        }
-    }
-
-    fn apply_processing_mode(&mut self, mode: ProcessingMode) -> PageAction {
-        if matches!(mode, ProcessingMode::Disabled) {
-            let mut config = match read_config() {
-                Ok(cfg) => cfg,
-                Err(e) => {
-                    self.status_message = Some((false, format!("Failed to read config: {e}")));
-                    return PageAction::Consumed;
-                }
-            };
-            config.processing_mode = ProcessingMode::Disabled;
-            if let Err(e) = write_config(&config) {
-                self.status_message = Some((false, format!("Failed to update config: {e}")));
-                return PageAction::Consumed;
-            }
-            self.status_message =
-                Some((true, "Processing set to Disabled (raw mode).".to_string()));
-            return PageAction::Consumed;
-        }
-
-        let provider = match mode.as_provider() {
-            Some(provider) => provider,
-            None => return PageAction::Consumed,
-        };
-
-        if provider_has_credentials(&provider) {
-            self.finalize_processing_provider(provider);
-            return PageAction::Consumed;
-        }
-
-        self.setup_flow = Some(SetupFlow::ChooseAuth {
+    fn open_auth_menu(&mut self, provider: Provider, set_processing_on_success: bool) {
+        // Avoid leaking stale main-screen status into auth-specific subflows.
+        self.clear_status();
+        self.setup_flow = Some(SetupFlow::AuthMenu {
             provider,
             selected: 0,
+            set_processing_on_success,
         });
-        self.status_message = Some((
-            false,
-            "Credentials required. Choose API key or OAuth to continue.".to_string(),
-        ));
-        PageAction::Consumed
+    }
+
+    fn apply_processing_choice(&mut self, choice: ProcessingChoice) -> PageAction {
+        match choice {
+            ProcessingChoice::Disabled => {
+                let mut config = match read_config() {
+                    Ok(cfg) => cfg,
+                    Err(e) => {
+                        self.set_status_main(false, format!("Failed to read config: {e}"));
+                        return PageAction::Consumed;
+                    }
+                };
+                config.processing_mode = ProcessingMode::Disabled;
+                if let Err(e) = write_config(&config) {
+                    self.set_status_main(false, format!("Failed to update config: {e}"));
+                    return PageAction::Consumed;
+                }
+                self.set_status_main(true, "Processing set to Disabled (raw mode).");
+                PageAction::Consumed
+            }
+            ProcessingChoice::Cloud => {
+                self.set_status_main(
+                    false,
+                    "Soul Vault Cloud processing is coming soon. Choose Claude, ChatGPT, Gemini, or Disabled.",
+                );
+                PageAction::Consumed
+            }
+            ProcessingChoice::Claude | ProcessingChoice::ChatGpt | ProcessingChoice::Gemini => {
+                let provider = choice.provider().expect("provider choice");
+                if provider_has_credentials(&provider) {
+                    self.finalize_processing_provider(provider);
+                    return PageAction::Consumed;
+                }
+
+                self.open_auth_menu(provider.clone(), true);
+                self.set_status_subflow(
+                    false,
+                    format!(
+                        "{} needs credentials before it can be used for processing.",
+                        provider.display_name()
+                    ),
+                );
+                PageAction::Consumed
+            }
+        }
     }
 
     fn finalize_processing_provider(&mut self, provider: Provider) {
         let mut config = match read_config() {
             Ok(cfg) => cfg,
             Err(e) => {
-                self.status_message = Some((false, format!("Failed to read config: {e}")));
+                self.set_status_main(false, format!("Failed to read config: {e}"));
                 return;
             }
         };
@@ -334,13 +305,10 @@ impl SettingsPage {
         }
         config.processing_mode = ProcessingMode::from_provider(&provider);
         if let Err(e) = write_config(&config) {
-            self.status_message = Some((false, format!("Failed to update config: {e}")));
+            self.set_status_main(false, format!("Failed to update config: {e}"));
             return;
         }
-        self.status_message = Some((
-            true,
-            format!("Processing set to {}.", provider.display_name()),
-        ));
+        self.set_status_main(true, format!("Processing set to {}.", provider.display_name()));
     }
 
     fn handle_setup_flow_key(&mut self, key: KeyEvent) -> PageAction {
@@ -350,73 +318,88 @@ impl SettingsPage {
         };
 
         match flow {
-            SetupFlow::ChooseAuth {
+            SetupFlow::AuthMenu {
                 provider,
                 mut selected,
+                set_processing_on_success,
             } => {
-                let oauth_available = oauth_supported(&provider);
+                let actions = auth_actions_for_provider(&provider);
+                if actions.is_empty() {
+                    self.setup_flow = None;
+                    return PageAction::Consumed;
+                }
+
                 match key.code {
                     KeyCode::Char('j') | KeyCode::Down => {
-                        selected = (selected + 1) % 3;
-                        self.setup_flow = Some(SetupFlow::ChooseAuth { provider, selected });
+                        selected = (selected + 1) % actions.len();
+                        self.setup_flow = Some(SetupFlow::AuthMenu {
+                            provider,
+                            selected,
+                            set_processing_on_success,
+                        });
                         PageAction::Consumed
                     }
                     KeyCode::Char('k') | KeyCode::Up => {
-                        selected = (selected + 2) % 3;
-                        self.setup_flow = Some(SetupFlow::ChooseAuth { provider, selected });
+                        selected = (selected + actions.len() - 1) % actions.len();
+                        self.setup_flow = Some(SetupFlow::AuthMenu {
+                            provider,
+                            selected,
+                            set_processing_on_success,
+                        });
                         PageAction::Consumed
                     }
-                    KeyCode::Enter => {
-                        match selected {
-                            0 => {
-                                self.setup_flow = Some(SetupFlow::EnterApiKey {
-                                    provider,
-                                    input: String::new(),
-                                    cursor: 0,
-                                    submitting: false,
-                                });
-                            }
-                            1 => {
-                                if oauth_available {
-                                    self.pending_oauth = true;
-                                    self.pending_processing_provider = Some(provider.clone());
-                                    self.status_message = Some((
-                                        true,
-                                        format!(
-                                            "Starting OAuth for {}...",
-                                            provider.display_name()
-                                        ),
-                                    ));
-                                    self.setup_flow = None;
-                                    return PageAction::StartOAuthConnect(provider);
-                                } else {
-                                    self.status_message = Some((
-                                        false,
-                                        format!(
-                                            "OAuth for {} is not configured. Set provider OAuth env vars or use API key.",
-                                            provider.display_name()
-                                        ),
-                                    ));
-                                }
-                            }
-                            _ => {
-                                self.setup_flow = None;
+                    KeyCode::Enter => match actions[selected] {
+                        AuthAction::ApiKey => {
+                            if set_processing_on_success {
+                                self.pending_processing_provider = Some(provider.clone());
+                            } else {
                                 self.pending_processing_provider = None;
-                                self.status_message = Some((
-                                    false,
-                                    "Processing mode unchanged. Setup cancelled.".to_string(),
-                                ));
                             }
+                            self.setup_flow = Some(SetupFlow::EnterApiKey {
+                                provider: provider.clone(),
+                                input: String::new(),
+                                cursor: 0,
+                                submitting: false,
+                                set_processing_on_success,
+                            });
+                            PageAction::Consumed
                         }
-                        PageAction::Consumed
-                    }
+                        AuthAction::ClaudeSetupToken => {
+                            if set_processing_on_success {
+                                self.pending_processing_provider = Some(provider.clone());
+                            } else {
+                                self.pending_processing_provider = None;
+                            }
+                            self.setup_flow = Some(SetupFlow::EnterSetupToken {
+                                provider: provider.clone(),
+                                input: String::new(),
+                                cursor: 0,
+                                set_processing_on_success,
+                            });
+                            PageAction::Consumed
+                        }
+                        AuthAction::OAuth => self.handle_oauth_action(&provider, set_processing_on_success),
+                        AuthAction::Back => {
+                            self.setup_flow = None;
+                            self.pending_processing_provider = None;
+                            if set_processing_on_success {
+                                self.set_status_subflow(
+                                    false,
+                                    "Processing mode unchanged. Setup cancelled.",
+                                );
+                            }
+                            PageAction::Consumed
+                        }
+                    },
                     KeyCode::Esc => {
                         self.setup_flow = None;
                         self.pending_processing_provider = None;
-                        self.status_message = Some((
-                            false,
-                            "Processing mode unchanged. Setup cancelled.".to_string(),
-                        ));
+                        if set_processing_on_success {
+                            self.set_status_subflow(
+                                false,
+                                "Processing mode unchanged. Setup cancelled.",
+                            );
+                        }
                         PageAction::Consumed
                     }
                     _ => PageAction::Ignored,
@@ -427,14 +410,14 @@ impl SettingsPage {
                 mut input,
                 mut cursor,
                 submitting,
+                set_processing_on_success,
             } => {
                 if submitting {
                     return match key.code {
                         KeyCode::Esc => {
                             self.setup_flow = None;
                             self.pending_processing_provider = None;
-                            self.status_message =
-                                Some((false, "API key setup cancelled.".to_string()));
+                            self.set_status_subflow(false, "API key setup cancelled.");
                             PageAction::Consumed
                         }
                         _ => PageAction::Consumed,
@@ -443,10 +426,7 @@ impl SettingsPage {
 
                 match key.code {
                     KeyCode::Esc => {
-                        self.setup_flow = Some(SetupFlow::ChooseAuth {
-                            provider,
-                            selected: 0,
-                        });
+                            self.open_auth_menu(provider.clone(), set_processing_on_success);
                         PageAction::Consumed
                     }
                     KeyCode::Left => {
@@ -456,6 +436,7 @@ impl SettingsPage {
                             input,
                             cursor,
                             submitting: false,
+                            set_processing_on_success,
                         });
                         PageAction::Consumed
                     }
@@ -468,6 +449,7 @@ impl SettingsPage {
                             input,
                             cursor,
                             submitting: false,
+                            set_processing_on_success,
                         });
                         PageAction::Consumed
                     }
@@ -481,6 +463,7 @@ impl SettingsPage {
                             input,
                             cursor,
                             submitting: false,
+                            set_processing_on_success,
                         });
                         PageAction::Consumed
                     }
@@ -492,13 +475,13 @@ impl SettingsPage {
                             input,
                             cursor,
                             submitting: false,
+                            set_processing_on_success,
                         });
                         PageAction::Consumed
                     }
                     KeyCode::Enter => {
                         if input.trim().is_empty() {
-                            self.status_message =
-                                Some((false, "API key cannot be empty.".to_string()));
+                            self.set_status_subflow(false, "API key cannot be empty.");
                             return PageAction::Consumed;
                         }
                         self.setup_flow = Some(SetupFlow::EnterApiKey {
@@ -506,16 +489,102 @@ impl SettingsPage {
                             input: input.clone(),
                             cursor,
                             submitting: true,
+                            set_processing_on_success,
                         });
-                        self.status_message = Some((
+                        self.set_status_subflow(
                             true,
                             format!("Validating {} API key...", provider.display_name()),
-                        ));
+                        );
                         PageAction::StartApiKeySetup(provider, input)
                     }
                     _ => PageAction::Ignored,
                 }
             }
+            SetupFlow::EnterSetupToken {
+                provider,
+                mut input,
+                mut cursor,
+                set_processing_on_success,
+            } => match key.code {
+                KeyCode::Esc => {
+                    self.open_auth_menu(provider.clone(), set_processing_on_success);
+                    PageAction::Consumed
+                }
+                KeyCode::Left => {
+                    cursor = cursor.saturating_sub(1);
+                    self.setup_flow = Some(SetupFlow::EnterSetupToken {
+                        provider,
+                        input,
+                        cursor,
+                        set_processing_on_success,
+                    });
+                    PageAction::Consumed
+                }
+                KeyCode::Right => {
+                    if cursor < input.len() {
+                        cursor += 1;
+                    }
+                    self.setup_flow = Some(SetupFlow::EnterSetupToken {
+                        provider,
+                        input,
+                        cursor,
+                        set_processing_on_success,
+                    });
+                    PageAction::Consumed
+                }
+                KeyCode::Backspace => {
+                    if cursor > 0 {
+                        input.remove(cursor - 1);
+                        cursor -= 1;
+                    }
+                    self.setup_flow = Some(SetupFlow::EnterSetupToken {
+                        provider,
+                        input,
+                        cursor,
+                        set_processing_on_success,
+                    });
+                    PageAction::Consumed
+                }
+                KeyCode::Char(c) => {
+                    input.insert(cursor, c);
+                    cursor += 1;
+                    self.setup_flow = Some(SetupFlow::EnterSetupToken {
+                        provider,
+                        input,
+                        cursor,
+                        set_processing_on_success,
+                    });
+                    PageAction::Consumed
+                }
+                KeyCode::Enter => {
+                    let token = input.trim();
+                    if token.is_empty() {
+                        self.set_status_subflow(false, "Setup-token cannot be empty.");
+                        return PageAction::Consumed;
+                    }
+                    match save_setup_token(&provider, token) {
+                        Ok(()) => {
+                            if self.pending_processing_provider.as_ref() == Some(&provider) {
+                                self.finalize_processing_provider(provider);
+                                self.pending_processing_provider = None;
+                            }
+                            self.setup_flow = None;
+                            self.set_status_subflow(
+                                true,
+                                "Setup-token saved. Cloud import is now ready.",
+                            );
+                        }
+                        Err(e) => {
+                            self.set_status_subflow(
+                                false,
+                                format!("Failed to save setup-token: {e}"),
+                            );
+                        }
+                    }
+                    PageAction::Consumed
+                }
+                _ => PageAction::Ignored,
+            },
         }
     }
 
@@ -535,7 +604,7 @@ impl SettingsPage {
                 KeyCode::Enter => {
                     if selected == 0 {
                         self.reset_flow = None;
-                        self.status_message = Some((false, "Reset cancelled.".to_string()));
+                        self.set_status_subflow(false, "Reset cancelled.");
                     } else {
                         self.reset_flow = Some(ResetFlow::TypeConfirm {
                             input: String::new(),
@@ -545,7 +614,7 @@ impl SettingsPage {
                 }
                 KeyCode::Esc => {
                     self.reset_flow = None;
-                    self.status_message = Some((false, "Reset cancelled.".to_string()));
+                    self.set_status_subflow(false, "Reset cancelled.");
                     PageAction::Consumed
                 }
                 _ => PageAction::Ignored,
@@ -553,7 +622,7 @@ impl SettingsPage {
             Some(ResetFlow::TypeConfirm { mut input }) => match key.code {
                 KeyCode::Esc => {
                     self.reset_flow = None;
-                    self.status_message = Some((false, "Reset cancelled.".to_string()));
+                    self.set_status_subflow(false, "Reset cancelled.");
                     PageAction::Consumed
                 }
                 KeyCode::Backspace => {
@@ -570,10 +639,7 @@ impl SettingsPage {
                 }
                 KeyCode::Enter => {
                     if input.trim() != "RESET" {
-                        self.status_message = Some((
-                            false,
-                            "Confirmation mismatch. Type RESET exactly.".to_string(),
-                        ));
+                        self.set_status_subflow(false, "Confirmation mismatch. Type RESET exactly.");
                         return PageAction::Consumed;
                     }
 
@@ -582,11 +648,10 @@ impl SettingsPage {
                             app.vault_initialized = false;
                             app.should_quit = true;
                             self.reset_flow = None;
-                            self.status_message =
-                                Some((true, "Vault moved to Trash successfully.".to_string()));
+                            self.set_status_subflow(true, "Vault moved to Trash successfully.");
                         }
                         Err(e) => {
-                            self.status_message = Some((false, format!("Reset failed: {e}")));
+                            self.set_status_subflow(false, format!("Reset failed: {e}"));
                         }
                     }
                     PageAction::Consumed
@@ -596,6 +661,84 @@ impl SettingsPage {
             None => PageAction::Ignored,
         }
     }
+}
+
+impl SettingsPage {
+    fn handle_oauth_action(
+        &mut self,
+        provider: &Provider,
+        set_processing_on_success: bool,
+    ) -> PageAction {
+        if is_logged_in(provider).unwrap_or(false) {
+            match remove_credentials(provider) {
+                Ok(true) => {
+                    self.set_status_subflow(true, format!("Disconnected {}.", provider.display_name()));
+                }
+                Ok(false) => {
+                    self.set_status_subflow(
+                        false,
+                        format!("No active {} connection.", provider.display_name()),
+                    );
+                }
+                Err(e) => {
+                    self.set_status_subflow(false, format!("Disconnect failed: {e}"));
+                }
+            }
+            self.setup_flow = None;
+            self.pending_processing_provider = None;
+            return PageAction::Consumed;
+        }
+
+        if !oauth_supported(provider) {
+            self.set_status_subflow(
+                false,
+                match provider {
+                    Provider::ChatGpt => "OAuth requires Codex CLI (`codex login`). Install Codex CLI or use API key.".to_string(),
+                    Provider::Gemini => "OAuth requires Gemini CLI (`gemini`). Install Gemini CLI or use API key.".to_string(),
+                    Provider::Claude => "Claude browser OAuth is not configured. Use API key or setup-token.".to_string(),
+                },
+            );
+            return PageAction::Consumed;
+        }
+
+        self.pending_oauth = true;
+        if set_processing_on_success {
+            self.pending_processing_provider = Some(provider.clone());
+        } else {
+            self.pending_processing_provider = None;
+        }
+        self.set_status_subflow(true, format!("Starting OAuth for {}...", provider.display_name()));
+        self.setup_flow = None;
+        PageAction::StartOAuthConnect(provider.clone())
+    }
+}
+
+impl ProcessingChoice {
+    fn provider(self) -> Option<Provider> {
+        match self {
+            ProcessingChoice::Disabled | ProcessingChoice::Cloud => None,
+            ProcessingChoice::Claude => Some(Provider::Claude),
+            ProcessingChoice::ChatGpt => Some(Provider::ChatGpt),
+            ProcessingChoice::Gemini => Some(Provider::Gemini),
+        }
+    }
+
+    fn label(self) -> &'static str {
+        match self {
+            ProcessingChoice::Disabled => "Disabled (raw sessions only)",
+            ProcessingChoice::Claude => "Claude",
+            ProcessingChoice::ChatGpt => "ChatGPT",
+            ProcessingChoice::Gemini => "Gemini",
+            ProcessingChoice::Cloud => "Soul Vault Cloud (coming soon)",
+        }
+    }
+}
+
+fn auth_actions_for_provider(provider: &Provider) -> Vec<AuthAction> {
+    if *provider == Provider::Claude {
+        return vec![AuthAction::ApiKey, AuthAction::ClaudeSetupToken, AuthAction::Back];
+    }
+    vec![AuthAction::ApiKey, AuthAction::OAuth, AuthAction::Back]
 }
 
 fn render_not_init(area: Rect, buf: &mut Buffer) {
@@ -620,7 +763,7 @@ fn render_not_init(area: Rect, buf: &mut Buffer) {
     .render(area, buf);
 }
 
-fn render_settings(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
+fn render_settings_main(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
     let config = match read_config() {
         Ok(c) => c,
         Err(_) => {
@@ -632,6 +775,8 @@ fn render_settings(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
     };
 
     let root = vault_root();
+    let current = page.current_item();
+
     let mut lines: Vec<Line> = vec![
         section_header("  Vault"),
         Line::from(""),
@@ -639,95 +784,188 @@ fn render_settings(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
         kv_line("  Processing", config.processing_mode.display_name()),
         kv_line("  Created", &config.created_at),
         Line::from(""),
-        section_header("  Processing mode"),
+        section_header("  Credentials & Connections"),
         Line::from(""),
     ];
 
-    lines.extend(processing_mode_lines(
-        &config.processing_mode,
-        page.current_item(),
-    ));
-    lines.extend([
-        Line::from(""),
-        section_header("  Providers"),
-        Line::from(""),
-    ]);
-
-    for p in &config.providers {
-        let (status, color) = provider_status(&p.name, p.enabled);
-        lines.push(Line::from(vec![
-            Span::raw("    "),
-            Span::styled(
-                format!("{:<12}", p.name.display_name()),
-                Style::default().add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(status, Style::default().fg(color)),
-        ]));
+    for provider in [Provider::Claude, Provider::ChatGpt, Provider::Gemini] {
+        let selected = current == SelectableItem::Credential(provider.clone());
+        lines.push(credential_line(&config, &provider, selected));
     }
 
     lines.push(Line::from(""));
-    lines.push(section_header("  API Key"));
+    lines.push(section_header("  Processing Mode"));
     lines.push(Line::from(""));
-    lines.extend(api_key_lines());
 
-    lines.push(Line::from(""));
-    lines.push(section_header("  Connections"));
-    lines.push(Line::from(""));
-    lines.extend(connection_lines(&config, page.current_item()));
+    for choice in [
+        ProcessingChoice::Disabled,
+        ProcessingChoice::Claude,
+        ProcessingChoice::ChatGpt,
+        ProcessingChoice::Gemini,
+        ProcessingChoice::Cloud,
+    ] {
+        let selected = current == SelectableItem::Processing(choice);
+        let active = match choice {
+            ProcessingChoice::Disabled => config.processing_mode == ProcessingMode::Disabled,
+            ProcessingChoice::Cloud => false,
+            _ => choice.provider() == config.processing_mode.as_provider(),
+        };
+        lines.push(processing_line(choice, selected, active));
+    }
+
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
         "  Danger zone",
         Style::default().fg(rat::RED).add_modifier(Modifier::BOLD),
     )));
     lines.push(Line::from(""));
-    lines.push(Line::from(Span::styled(
-        "    Reset will move your vault to Trash.",
-        Style::default().fg(rat::DIM),
-    )));
-    let danger_style = if page.current_item() == SettingsItem::DangerReset {
-        Style::default().fg(rat::RED).add_modifier(Modifier::BOLD)
-    } else {
-        Style::default().fg(rat::RED)
-    };
-    let danger_prefix = if page.current_item() == SettingsItem::DangerReset {
-        "  >"
-    } else {
-        "   "
-    };
-    lines.push(Line::from(Span::styled(
-        format!("{danger_prefix} Press X to reset vault (typed confirmation required)"),
-        danger_style,
-    )));
+    lines.push(danger_line(current == SelectableItem::DangerReset));
+
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        "  Processing: 1 Disabled · 2 Claude · 3 ChatGPT · 4 Gemini · 5 Cloud (coming soon)",
+        "  Up/Down select · Enter open/apply · X reset · Esc back",
         Style::default().fg(rat::DIM),
     )));
-    if page.reset_flow.is_some() {
-        lines.push(Line::from(Span::styled(
-            "  Reset: j/k choose · Enter confirm · Esc cancel",
-            Style::default().fg(rat::DIM),
-        )));
-    } else if page.setup_flow.is_some() {
-        lines.push(Line::from(Span::styled(
-            "  Setup: Up/Down choose · Enter confirm · Esc cancel",
-            Style::default().fg(rat::DIM),
-        )));
-    } else {
-        lines.push(Line::from(Span::styled(
-            "  Connections: Up/Down select · Enter action · Esc back",
-            Style::default().fg(rat::DIM),
-        )));
-    }
-    lines.extend(setup_flow_lines(page));
-    lines.extend(reset_flow_lines(page));
+
     if page.pending_oauth {
+        lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
             "  Waiting for OAuth callback in your browser...",
             Style::default().fg(rat::CYAN),
         )));
     }
-    if let Some((ok, msg)) = &page.status_message {
+
+    if !page.status_from_subflow {
+        if let Some((ok, msg)) = &page.status_message {
+        let color = if *ok { rat::EMERALD } else { rat::RED };
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            format!("  {}", msg),
+            Style::default().fg(color),
+        )));
+        }
+    }
+
+    Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(rat::GOLD))
+                .title(" Settings ")
+                .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD)),
+        )
+        .render(area, buf);
+}
+
+fn render_setup_flow(
+    area: Rect,
+    buf: &mut Buffer,
+    flow: &SetupFlow,
+    status_message: Option<&(bool, String)>,
+) {
+    let mut lines: Vec<Line> = vec![section_header("  Credential Setup"), Line::from("")];
+
+    match flow {
+        SetupFlow::AuthMenu {
+            provider,
+            selected,
+            set_processing_on_success,
+        } => {
+            lines.push(Line::from(Span::styled(
+                format!("  {}", provider.display_name()),
+                Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
+            )));
+            lines.push(Line::from(Span::styled(
+                if *set_processing_on_success {
+                    "  Choose how to set credentials for processing"
+                } else {
+                    "  Manage provider credentials"
+                },
+                Style::default().fg(rat::DIM),
+            )));
+            lines.push(Line::from(""));
+
+            let actions = auth_actions_for_provider(provider);
+            for (idx, action) in actions.iter().enumerate() {
+                let is_selected = idx == *selected;
+                let prefix = if is_selected { "  > " } else { "    " };
+                let color = if is_selected { rat::GOLD } else { rat::DIM };
+                lines.push(Line::from(Span::styled(
+                    format!("{}{}", prefix, auth_action_label(*action)),
+                    Style::default().fg(color),
+                )));
+            }
+        }
+        SetupFlow::EnterApiKey {
+            provider,
+            input,
+            cursor,
+            submitting,
+            ..
+        } => {
+            lines.push(Line::from(Span::styled(
+                format!("  Enter {} API key", provider.display_name()),
+                Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
+            )));
+            lines.push(Line::from(Span::styled(
+                format!("  Hint: {}", provider.api_key_hint()),
+                Style::default().fg(rat::DIM),
+            )));
+            lines.push(Line::from(""));
+
+            let mut shown = input.clone();
+            if *cursor <= shown.len() {
+                shown.insert(*cursor, '|');
+            }
+            lines.push(Line::from(Span::styled(
+                format!("  {}", shown),
+                Style::default().fg(rat::CYAN),
+            )));
+
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                if *submitting {
+                    "  Validating and saving..."
+                } else {
+                    "  Enter save · Esc back"
+                },
+                Style::default().fg(rat::DIM),
+            )));
+        }
+        SetupFlow::EnterSetupToken {
+            provider,
+            input,
+            cursor,
+            ..
+        } => {
+            lines.push(Line::from(Span::styled(
+                format!("  Enter {} setup-token", provider.display_name()),
+                Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
+            )));
+            lines.push(Line::from(Span::styled(
+                "  Generate it with `claude setup-token`, then paste it here.",
+                Style::default().fg(rat::DIM),
+            )));
+            lines.push(Line::from(""));
+
+            let mut shown = input.clone();
+            if *cursor <= shown.len() {
+                shown.insert(*cursor, '|');
+            }
+            lines.push(Line::from(Span::styled(
+                format!("  {}", shown),
+                Style::default().fg(rat::CYAN),
+            )));
+
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "  Enter save · Esc back",
+                Style::default().fg(rat::DIM),
+            )));
+        }
+    }
+
+    if let Some((ok, msg)) = status_message {
         let color = if *ok { rat::EMERALD } else { rat::RED };
         lines.push(Line::from(""));
         lines.push(Line::from(Span::styled(
@@ -738,7 +976,7 @@ fn render_settings(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
 
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        "  You can configure processing and connections directly in Settings.",
+        "  Up/Down choose · Enter confirm · Esc back",
         Style::default().fg(rat::DIM),
     )));
 
@@ -753,202 +991,29 @@ fn render_settings(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
         .render(area, buf);
 }
 
-fn connection_providers() -> Vec<Provider> {
-    vec![Provider::Claude, Provider::ChatGpt, Provider::Gemini]
-}
-
-fn connection_lines(config: &SoulVaultConfig, selected_item: SettingsItem) -> Vec<Line<'static>> {
-    connection_providers()
-        .into_iter()
-        .enumerate()
-        .map(|(idx, provider)| {
-            let state = connection_state(config, &provider);
-            let selected = matches!(
-                (idx, selected_item),
-                (0, SettingsItem::ConnectionClaude)
-                    | (1, SettingsItem::ConnectionChatGpt)
-                    | (2, SettingsItem::ConnectionGemini)
-            );
-            let prefix = if selected { "  > " } else { "    " };
-            let name_style = if selected {
-                Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(rat::DIM)
-            };
-            let mut spans = vec![
-                Span::styled(prefix, name_style),
-                Span::styled(format!("{:<12}", provider.display_name()), name_style),
-                Span::styled(state.label, Style::default().fg(state.color)),
-            ];
-            if let Some(label) = state.action_label {
-                spans.push(Span::raw("  "));
-                spans.push(Span::styled(label, Style::default().fg(rat::CYAN)));
-            }
-            Line::from(spans)
-        })
-        .collect()
-}
-
-fn connection_state(config: &SoulVaultConfig, provider: &Provider) -> ConnectionState {
-    if !oauth_supported(provider) {
-        return ConnectionState {
-            label: "oauth not configured",
-            color: rat::DIM,
-            action: ConnectionAction::ConfigureOAuth,
-            action_label: Some("Set OAuth env vars"),
-        };
-    }
-
-    if !provider_enabled(config, provider) {
-        return ConnectionState {
-            label: "not set up",
-            color: rat::AMBER,
-            action: ConnectionAction::Setup,
-            action_label: Some("Run `soul init`"),
-        };
-    }
-
-    if is_logged_in(provider).unwrap_or(false) {
-        return ConnectionState {
-            label: "connected",
-            color: rat::EMERALD,
-            action: ConnectionAction::Disconnect,
-            action_label: Some("[Enter] Disconnect"),
-        };
-    }
-
-    ConnectionState {
-        label: "ready",
-        color: rat::CYAN,
-        action: ConnectionAction::Connect,
-        action_label: Some("[Enter] Connect via OAuth"),
-    }
-}
-
-fn processing_mode_lines(mode: &ProcessingMode, selected_item: SettingsItem) -> Vec<Line<'static>> {
-    let options = [
-        (
-            1usize,
-            ProcessingMode::Disabled,
-            "Disabled (raw sessions only)",
-        ),
-        (2usize, ProcessingMode::Claude, "Claude"),
-        (3usize, ProcessingMode::ChatGpt, "ChatGPT"),
-        (4usize, ProcessingMode::Gemini, "Gemini"),
+fn render_reset_flow(
+    area: Rect,
+    buf: &mut Buffer,
+    flow: &ResetFlow,
+    status_message: Option<&(bool, String)>,
+) {
+    let mut lines: Vec<Line> = vec![
+        section_header("  Reset Vault"),
+        Line::from(""),
+        Line::from(Span::styled(
+            "  This will move your vault to Trash.",
+            Style::default().fg(rat::DIM),
+        )),
+        Line::from(""),
     ];
 
-    let mut lines: Vec<Line<'static>> = options
-        .iter()
-        .map(|(idx, candidate, label)| {
-            let selected = *mode == *candidate;
-            let option_selected = matches!(
-                (idx, selected_item),
-                (1, SettingsItem::ProcessingDisabled)
-                    | (2, SettingsItem::ProcessingClaude)
-                    | (3, SettingsItem::ProcessingChatGpt)
-                    | (4, SettingsItem::ProcessingGemini)
-            );
-            let marker = if selected { "•" } else { " " };
-            let color = if option_selected {
-                rat::GOLD
-            } else if selected {
-                rat::EMERALD
-            } else {
-                rat::DIM
-            };
-            let prefix = if option_selected { "  >" } else { "   " };
-            Line::from(vec![
-                Span::raw(prefix),
-                Span::styled(
-                    format!(" {} {}. {}", marker, idx, label),
-                    Style::default().fg(color),
-                ),
-            ])
-        })
-        .collect();
-
-    let cloud_selected = selected_item == SettingsItem::ProcessingCloud;
-    lines.push(Line::from(vec![
-        Span::raw(if cloud_selected { "  >" } else { "   " }),
-        Span::styled(
-            "  5. Soul Vault Cloud (coming soon)",
-            Style::default().fg(if cloud_selected { rat::GOLD } else { rat::DIM }),
-        ),
-    ]));
-    lines
-}
-
-fn setup_flow_lines(page: &SettingsPage) -> Vec<Line<'static>> {
-    let mut lines = Vec::new();
-    match &page.setup_flow {
-        Some(SetupFlow::ChooseAuth { provider, selected }) => {
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                format!("  {} setup", provider.display_name()),
-                Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
-            )));
-            let options = ["API key", "OAuth", "Back"];
-            for (idx, option) in options.iter().enumerate() {
-                let prefix = if idx == *selected { "  > " } else { "    " };
-                let color = if idx == *selected {
-                    rat::GOLD
-                } else {
-                    rat::DIM
-                };
-                lines.push(Line::from(Span::styled(
-                    format!("{prefix}{option}"),
-                    Style::default().fg(color),
-                )));
-            }
-        }
-        Some(SetupFlow::EnterApiKey {
-            provider,
-            input,
-            cursor,
-            submitting,
-        }) => {
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                format!("  Enter {} API key", provider.display_name()),
-                Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
-            )));
-            lines.push(Line::from(Span::styled(
-                format!("  Hint: {}", provider.api_key_hint()),
-                Style::default().fg(rat::DIM),
-            )));
-            let mut shown = input.clone();
-            if *cursor <= shown.len() {
-                shown.insert(*cursor, '|');
-            }
-            lines.push(Line::from(Span::styled(
-                format!("  {}", shown),
-                Style::default().fg(rat::CYAN),
-            )));
-            if *submitting {
-                lines.push(Line::from(Span::styled(
-                    "  Validating and saving...",
-                    Style::default().fg(rat::DIM),
-                )));
-            }
-        }
-        None => {}
-    }
-    lines
-}
-
-fn reset_flow_lines(page: &SettingsPage) -> Vec<Line<'static>> {
-    let mut lines = Vec::new();
-    match &page.reset_flow {
-        Some(ResetFlow::Confirm { selected }) => {
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                "  Reset vault?",
-                Style::default().fg(rat::RED).add_modifier(Modifier::BOLD),
-            )));
+    match flow {
+        ResetFlow::Confirm { selected } => {
             let options = ["Cancel", "Yes, move vault to Trash"];
             for (idx, option) in options.iter().enumerate() {
-                let prefix = if idx == *selected { "  > " } else { "    " };
-                let color = if idx == *selected {
+                let is_selected = idx == *selected;
+                let prefix = if is_selected { "  > " } else { "    " };
+                let color = if is_selected {
                     if idx == 1 {
                         rat::RED
                     } else {
@@ -958,29 +1023,156 @@ fn reset_flow_lines(page: &SettingsPage) -> Vec<Line<'static>> {
                     rat::DIM
                 };
                 lines.push(Line::from(Span::styled(
-                    format!("{prefix}{option}"),
+                    format!("{}{}", prefix, option),
                     Style::default().fg(color),
                 )));
             }
         }
-        Some(ResetFlow::TypeConfirm { input }) => {
-            lines.push(Line::from(""));
+        ResetFlow::TypeConfirm { input } => {
             lines.push(Line::from(Span::styled(
                 "  Type RESET to confirm:",
                 Style::default().fg(rat::RED).add_modifier(Modifier::BOLD),
             )));
             lines.push(Line::from(Span::styled(
-                format!("    {}", input),
+                format!("  {}", input),
                 Style::default().fg(rat::CYAN),
             )));
         }
-        None => {}
     }
-    lines
+
+    if let Some((ok, msg)) = status_message {
+        let color = if *ok { rat::EMERALD } else { rat::RED };
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            format!("  {}", msg),
+            Style::default().fg(color),
+        )));
+    }
+
+    lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "  Up/Down choose · Enter confirm · Esc back",
+        Style::default().fg(rat::DIM),
+    )));
+
+    Paragraph::new(lines)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .border_style(Style::default().fg(rat::GOLD))
+                .title(" Settings ")
+                .title_style(Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD)),
+        )
+        .render(area, buf);
 }
 
-fn oauth_supported(provider: &Provider) -> bool {
-    oauth_is_configured(provider)
+fn auth_action_label(action: AuthAction) -> &'static str {
+    match action {
+        AuthAction::ApiKey => "Set API key",
+        AuthAction::ClaudeSetupToken => "Paste setup-token",
+        AuthAction::OAuth => "OAuth",
+        AuthAction::Back => "Back",
+    }
+}
+
+fn credential_line(config: &SoulVaultConfig, provider: &Provider, selected: bool) -> Line<'static> {
+    let prefix = if selected { "  > " } else { "    " };
+    let name_style = if selected {
+        Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(rat::DIM)
+    };
+
+    let key_label = api_key_status_label(provider);
+    let oauth_label = oauth_status_label(config, provider);
+
+    Line::from(vec![
+        Span::styled(prefix, name_style),
+        Span::styled(format!("{:<8}", provider.display_name()), name_style),
+        Span::styled(format!(" API: {:<12}", key_label), Style::default().fg(rat::DIM)),
+        Span::styled(format!(" OAuth: {:<15}", oauth_label), Style::default().fg(rat::DIM)),
+    ])
+}
+
+fn processing_line(choice: ProcessingChoice, selected: bool, active: bool) -> Line<'static> {
+    let prefix = if selected { "  > " } else { "    " };
+    let marker = if active { "●" } else { " " };
+    let color = if selected {
+        rat::GOLD
+    } else if active {
+        rat::EMERALD
+    } else {
+        rat::DIM
+    };
+
+    Line::from(Span::styled(
+        format!("{} {} {}", prefix, marker, choice.label()),
+        Style::default().fg(color),
+    ))
+}
+
+fn danger_line(selected: bool) -> Line<'static> {
+    let prefix = if selected { "  > " } else { "    " };
+    let style = if selected {
+        Style::default().fg(rat::RED).add_modifier(Modifier::BOLD)
+    } else {
+        Style::default().fg(rat::RED)
+    };
+    Line::from(Span::styled(
+        format!("{}Reset vault (typed confirmation required)", prefix),
+        style,
+    ))
+}
+
+fn api_key_status_label(provider: &Provider) -> String {
+    let key = get_api_key(&provider.to_string())
+        .ok()
+        .flatten()
+        .unwrap_or_default();
+    if key.trim().is_empty() {
+        return "not set".to_string();
+    }
+
+    match get_key_health(provider).ok().flatten().map(|h| h.status) {
+        Some(ApiKeyHealth::Verified) => "verified".to_string(),
+        Some(ApiKeyHealth::Unverified) => "unverified".to_string(),
+        Some(ApiKeyHealth::Invalid) => "invalid".to_string(),
+        None => "set".to_string(),
+    }
+}
+
+fn oauth_status_label(config: &SoulVaultConfig, provider: &Provider) -> &'static str {
+    if *provider == Provider::Claude {
+        return if is_logged_in(provider).unwrap_or(false) {
+            "token saved"
+        } else {
+            "setup-token"
+        };
+    }
+    if !oauth_supported(provider) {
+        return "unavailable";
+    }
+    if is_logged_in(provider).unwrap_or(false) {
+        return "connected";
+    }
+    if !provider_enabled(config, provider) {
+        return "not setup";
+    }
+    "ready"
+}
+
+fn section_header(label: &str) -> Line<'static> {
+    Line::from(Span::styled(
+        label.to_string(),
+        Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
+    ))
+}
+
+fn kv_line(label: &str, value: &str) -> Line<'static> {
+    Line::from(vec![
+        Span::styled(format!("{:<18}", label), Style::default().fg(rat::DIM)),
+        Span::styled(value.to_string(), Style::default().fg(rat::CYAN)),
+    ])
 }
 
 fn provider_has_credentials(provider: &Provider) -> bool {
@@ -1002,48 +1194,11 @@ fn provider_enabled(config: &SoulVaultConfig, provider: &Provider) -> bool {
         .unwrap_or(false)
 }
 
-fn provider_status(provider: &Provider, enabled: bool) -> (String, ratatui::style::Color) {
-    if !enabled {
-        return ("disabled".into(), rat::DIM);
-    }
-    let has_key = get_api_key(&provider.to_string())
-        .ok()
-        .flatten()
-        .map(|k| !k.trim().is_empty())
-        .unwrap_or(false);
-    let has_oauth = is_logged_in(provider).unwrap_or(false);
-
-    if has_oauth {
-        ("ready".into(), rat::EMERALD)
-    } else if !has_key {
-        ("enabled · no credentials".into(), rat::AMBER)
-    } else {
-        match get_key_health(provider).ok().flatten() {
-            Some(record) => match record.status {
-                ApiKeyHealth::Verified => ("ready".into(), rat::EMERALD),
-                ApiKeyHealth::Unverified => ("key unverified".into(), rat::AMBER),
-                ApiKeyHealth::Invalid => ("key invalid".into(), rat::RED),
-            },
-            None => ("key set · unknown".into(), rat::AMBER),
-        }
-    }
+fn oauth_supported(provider: &Provider) -> bool {
+    oauth_connect_available(provider)
 }
 
-fn api_key_lines() -> Vec<Line<'static>> {
-    let providers = [Provider::Claude, Provider::ChatGpt, Provider::Gemini];
-    providers
-        .iter()
-        .map(|provider| {
-            let key = get_api_key(&provider.to_string())
-                .ok()
-                .flatten()
-                .unwrap_or_default();
-            let health = get_key_health(provider).ok().flatten();
-            api_key_line(provider, &key, health.as_ref())
-        })
-        .collect()
-}
-
+#[allow(dead_code)]
 fn mask_key(key: &str) -> String {
     if key.len() <= 8 {
         "••••••••".to_string()
@@ -1052,6 +1207,7 @@ fn mask_key(key: &str) -> String {
     }
 }
 
+#[allow(dead_code)]
 fn api_key_line(
     provider: &Provider,
     key: &str,
@@ -1083,22 +1239,5 @@ fn api_key_line(
         Span::styled(masked, Style::default().fg(rat::EMERALD)),
         Span::raw("  "),
         Span::styled(format!("[{}]", label), Style::default().fg(color)),
-    ])
-}
-
-fn section_header(label: &str) -> Line<'static> {
-    Line::from(Span::styled(
-        label.to_string(),
-        Style::default().fg(rat::GOLD).add_modifier(Modifier::BOLD),
-    ))
-}
-
-fn kv_line(label: &str, value: &str) -> Line<'static> {
-    Line::from(vec![
-        Span::styled(format!("{:<18}", label), Style::default().fg(rat::DIM)),
-        Span::styled(
-            value.to_string(),
-            Style::default().add_modifier(Modifier::BOLD),
-        ),
     ])
 }

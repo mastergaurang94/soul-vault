@@ -32,6 +32,10 @@ pub fn key_status_path() -> PathBuf {
     config_dir().join("key_status.json")
 }
 
+pub fn oauth_client_ids_path() -> PathBuf {
+    config_dir().join("oauth_client_ids.json")
+}
+
 pub fn identity_dir() -> PathBuf {
     vault_root().join("identity")
 }
@@ -141,6 +145,7 @@ pub struct ApiKeyHealthRecord {
 }
 
 pub type ApiKeyHealthConfig = HashMap<String, ApiKeyHealthRecord>;
+pub type OAuthClientIdsConfig = HashMap<String, String>;
 
 /// Reads key_status.json. Returns empty map if missing.
 pub fn read_key_health() -> Result<ApiKeyHealthConfig> {
@@ -193,6 +198,26 @@ pub fn get_key_health(provider: &Provider) -> Result<Option<ApiKeyHealthRecord>>
 pub fn get_api_key(provider: &str) -> Result<Option<String>> {
     let keys = read_keys()?;
     Ok(keys.get(provider).cloned())
+}
+
+/// Reads oauth_client_ids.json. Returns empty map if missing.
+pub fn read_oauth_client_ids() -> Result<OAuthClientIdsConfig> {
+    let path = oauth_client_ids_path();
+    if !path.exists() {
+        return Ok(OAuthClientIdsConfig::new());
+    }
+
+    let raw =
+        fs::read_to_string(&path).with_context(|| format!("Failed to read {}", path.display()))?;
+    let ids: OAuthClientIdsConfig =
+        serde_json::from_str(&raw).with_context(|| "Failed to parse oauth_client_ids.json")?;
+    Ok(ids)
+}
+
+/// Returns a single provider's OAuth client ID, or None.
+pub fn get_oauth_client_id(provider: &Provider) -> Result<Option<String>> {
+    let ids = read_oauth_client_ids()?;
+    Ok(ids.get(&provider.to_string()).cloned())
 }
 
 /// Stores a single provider's API key.

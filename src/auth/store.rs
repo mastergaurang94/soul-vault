@@ -32,6 +32,19 @@ pub fn save_credentials(credentials: &AuthCredentials) -> Result<()> {
     Ok(())
 }
 
+pub fn save_setup_token(provider: &Provider, token: &str) -> Result<()> {
+    let trimmed = token.trim();
+    if trimmed.is_empty() {
+        anyhow::bail!("Setup-token cannot be empty");
+    }
+    save_credentials(&AuthCredentials {
+        provider: provider.clone(),
+        access_token: trimmed.to_string(),
+        refresh_token: None,
+        expires_at: None,
+    })
+}
+
 pub fn load_credentials(provider: &Provider) -> Result<Option<AuthCredentials>> {
     let store = read_auth_store()?;
     Ok(store

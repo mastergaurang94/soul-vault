@@ -35,6 +35,6 @@ pub async fn run(provider: Option<&str>) -> Result<()> {
 fn parse_provider(raw: Option<&str>) -> Result<Provider> {
     match raw {
         Some(value) => value.parse::<Provider>().map_err(anyhow::Error::msg),
-        None => Ok(Provider::Claude),
+        None => anyhow::bail!("Provider required. Use `soul login <claude|chatgpt|gemini>`."),
     }
 }

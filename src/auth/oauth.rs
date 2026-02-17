@@ -5,13 +5,17 @@ use reqwest::Client;
 
 use crate::auth::types::{AuthCredentials, OAuthConfig, TokenResponse};
 use crate::types::Provider;
+use crate::vault::config::get_oauth_client_id;
 
 pub fn oauth_config(provider: &Provider) -> OAuthConfig {
     match provider {
         Provider::Claude => OAuthConfig {
             provider: Provider::Claude,
-            client_id: std::env::var("SOUL_OAUTH_CLAUDE_CLIENT_ID")
-                .unwrap_or_else(|_| "anthropic-cli-placeholder-client-id".to_string()),
+            client_id: resolve_client_id(
+                &Provider::Claude,
+                "SOUL_OAUTH_CLAUDE_CLIENT_ID",
+                "anthropic-cli-placeholder-client-id",
+            ),
             client_secret: std::env::var("SOUL_OAUTH_CLAUDE_CLIENT_SECRET").ok(),
             auth_url: std::env::var("SOUL_OAUTH_CLAUDE_AUTH_URL")
                 .unwrap_or_else(|_| "https://console.anthropic.com/oauth/authorize".to_string()),
@@ -21,8 +25,11 @@ pub fn oauth_config(provider: &Provider) -> OAuthConfig {
         },
         Provider::ChatGpt => OAuthConfig {
             provider: Provider::ChatGpt,
-            client_id: std::env::var("SOUL_OAUTH_CHATGPT_CLIENT_ID")
-                .unwrap_or_else(|_| "openai-placeholder-client-id".to_string()),
+            client_id: resolve_client_id(
+                &Provider::ChatGpt,
+                "SOUL_OAUTH_CHATGPT_CLIENT_ID",
+                "openai-placeholder-client-id",
+            ),
             client_secret: std::env::var("SOUL_OAUTH_CHATGPT_CLIENT_SECRET").ok(),
             auth_url: std::env::var("SOUL_OAUTH_CHATGPT_AUTH_URL")
                 .unwrap_or_else(|_| "https://auth.openai.com/oauth/authorize".to_string()),
@@ -33,8 +40,11 @@ pub fn oauth_config(provider: &Provider) -> OAuthConfig {
         },
         Provider::Gemini => OAuthConfig {
             provider: Provider::Gemini,
-            client_id: std::env::var("SOUL_OAUTH_GEMINI_CLIENT_ID")
-                .unwrap_or_else(|_| "google-placeholder-client-id".to_string()),
+            client_id: resolve_client_id(
+                &Provider::Gemini,
+                "SOUL_OAUTH_GEMINI_CLIENT_ID",
+                "google-placeholder-client-id",
+            ),
             client_secret: std::env::var("SOUL_OAUTH_GEMINI_CLIENT_SECRET").ok(),
             auth_url: std::env::var("SOUL_OAUTH_GEMINI_AUTH_URL")
                 .unwrap_or_else(|_| "https://accounts.google.com/o/oauth2/v2/auth".to_string()),
@@ -44,6 +54,20 @@ pub fn oauth_config(provider: &Provider) -> OAuthConfig {
                 .unwrap_or_else(|_| "https://www.googleapis.com/auth/userinfo.email".to_string()),
         },
     }
+}
+
+fn resolve_client_id(provider: &Provider, env_name: &str, fallback: &str) -> String {
+    if let Ok(value) = std::env::var(env_name) {
+        if !value.trim().is_empty() {
+            return value;
+        }
+    }
+    if let Ok(Some(value)) = get_oauth_client_id(provider) {
+        if !value.trim().is_empty() {
+            return value;
+        }
+    }
+    fallback.to_string()
 }
 
 pub fn oauth_is_configured(provider: &Provider) -> bool {
@@ -169,10 +193,12 @@ mod tests {
 
     #[test]
     fn oauth_is_configured_is_false_for_placeholder_defaults() {
-        std::env::remove_var("SOUL_OAUTH_CHATGPT_CLIENT_ID");
-        std::env::remove_var("SOUL_OAUTH_GEMINI_CLIENT_ID");
+        std::env::set_var("SOUL_OAUTH_CHATGPT_CLIENT_ID", "openai-placeholder-client-id");
+        std::env::set_var("SOUL_OAUTH_GEMINI_CLIENT_ID", "google-placeholder-client-id");
         assert!(!oauth_is_configured(&Provider::ChatGpt));
         assert!(!oauth_is_configured(&Provider::Gemini));
+        std::env::remove_var("SOUL_OAUTH_CHATGPT_CLIENT_ID");
+        std::env::remove_var("SOUL_OAUTH_GEMINI_CLIENT_ID");
     }
 
     #[test]

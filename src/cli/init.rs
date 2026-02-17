@@ -8,7 +8,7 @@ use crossterm::{
 };
 use std::io::{self, IsTerminal, Write};
 
-use crate::auth::{connect_provider, is_logged_in, oauth_is_configured};
+use crate::auth::{connect_provider, is_logged_in, oauth_connect_available, save_setup_token};
 use crate::cli::init_validate::{validate_api_key, ApiKeyValidation};
 use crate::types::{ProcessingMode, Provider, ProviderConfig, SoulVaultConfig};
 use crate::ui::theme::*;
@@ -362,12 +362,17 @@ async fn configure_single_provider(
 ) -> Result<()> {
     loop {
         render_auth_method_screen(provider)?;
-        println!("    {} API key", dim("1."));
-        if supports_oauth(provider) {
-            println!("    {} OAuth", dim("2."));
+        if *provider == Provider::Claude {
+            println!("    {} API key", dim("1."));
+            println!("    {} Setup-token", dim("2."));
             println!("    {} Back", dim("3."));
         } else {
-            println!("    {} OAuth {}", dim("2."), dim("(not configured)"));
+            println!("    {} API key", dim("1."));
+            if supports_oauth(provider) {
+                println!("    {} OAuth", dim("2."));
+            } else {
+                println!("    {} OAuth {}", dim("2."), dim("(not configured)"));
+            }
             println!("    {} Back", dim("3."));
         }
         println!();
@@ -386,12 +391,20 @@ async fn configure_single_provider(
                 return Ok(());
             }
             2 => {
+                if *provider == Provider::Claude {
+                    let saved = setup_claude_setup_token().await?;
+                    if saved {
+                        set_provider_enabled(providers, provider, true);
+                    }
+                    return Ok(());
+                }
                 if !supports_oauth(provider) {
-                    println!(
-                        "  {} OAuth for {} is not configured. Set provider OAuth env vars first.",
-                        amber(ICON_STAR),
-                        provider.display_name()
-                    );
+                    let reason = match provider {
+                        Provider::ChatGpt => "Codex CLI (`codex`) is not available.",
+                        Provider::Gemini => "Gemini CLI (`gemini`) is not available.",
+                        Provider::Claude => "Claude browser OAuth is not configured.",
+                    };
+                    println!("  {} OAuth unavailable: {}", amber(ICON_STAR), reason);
                     continue;
                 }
                 println!();
@@ -493,8 +506,28 @@ async fn setup_api_key(provider: &Provider) -> Result<bool> {
     }
 }
 
+async fn setup_claude_setup_token() -> Result<bool> {
+    println!(
+        "{}",
+        dim("  Setup-token comes from `claude setup-token` and is saved locally in ~/soul-vault/auth.yaml")
+    );
+    let token_input = ask(&format!(
+        "    {} Paste Claude setup-token {} ",
+        ICON_KEY,
+        dim("(Enter to skip)")
+    ))?;
+    let token = token_input.trim();
+    if token.is_empty() {
+        println!("    {} Claude setup-token skipped.", dim(ICON_DOT));
+        return Ok(false);
+    }
+    save_setup_token(&Provider::Claude, token)?;
+    println!("{}", check("Claude setup-token saved"));
+    Ok(true)
+}
+
 fn supports_oauth(provider: &Provider) -> bool {
-    oauth_is_configured(provider)
+    oauth_connect_available(provider)
 }
 
 fn provider_has_credentials(provider: &Provider) -> bool {

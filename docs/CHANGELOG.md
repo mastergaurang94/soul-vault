@@ -7,6 +7,41 @@ Agents: append entries here after completing work.
 
 ---
 
+## 2026-02-17 — Provider-Native OAuth UX + Claude Setup-Token Alignment
+
+### Provider-native OAuth connection path
+- Updated `src/auth/connect.rs` to use provider-native auth entrypoints for cloud login:
+  - ChatGPT: runs `codex login`, then imports `~/.codex/auth.json` tokens into `~/soul-vault/auth.yaml`
+  - Gemini: imports `~/.gemini/oauth_creds.json`; if missing, launches `gemini` for first-time login and imports credentials after completion
+- Added post-login cloud verification:
+  - imported OAuth token is now tested against provider cloud list endpoint before marking connection successful
+  - failed verification returns actionable reconnect guidance
+- Added provider-aware OAuth availability checks (`oauth_connect_available`) and wired them into:
+  - `src/cli/init.rs` OAuth option gating/copy
+  - `src/tui/pages/settings.rs` OAuth status and actionable errors
+
+### Claude auth UX parity with OpenClaw-style setup-token flow
+- Added setup-token save support in auth store:
+  - `src/auth/store.rs` (`save_setup_token`)
+  - exported via `src/auth/mod.rs`
+- Updated Settings credential menu for Claude:
+  - `Set API key`, `Paste setup-token`, `Back` (no generic OAuth action for Claude)
+  - added dedicated setup-token input flow in `src/tui/pages/settings.rs`
+- Updated init provider auth menu for Claude:
+  - `API key`, `Setup-token`, `Back` in `src/cli/init.rs`
+
+### Interactive explicitness and messaging
+- `soul login` now requires explicit provider selection (no implicit Claude default):
+  - `soul login <claude|chatgpt|gemini>`
+- Clarified Claude browser-OAuth errors to direct users toward API key/setup-token paths.
+
+### Cloud client integration coverage
+- Added mocked API integration tests in `src/cli/cloud_client.rs` for:
+  - ChatGPT list pagination across cursor pages
+  - 429 retry/backoff flow recovering to success
+  - expired OAuth credential refresh before cloud list call
+- Tests are marked `#[ignore]` because they require local TCP bind for mock HTTP server (wiremock), which is unavailable in restricted sandboxes; they run in normal local/CI environments that allow localhost bind.
+
 ## 2026-02-17 — Cloud Import Across Claude, ChatGPT, and Gemini
 
 ### Cloud import foundation

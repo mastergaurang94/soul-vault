@@ -515,6 +515,81 @@ fn percent_encode(raw: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::OnceLock;
+
+    use crate::auth::{load_credentials, save_credentials, AuthCredentials};
+    use tokio::sync::Mutex;
+    use wiremock::matchers::{header, method, path};
+    use wiremock::{Mock, MockServer, Request, Respond, ResponseTemplate};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        LOCK.get_or_init(|| Mutex::new(()))
+    }
+
+    struct EnvSnapshot {
+        key: &'static str,
+        value: Option<String>,
+    }
+
+    struct Retry429ThenOk {
+        calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl Respond for Retry429ThenOk {
+        fn respond(&self, _request: &Request) -> ResponseTemplate {
+            let call = self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            if call == 0 {
+                ResponseTemplate::new(429).set_body_string("rate limited")
+            } else {
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "conversations": [],
+                    "next_cursor": null
+                }))
+            }
+        }
+    }
+
+    struct PaginationResponder {
+        calls: std::sync::Arc<std::sync::atomic::AtomicUsize>,
+    }
+
+    impl Respond for PaginationResponder {
+        fn respond(&self, _request: &Request) -> ResponseTemplate {
+            let call = self.calls.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            if call == 0 {
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "conversations": [
+                        {"id": "c1", "updated_at": "2026-01-01T00:00:00Z"}
+                    ],
+                    "next_cursor": "cursor-2"
+                }))
+            } else {
+                ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                    "conversations": [
+                        {"id": "c2", "updated_at": "2026-01-02T00:00:00Z"}
+                    ],
+                    "next_cursor": null
+                }))
+            }
+        }
+    }
+
+    impl EnvSnapshot {
+        fn capture(key: &'static str) -> Self {
+            Self {
+                key,
+                value: std::env::var(key).ok(),
+            }
+        }
+
+        fn restore(self) {
+            match self.value {
+                Some(v) => std::env::set_var(self.key, v),
+                None => std::env::remove_var(self.key),
+            }
+        }
+    }
 
     #[test]
     fn parse_list_page_accepts_multiple_shapes() {
@@ -628,5 +703,163 @@ mod tests {
             provider_token_env(&Provider::Gemini),
             "SOUL_CLOUD_GEMINI_ACCESS_TOKEN"
         );
+    }
+
+    #[tokio::test]
+    #[ignore = "requires local TCP bind for mock HTTP server"]
+    async fn cloud_list_supports_pagination_with_mocked_api() {
+        let _guard = env_lock().lock().await;
+        let base = EnvSnapshot::capture("SOUL_CLOUD_CHATGPT_BASE_URL");
+        let token = EnvSnapshot::capture("SOUL_CLOUD_CHATGPT_ACCESS_TOKEN");
+        let home = EnvSnapshot::capture("HOME");
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::env::set_var("HOME", tmp.path());
+
+        let server = MockServer::start().await;
+        std::env::set_var("SOUL_CLOUD_CHATGPT_BASE_URL", server.uri());
+        std::env::set_var("SOUL_CLOUD_CHATGPT_ACCESS_TOKEN", "test-token");
+
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        Mock::given(method("GET"))
+            .and(path("/conversations"))
+            .and(header("authorization", "Bearer test-token"))
+            .respond_with(PaginationResponder {
+                calls: calls.clone(),
+            })
+            .expect(2)
+            .mount(&server)
+            .await;
+
+        let client = build_cloud_client(Provider::ChatGpt);
+        let first = client
+            .list_conversations(None)
+            .await
+            .expect("first page should succeed");
+        assert_eq!(first.items.len(), 1);
+        assert_eq!(first.items[0].conversation_id, "c1");
+        assert_eq!(first.next_cursor.as_deref(), Some("cursor-2"));
+
+        let second = client
+            .list_conversations(first.next_cursor.clone())
+            .await
+            .expect("second page should succeed");
+        assert_eq!(second.items.len(), 1);
+        assert_eq!(second.items[0].conversation_id, "c2");
+        assert!(second.next_cursor.is_none());
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+
+        token.restore();
+        base.restore();
+        home.restore();
+    }
+
+    #[tokio::test]
+    #[ignore = "requires local TCP bind for mock HTTP server"]
+    async fn cloud_list_retries_after_429_with_mocked_api() {
+        let _guard = env_lock().lock().await;
+        let base = EnvSnapshot::capture("SOUL_CLOUD_CHATGPT_BASE_URL");
+        let token = EnvSnapshot::capture("SOUL_CLOUD_CHATGPT_ACCESS_TOKEN");
+        let home = EnvSnapshot::capture("HOME");
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::env::set_var("HOME", tmp.path());
+
+        let server = MockServer::start().await;
+        std::env::set_var("SOUL_CLOUD_CHATGPT_BASE_URL", server.uri());
+        std::env::set_var("SOUL_CLOUD_CHATGPT_ACCESS_TOKEN", "retry-token");
+
+        let calls = std::sync::Arc::new(std::sync::atomic::AtomicUsize::new(0));
+        Mock::given(method("GET"))
+            .and(path("/conversations"))
+            .and(header("authorization", "Bearer retry-token"))
+            .respond_with(Retry429ThenOk {
+                calls: calls.clone(),
+            })
+            .expect(2)
+            .mount(&server)
+            .await;
+
+        let client = build_cloud_client(Provider::ChatGpt);
+        let page = client
+            .list_conversations(None)
+            .await
+            .expect("request should retry and eventually succeed");
+        assert!(page.items.is_empty());
+        assert_eq!(calls.load(std::sync::atomic::Ordering::SeqCst), 2);
+
+        token.restore();
+        base.restore();
+        home.restore();
+    }
+
+    #[tokio::test]
+    #[ignore = "requires local TCP bind for mock HTTP server"]
+    async fn cloud_list_refreshes_expired_oauth_token_and_succeeds() {
+        let _guard = env_lock().lock().await;
+        let home = EnvSnapshot::capture("HOME");
+        let cloud_base = EnvSnapshot::capture("SOUL_CLOUD_CHATGPT_BASE_URL");
+        let cloud_env_token = EnvSnapshot::capture("SOUL_CLOUD_CHATGPT_ACCESS_TOKEN");
+        let oauth_client_id = EnvSnapshot::capture("SOUL_OAUTH_CHATGPT_CLIENT_ID");
+        let oauth_token_url = EnvSnapshot::capture("SOUL_OAUTH_CHATGPT_TOKEN_URL");
+
+        let tmp = tempfile::tempdir().expect("tempdir");
+        std::env::set_var("HOME", tmp.path());
+        std::env::remove_var("SOUL_CLOUD_CHATGPT_ACCESS_TOKEN");
+
+        let server = MockServer::start().await;
+        std::env::set_var("SOUL_CLOUD_CHATGPT_BASE_URL", server.uri());
+        std::env::set_var("SOUL_OAUTH_CHATGPT_CLIENT_ID", "test-client-id");
+        std::env::set_var(
+            "SOUL_OAUTH_CHATGPT_TOKEN_URL",
+            format!("{}/oauth/token", server.uri()),
+        );
+
+        save_credentials(&AuthCredentials {
+            provider: Provider::ChatGpt,
+            access_token: "expired-token".to_string(),
+            refresh_token: Some("refresh-123".to_string()),
+            expires_at: Some((chrono::Utc::now() - chrono::Duration::hours(1)).to_rfc3339()),
+        })
+        .expect("seed credentials");
+
+        Mock::given(method("POST"))
+            .and(path("/oauth/token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "access_token": "new-access-token",
+                "refresh_token": "new-refresh-token",
+                "expires_in": 3600
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(path("/conversations"))
+            .and(header("authorization", "Bearer new-access-token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!({
+                "conversations": [],
+                "next_cursor": null
+            })))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let client = build_cloud_client(Provider::ChatGpt);
+        let page = client
+            .list_conversations(None)
+            .await
+            .expect("refresh + list should succeed");
+        assert!(page.items.is_empty());
+
+        let saved = load_credentials(&Provider::ChatGpt)
+            .expect("load credentials")
+            .expect("credential exists");
+        assert_eq!(saved.access_token, "new-access-token");
+        assert_eq!(saved.refresh_token.as_deref(), Some("new-refresh-token"));
+
+        oauth_token_url.restore();
+        oauth_client_id.restore();
+        cloud_env_token.restore();
+        cloud_base.restore();
+        home.restore();
     }
 }
