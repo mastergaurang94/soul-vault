@@ -135,8 +135,7 @@ fn provider_line_state(
         .map(|k| !k.trim().is_empty())
         .unwrap_or(false);
     if !has_key {
-        let status = "not connected".to_string();
-        return (dim(ICON_DOT), status.clone(), dim(&status));
+        return not_connected();
     }
 
     match get_key_health(provider).ok().flatten().map(|r| r.status) {
@@ -147,15 +146,14 @@ fn provider_line_state(
             };
             (emerald(ICON_CHECK), status.clone(), dim(&status))
         }
-        Some(ApiKeyHealth::Unverified) | Some(ApiKeyHealth::Invalid) => {
-            let status = "not connected".to_string();
-            (dim(ICON_DOT), status.clone(), dim(&status))
-        }
-        None => {
-            let status = "not connected".to_string();
-            (dim(ICON_DOT), status.clone(), dim(&status))
-        }
+        Some(ApiKeyHealth::Unverified) | Some(ApiKeyHealth::Invalid) => not_connected(),
+        None => not_connected(),
     }
+}
+
+fn not_connected() -> (String, String, String) {
+    let status = "not connected".to_string();
+    (dim(ICON_DOT), status.clone(), dim(&status))
 }
 
 // ─── Box Drawing ──────────────────────────────────────────────────────────────

@@ -7,6 +7,28 @@ Agents: append entries here after completing work.
 
 ---
 
+## 2026-02-17 — Refactor Pass: Simpler CLI Internal Flows (No Behavior Changes)
+
+### Shared source-tracking helpers
+- Simplified `src/cli/pull_tracking.rs` by extracting common helpers used by both pull and cloud tracking paths:
+  - `source_hashes(source_key)` for loading existing hashes
+  - `upsert_source_entry(...)` for updating/creating `SourceEntry` records
+- Removed duplicated source-entry update blocks while preserving file-hash semantics and timestamps.
+
+### Pull import flow cleanup
+- Simplified `src/cli/pull.rs` by centralizing repeated tracking/timestamp side effects into:
+  - `update_provider_import_tracking(...)`
+- Kept all existing output copy, warning behavior, and success/error handling unchanged.
+
+### Watch event path deduplication
+- Simplified `src/cli/watch_events.rs` by extracting:
+  - `run_ingest(...)` for shared ingest error rendering
+  - `refresh_source_tracking(...)` for shared tracking refresh logic
+- Reused these helpers in both folder-watch and auto-watch branches; no UX/output changes beyond existing messages.
+
+### Status rendering simplification
+- Simplified `src/cli/status.rs` by introducing `not_connected()` to remove repeated provider-state tuple construction.
+
 ## 2026-02-17 — Provider-Native OAuth UX + Claude Setup-Token Alignment
 
 ### Provider-native OAuth connection path

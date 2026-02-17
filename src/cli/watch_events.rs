@@ -91,23 +91,13 @@ pub(crate) async fn process_folder_changes(
                 );
             }
 
-            match crate::cli::ingest::run_for_files(abs_path, &files_to_ingest).await {
-                Ok(()) => {
-                    println!(
-                        "  {}   {} imported, {} skipped",
-                        dim(&" ".repeat(8)),
-                        bold_white(&files_to_ingest.len().to_string()),
-                        dim(&skipped.to_string())
-                    );
-                }
-                Err(e) => {
-                    println!(
-                        "  {}   {} {}",
-                        dim(&" ".repeat(8)),
-                        red(ICON_CROSS),
-                        red(&e.to_string())
-                    );
-                }
+            if run_ingest(abs_path, &files_to_ingest).await {
+                println!(
+                    "  {}   {} imported, {} skipped",
+                    dim(&" ".repeat(8)),
+                    bold_white(&files_to_ingest.len().to_string()),
+                    dim(&skipped.to_string())
+                );
             }
         }
         Err(e) => {
@@ -120,10 +110,7 @@ pub(crate) async fn process_folder_changes(
         }
     }
 
-    if let Ok(all_files) = discover_files(abs_path) {
-        let all_paths: Vec<_> = all_files.iter().map(|f| f.path.clone()).collect();
-        let _ = update_source_tracking(abs_path, &all_paths);
-    }
+    refresh_source_tracking(abs_path);
 
     println!();
     Ok(())
@@ -195,27 +182,13 @@ pub(crate) async fn process_auto_changes(
                     continue;
                 }
 
-                match crate::cli::ingest::run_for_files(dir, &files_to_ingest).await {
-                    Ok(()) => {
-                        println!(
-                            "  {}   {} imported",
-                            dim(&" ".repeat(8)),
-                            bold_white(&files_to_ingest.len().to_string())
-                        );
-                    }
-                    Err(e) => {
-                        println!(
-                            "  {}   {} {}",
-                            dim(&" ".repeat(8)),
-                            red(ICON_CROSS),
-                            red(&e.to_string())
-                        );
-                    }
-                }
-
-                if let Ok(all) = discover_files(dir) {
-                    let paths: Vec<_> = all.iter().map(|f| f.path.clone()).collect();
-                    let _ = update_source_tracking(dir, &paths);
+                if run_ingest(dir, &files_to_ingest).await {
+                    println!(
+                        "  {}   {} imported",
+                        dim(&" ".repeat(8)),
+                        bold_white(&files_to_ingest.len().to_string())
+                    );
+                    refresh_source_tracking(dir);
                 }
             }
             Err(e) => {
@@ -226,4 +199,26 @@ pub(crate) async fn process_auto_changes(
 
     println!();
     Ok(())
+}
+
+async fn run_ingest(base_dir: &Path, files: &[crate::types::FileInfo]) -> bool {
+    match crate::cli::ingest::run_for_files(base_dir, files).await {
+        Ok(()) => true,
+        Err(e) => {
+            println!(
+                "  {}   {} {}",
+                dim(&" ".repeat(8)),
+                red(ICON_CROSS),
+                red(&e.to_string())
+            );
+            false
+        }
+    }
+}
+
+fn refresh_source_tracking(base_dir: &Path) {
+    if let Ok(all_files) = discover_files(base_dir) {
+        let all_paths: Vec<_> = all_files.iter().map(|f| f.path.clone()).collect();
+        let _ = update_source_tracking(base_dir, &all_paths);
+    }
 }

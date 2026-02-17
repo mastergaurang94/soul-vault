@@ -95,30 +95,7 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
             amber(ICON_STAR)
         );
 
-        let pb = crate::cli::ingest_process::spinner("Updating source tracking...");
-        match update_pull_tracking(&to_import) {
-            Ok(()) => pb.finish_with_message(check("Source tracking updated")),
-            Err(e) => {
-                pb.finish_with_message(amber("Source tracking skipped"));
-                eprintln!(
-                    "{}",
-                    amber(&format!(
-                        "  ⚠ Could not update provider import source tracking: {}",
-                        e
-                    ))
-                );
-            }
-        }
-
-        if let Err(e) = update_pull_config_timestamps(&discovery.discovered_providers) {
-            eprintln!(
-                "{}",
-                amber(&format!(
-                    "  ⚠ Could not update provider import sync timestamps: {}",
-                    e
-                ))
-            );
-        }
+        update_provider_import_tracking(&to_import, &discovery.discovered_providers);
 
         println!(
             "{}",
@@ -140,8 +117,27 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
     let write_result = write_memories_to_vault(&merged, &today)?;
     pb.finish_with_message(check("Vault updated"));
 
+    update_provider_import_tracking(&to_import, &discovery.discovered_providers);
+
+    print_summary(
+        to_import.len(),
+        skipped,
+        &merged,
+        &write_result.topics_written,
+        &write_result.people_written,
+        &parse_errors,
+        &errors,
+    );
+
+    Ok(())
+}
+
+fn update_provider_import_tracking(
+    sessions: &[crate::adapters::SessionFile],
+    providers: &[Provider],
+) {
     let pb = crate::cli::ingest_process::spinner("Updating source tracking...");
-    match update_pull_tracking(&to_import) {
+    match update_pull_tracking(sessions) {
         Ok(()) => pb.finish_with_message(check("Source tracking updated")),
         Err(e) => {
             pb.finish_with_message(amber("Source tracking skipped"));
@@ -155,7 +151,7 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
         }
     }
 
-    if let Err(e) = update_pull_config_timestamps(&discovery.discovered_providers) {
+    if let Err(e) = update_pull_config_timestamps(providers) {
         eprintln!(
             "{}",
             amber(&format!(
@@ -164,18 +160,6 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
             ))
         );
     }
-
-    print_summary(
-        to_import.len(),
-        skipped,
-        &merged,
-        &write_result.topics_written,
-        &write_result.people_written,
-        &parse_errors,
-        &errors,
-    );
-
-    Ok(())
 }
 
 async fn run_cloud(provider: Option<&str>, force: bool) -> Result<()> {

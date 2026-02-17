@@ -14,12 +14,7 @@ const PULL_SOURCE_KEY: &str = "soul-pull";
 const CLOUD_SOURCE_KEY: &str = "soul-cloud";
 
 pub(crate) fn filter_new_sessions(sessions: Vec<SessionFile>) -> Result<(Vec<SessionFile>, usize)> {
-    let sources = read_sources()?;
-    let pull_entry = sources.sources.iter().find(|s| s.path == PULL_SOURCE_KEY);
-
-    let existing_hashes: std::collections::HashMap<String, String> = pull_entry
-        .map(|e| e.file_hashes.clone())
-        .unwrap_or_default();
+    let existing_hashes = source_hashes(PULL_SOURCE_KEY)?;
 
     let mut to_import = Vec::new();
     let mut skipped = 0;
@@ -45,13 +40,7 @@ pub(crate) fn filter_new_sessions(sessions: Vec<SessionFile>) -> Result<(Vec<Ses
 
 pub(crate) fn update_pull_tracking(sessions: &[SessionFile]) -> Result<()> {
     let mut sources = read_sources()?;
-
-    let mut file_hashes = sources
-        .sources
-        .iter()
-        .find(|s| s.path == PULL_SOURCE_KEY)
-        .map(|e| e.file_hashes.clone())
-        .unwrap_or_default();
+    let mut file_hashes = source_hashes_from_entries(&sources.sources, PULL_SOURCE_KEY);
 
     for session in sessions {
         let path_key = session.path.to_string_lossy().to_string();
@@ -60,24 +49,7 @@ pub(crate) fn update_pull_tracking(sessions: &[SessionFile]) -> Result<()> {
         }
     }
 
-    let now = chrono::Utc::now().to_rfc3339();
-
-    if let Some(entry) = sources
-        .sources
-        .iter_mut()
-        .find(|s| s.path == PULL_SOURCE_KEY)
-    {
-        entry.files_ingested = file_hashes.len();
-        entry.last_ingested = now;
-        entry.file_hashes = file_hashes;
-    } else {
-        sources.sources.push(SourceEntry {
-            path: PULL_SOURCE_KEY.to_string(),
-            files_ingested: file_hashes.len(),
-            last_ingested: now,
-            file_hashes,
-        });
-    }
+    upsert_source_entry(&mut sources.sources, PULL_SOURCE_KEY, file_hashes);
 
     write_sources(&sources)?;
     Ok(())
@@ -107,7 +79,10 @@ pub(crate) fn filter_cloud_stubs(
 
     for stub in stubs {
         let key = cloud_meta_key(provider, &stub.conversation_id);
-        let marker = hash_string(&cloud_meta_marker(&stub.conversation_id, stub.updated_at.as_ref()));
+        let marker = hash_string(&cloud_meta_marker(
+            &stub.conversation_id,
+            stub.updated_at.as_ref(),
+        ));
         if hashes.get(&key).map(|v| v == &marker).unwrap_or(false) {
             skipped += 1;
         } else {
@@ -145,12 +120,15 @@ pub(crate) fn update_cloud_tracking(
     conversations: &[CloudConversation],
 ) -> Result<()> {
     let mut sources = read_sources()?;
-    let mut file_hashes = cloud_hashes()?;
+    let mut file_hashes = source_hashes_from_entries(&sources.sources, CLOUD_SOURCE_KEY);
 
     for conv in conversations {
         file_hashes.insert(
             cloud_meta_key(provider, &conv.conversation_id),
-            hash_string(&cloud_meta_marker(&conv.conversation_id, conv.updated_at.as_ref())),
+            hash_string(&cloud_meta_marker(
+                &conv.conversation_id,
+                conv.updated_at.as_ref(),
+            )),
         );
         file_hashes.insert(
             cloud_body_key(provider, &conv.conversation_id),
@@ -158,32 +136,50 @@ pub(crate) fn update_cloud_tracking(
         );
     }
 
-    let now = chrono::Utc::now().to_rfc3339();
-    if let Some(entry) = sources.sources.iter_mut().find(|s| s.path == CLOUD_SOURCE_KEY) {
-        entry.files_ingested = file_hashes.len();
-        entry.last_ingested = now;
-        entry.file_hashes = file_hashes;
-    } else {
-        sources.sources.push(SourceEntry {
-            path: CLOUD_SOURCE_KEY.to_string(),
-            files_ingested: file_hashes.len(),
-            last_ingested: now,
-            file_hashes,
-        });
-    }
+    upsert_source_entry(&mut sources.sources, CLOUD_SOURCE_KEY, file_hashes);
 
     write_sources(&sources)?;
     update_pull_config_timestamps(std::slice::from_ref(provider))
 }
 
 fn cloud_hashes() -> Result<HashMap<String, String>> {
+    source_hashes(CLOUD_SOURCE_KEY)
+}
+
+fn source_hashes(source_key: &str) -> Result<HashMap<String, String>> {
     let sources = read_sources()?;
-    Ok(sources
-        .sources
+    Ok(source_hashes_from_entries(&sources.sources, source_key))
+}
+
+fn source_hashes_from_entries(
+    entries: &[SourceEntry],
+    source_key: &str,
+) -> HashMap<String, String> {
+    entries
         .iter()
-        .find(|s| s.path == CLOUD_SOURCE_KEY)
+        .find(|s| s.path == source_key)
         .map(|e| e.file_hashes.clone())
-        .unwrap_or_default())
+        .unwrap_or_default()
+}
+
+fn upsert_source_entry(
+    entries: &mut Vec<SourceEntry>,
+    source_key: &str,
+    file_hashes: HashMap<String, String>,
+) {
+    let now = chrono::Utc::now().to_rfc3339();
+    if let Some(entry) = entries.iter_mut().find(|s| s.path == source_key) {
+        entry.files_ingested = file_hashes.len();
+        entry.last_ingested = now;
+        entry.file_hashes = file_hashes;
+    } else {
+        entries.push(SourceEntry {
+            path: source_key.to_string(),
+            files_ingested: file_hashes.len(),
+            last_ingested: now,
+            file_hashes,
+        });
+    }
 }
 
 fn cloud_meta_key(provider: &Provider, conversation_id: &str) -> String {

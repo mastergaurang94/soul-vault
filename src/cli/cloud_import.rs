@@ -6,9 +6,7 @@ use std::sync::Arc;
 use anyhow::Result;
 
 use crate::cli::cloud_client::build_cloud_client;
-use crate::cli::cloud_types::{
-    CloudImportEvent, CloudImportSummary, ImportJobState,
-};
+use crate::cli::cloud_types::{CloudImportEvent, CloudImportSummary, ImportJobState};
 use crate::cli::pull_tracking::{
     filter_cloud_stubs, filter_new_cloud_conversations, update_cloud_tracking,
 };
@@ -36,7 +34,14 @@ where
     }
 
     let client = build_cloud_client(provider.clone());
-    emit(event(provider.clone(), ImportJobState::Queued, 0, 0, None, "Queued"));
+    emit(event(
+        provider.clone(),
+        ImportJobState::Queued,
+        0,
+        0,
+        None,
+        "Queued",
+    ));
 
     let mut cursor = None;
     let mut stubs = Vec::new();
@@ -233,7 +238,14 @@ where
         cancelled: false,
     };
 
-    emit(event(provider, ImportJobState::Done, 1, 1, None, "Completed"));
+    emit(event(
+        provider,
+        ImportJobState::Done,
+        1,
+        1,
+        None,
+        "Completed",
+    ));
     Ok(summary)
 }
 

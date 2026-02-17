@@ -107,6 +107,11 @@ Last updated: 2026-02-17
   - Reset is no longer a primary sidebar page
   - Settings now includes a `Danger zone` reset action (`X`) with typed confirmation (`RESET`)
   - successful reset still exits TUI immediately
+- [x] Code simplicity refactor pass completed with no feature/UI changes:
+  - `src/cli/pull_tracking.rs` now reuses shared source-hash load + source-entry upsert helpers
+  - `src/cli/pull.rs` now centralizes provider import tracking/timestamp updates in one helper path
+  - `src/cli/watch_events.rs` now reuses shared ingest + source-tracking refresh helpers across folder/auto watch flows
+  - `src/cli/status.rs` now reuses a single `not connected` state helper for provider lines
 
 ## 🔨 In Progress
 

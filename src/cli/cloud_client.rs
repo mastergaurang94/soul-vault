@@ -44,30 +44,31 @@ impl HttpCloudClient {
     fn new(provider: Provider) -> Self {
         let (base_url, list_path, detail_path_template, items_path_template, cursor_param) =
             match provider {
-            Provider::Claude => (
-                std::env::var("SOUL_CLOUD_CLAUDE_BASE_URL")
-                    .unwrap_or_else(|_| "https://api.anthropic.com/v1".to_string()),
-                "/conversations".to_string(),
-                "/conversations/{id}".to_string(),
-                None,
-                Some("cursor".to_string()),
-            ),
-            Provider::ChatGpt => (
-                std::env::var("SOUL_CLOUD_CHATGPT_BASE_URL")
-                    .unwrap_or_else(|_| "https://api.openai.com/v1".to_string()),
-                "/conversations".to_string(),
-                "/conversations/{id}".to_string(),
-                Some("/conversations/{id}/items".to_string()),
-                Some("cursor".to_string()),
-            ),
-            Provider::Gemini => (
-                std::env::var("SOUL_CLOUD_GEMINI_BASE_URL")
-                    .unwrap_or_else(|_| "https://generativelanguage.googleapis.com/v1beta".to_string()),
-                "/interactions".to_string(),
-                "/interactions/{id}".to_string(),
-                None,
-                Some("pageToken".to_string()),
-            ),
+                Provider::Claude => (
+                    std::env::var("SOUL_CLOUD_CLAUDE_BASE_URL")
+                        .unwrap_or_else(|_| "https://api.anthropic.com/v1".to_string()),
+                    "/conversations".to_string(),
+                    "/conversations/{id}".to_string(),
+                    None,
+                    Some("cursor".to_string()),
+                ),
+                Provider::ChatGpt => (
+                    std::env::var("SOUL_CLOUD_CHATGPT_BASE_URL")
+                        .unwrap_or_else(|_| "https://api.openai.com/v1".to_string()),
+                    "/conversations".to_string(),
+                    "/conversations/{id}".to_string(),
+                    Some("/conversations/{id}/items".to_string()),
+                    Some("cursor".to_string()),
+                ),
+                Provider::Gemini => (
+                    std::env::var("SOUL_CLOUD_GEMINI_BASE_URL").unwrap_or_else(|_| {
+                        "https://generativelanguage.googleapis.com/v1beta".to_string()
+                    }),
+                    "/interactions".to_string(),
+                    "/interactions/{id}".to_string(),
+                    None,
+                    Some("pageToken".to_string()),
+                ),
             };
 
         Self {
@@ -163,7 +164,8 @@ impl CloudProviderClient for HttpCloudClient {
                 .detail_path_template
                 .replace("{id}", &percent_encode(conversation_id));
             let value = self.get_json(&path, &[]).await?;
-            let mut conversation = parse_conversation(self.provider.clone(), conversation_id, value)?;
+            let mut conversation =
+                parse_conversation(self.provider.clone(), conversation_id, value)?;
 
             // OpenAI conversation bodies may omit full message items; fetch them when needed.
             if conversation.messages.is_empty() {
@@ -243,14 +245,14 @@ fn classify_http_error(provider: Provider, status: StatusCode, body: &str) -> an
             provider.display_name(),
             excerpt
         ),
-        StatusCode::BAD_GATEWAY
-        | StatusCode::SERVICE_UNAVAILABLE
-        | StatusCode::GATEWAY_TIMEOUT => anyhow::anyhow!(
-            "{} cloud service is temporarily unavailable ({}). {}",
-            provider.display_name(),
-            status,
-            excerpt
-        ),
+        StatusCode::BAD_GATEWAY | StatusCode::SERVICE_UNAVAILABLE | StatusCode::GATEWAY_TIMEOUT => {
+            anyhow::anyhow!(
+                "{} cloud service is temporarily unavailable ({}). {}",
+                provider.display_name(),
+                status,
+                excerpt
+            )
+        }
         _ => anyhow::anyhow!(
             "{} cloud API error ({}). {}",
             provider.display_name(),
@@ -329,7 +331,11 @@ fn parse_list_page(provider: &Provider, value: Value) -> Result<CloudFetchPage> 
     Ok(CloudFetchPage { items, next_cursor })
 }
 
-fn parse_conversation(provider: Provider, fallback_id: &str, value: Value) -> Result<CloudConversation> {
+fn parse_conversation(
+    provider: Provider,
+    fallback_id: &str,
+    value: Value,
+) -> Result<CloudConversation> {
     let conversation_id = value
         .get("id")
         .or_else(|| value.get("conversation_id"))
@@ -419,15 +425,13 @@ fn parse_message(raw: &Value) -> Option<CloudMessage> {
                 })
         })
         .or_else(|| {
-            raw.get("content")
-                .and_then(Value::as_array)
-                .map(|parts| {
-                    parts
-                        .iter()
-                        .filter_map(|part| part.get("text").and_then(Value::as_str))
-                        .collect::<Vec<_>>()
-                        .join("\n")
-                })
+            raw.get("content").and_then(Value::as_array).map(|parts| {
+                parts
+                    .iter()
+                    .filter_map(|part| part.get("text").and_then(Value::as_str))
+                    .collect::<Vec<_>>()
+                    .join("\n")
+            })
         })
         .or_else(|| {
             raw.get("output")
@@ -632,7 +636,8 @@ mod tests {
             ],
             "nextPageToken": "tok-2"
         });
-        let page = parse_list_page(&Provider::Gemini, payload).expect("gemini list parse should succeed");
+        let page =
+            parse_list_page(&Provider::Gemini, payload).expect("gemini list parse should succeed");
         assert_eq!(page.items.len(), 1);
         assert_eq!(page.items[0].conversation_id, "interactions/abc");
         assert_eq!(page.next_cursor.as_deref(), Some("tok-2"));
@@ -656,8 +661,8 @@ mod tests {
             "data": [],
             "next_cursor": null
         });
-        let page = parse_list_page(&Provider::ChatGpt, payload)
-            .expect("empty list should be valid");
+        let page =
+            parse_list_page(&Provider::ChatGpt, payload).expect("empty list should be valid");
         assert!(page.items.is_empty());
         assert!(page.next_cursor.is_none());
     }
@@ -675,11 +680,8 @@ mod tests {
 
     #[test]
     fn classify_http_error_is_actionable_per_provider() {
-        let auth_err = classify_http_error(
-            Provider::Claude,
-            StatusCode::UNAUTHORIZED,
-            "token rejected",
-        );
+        let auth_err =
+            classify_http_error(Provider::Claude, StatusCode::UNAUTHORIZED, "token rejected");
         assert!(auth_err.to_string().contains("soul login claude"));
 
         let rate_err = classify_http_error(Provider::ChatGpt, StatusCode::TOO_MANY_REQUESTS, "");

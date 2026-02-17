@@ -12,8 +12,8 @@ use std::process::Command;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use crate::auth::{exchange_code_for_token, oauth_config, oauth_is_configured, save_credentials};
 use crate::auth::types::AuthCredentials;
+use crate::auth::{exchange_code_for_token, oauth_config, oauth_is_configured, save_credentials};
 use crate::types::Provider;
 
 const CALLBACK_TIMEOUT: Duration = Duration::from_secs(180);
@@ -124,9 +124,8 @@ async fn verify_cloud_token(provider: &Provider, access_token: &str) -> Result<(
             "/conversations",
         ),
         Provider::Gemini => (
-            std::env::var("SOUL_CLOUD_GEMINI_BASE_URL").unwrap_or_else(|_| {
-                "https://generativelanguage.googleapis.com/v1beta".to_string()
-            }),
+            std::env::var("SOUL_CLOUD_GEMINI_BASE_URL")
+                .unwrap_or_else(|_| "https://generativelanguage.googleapis.com/v1beta".to_string()),
             "/interactions",
         ),
         Provider::Claude => (

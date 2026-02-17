@@ -193,8 +193,14 @@ mod tests {
 
     #[test]
     fn oauth_is_configured_is_false_for_placeholder_defaults() {
-        std::env::set_var("SOUL_OAUTH_CHATGPT_CLIENT_ID", "openai-placeholder-client-id");
-        std::env::set_var("SOUL_OAUTH_GEMINI_CLIENT_ID", "google-placeholder-client-id");
+        std::env::set_var(
+            "SOUL_OAUTH_CHATGPT_CLIENT_ID",
+            "openai-placeholder-client-id",
+        );
+        std::env::set_var(
+            "SOUL_OAUTH_GEMINI_CLIENT_ID",
+            "google-placeholder-client-id",
+        );
         assert!(!oauth_is_configured(&Provider::ChatGpt));
         assert!(!oauth_is_configured(&Provider::Gemini));
         std::env::remove_var("SOUL_OAUTH_CHATGPT_CLIENT_ID");

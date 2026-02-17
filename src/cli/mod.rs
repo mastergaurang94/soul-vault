@@ -1,9 +1,9 @@
 //! CLI command handlers for Soul Vault.
 
-mod export_bundle;
 pub(crate) mod cloud_client;
 pub(crate) mod cloud_import;
 pub(crate) mod cloud_types;
+mod export_bundle;
 mod export_context;
 mod export_json;
 mod export_types;

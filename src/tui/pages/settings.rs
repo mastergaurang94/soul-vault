@@ -308,7 +308,10 @@ impl SettingsPage {
             self.set_status_main(false, format!("Failed to update config: {e}"));
             return;
         }
-        self.set_status_main(true, format!("Processing set to {}.", provider.display_name()));
+        self.set_status_main(
+            true,
+            format!("Processing set to {}.", provider.display_name()),
+        );
     }
 
     fn handle_setup_flow_key(&mut self, key: KeyEvent) -> PageAction {
@@ -378,7 +381,9 @@ impl SettingsPage {
                             });
                             PageAction::Consumed
                         }
-                        AuthAction::OAuth => self.handle_oauth_action(&provider, set_processing_on_success),
+                        AuthAction::OAuth => {
+                            self.handle_oauth_action(&provider, set_processing_on_success)
+                        }
                         AuthAction::Back => {
                             self.setup_flow = None;
                             self.pending_processing_provider = None;
@@ -426,7 +431,7 @@ impl SettingsPage {
 
                 match key.code {
                     KeyCode::Esc => {
-                            self.open_auth_menu(provider.clone(), set_processing_on_success);
+                        self.open_auth_menu(provider.clone(), set_processing_on_success);
                         PageAction::Consumed
                     }
                     KeyCode::Left => {
@@ -639,7 +644,10 @@ impl SettingsPage {
                 }
                 KeyCode::Enter => {
                     if input.trim() != "RESET" {
-                        self.set_status_subflow(false, "Confirmation mismatch. Type RESET exactly.");
+                        self.set_status_subflow(
+                            false,
+                            "Confirmation mismatch. Type RESET exactly.",
+                        );
                         return PageAction::Consumed;
                     }
 
@@ -672,7 +680,10 @@ impl SettingsPage {
         if is_logged_in(provider).unwrap_or(false) {
             match remove_credentials(provider) {
                 Ok(true) => {
-                    self.set_status_subflow(true, format!("Disconnected {}.", provider.display_name()));
+                    self.set_status_subflow(
+                        true,
+                        format!("Disconnected {}.", provider.display_name()),
+                    );
                 }
                 Ok(false) => {
                     self.set_status_subflow(
@@ -707,7 +718,10 @@ impl SettingsPage {
         } else {
             self.pending_processing_provider = None;
         }
-        self.set_status_subflow(true, format!("Starting OAuth for {}...", provider.display_name()));
+        self.set_status_subflow(
+            true,
+            format!("Starting OAuth for {}...", provider.display_name()),
+        );
         self.setup_flow = None;
         PageAction::StartOAuthConnect(provider.clone())
     }
@@ -736,7 +750,11 @@ impl ProcessingChoice {
 
 fn auth_actions_for_provider(provider: &Provider) -> Vec<AuthAction> {
     if *provider == Provider::Claude {
-        return vec![AuthAction::ApiKey, AuthAction::ClaudeSetupToken, AuthAction::Back];
+        return vec![
+            AuthAction::ApiKey,
+            AuthAction::ClaudeSetupToken,
+            AuthAction::Back,
+        ];
     }
     vec![AuthAction::ApiKey, AuthAction::OAuth, AuthAction::Back]
 }
@@ -837,12 +855,12 @@ fn render_settings_main(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
 
     if !page.status_from_subflow {
         if let Some((ok, msg)) = &page.status_message {
-        let color = if *ok { rat::EMERALD } else { rat::RED };
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            format!("  {}", msg),
-            Style::default().fg(color),
-        )));
+            let color = if *ok { rat::EMERALD } else { rat::RED };
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                format!("  {}", msg),
+                Style::default().fg(color),
+            )));
         }
     }
 
@@ -1089,8 +1107,14 @@ fn credential_line(config: &SoulVaultConfig, provider: &Provider, selected: bool
     Line::from(vec![
         Span::styled(prefix, name_style),
         Span::styled(format!("{:<8}", provider.display_name()), name_style),
-        Span::styled(format!(" API: {:<12}", key_label), Style::default().fg(rat::DIM)),
-        Span::styled(format!(" OAuth: {:<15}", oauth_label), Style::default().fg(rat::DIM)),
+        Span::styled(
+            format!(" API: {:<12}", key_label),
+            Style::default().fg(rat::DIM),
+        ),
+        Span::styled(
+            format!(" OAuth: {:<15}", oauth_label),
+            Style::default().fg(rat::DIM),
+        ),
     ])
 }
 
