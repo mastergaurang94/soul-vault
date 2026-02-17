@@ -606,8 +606,15 @@ fn render_settings(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
     lines.push(Line::from(""));
     lines.extend(connection_lines(&config, page.selected_connection));
     lines.push(Line::from(""));
-    lines.push(section_header("  Danger zone"));
+    lines.push(Line::from(Span::styled(
+        "  Danger zone",
+        Style::default().fg(rat::RED).add_modifier(Modifier::BOLD),
+    )));
     lines.push(Line::from(""));
+    lines.push(Line::from(Span::styled(
+        "    Reset will move your vault to Trash.",
+        Style::default().fg(rat::DIM),
+    )));
     lines.push(Line::from(Span::styled(
         "    Press X to reset vault (typed confirmation required)",
         Style::default().fg(rat::RED),
