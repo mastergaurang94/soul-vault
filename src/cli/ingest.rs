@@ -9,7 +9,7 @@ use crate::cli::ingest_summary::print_summary;
 use crate::core::merger::merge_all_memories;
 use crate::types::FileInfo;
 use crate::ui::theme::*;
-use crate::vault::config::{assert_initialized, assert_path_exists};
+use crate::vault::config::{assert_initialized, assert_path_exists, processing_enabled};
 use crate::vault::sources::update_source_tracking;
 use crate::vault::write::write_memories_to_vault;
 
@@ -53,6 +53,37 @@ pub async fn run(folder_path: &str, force: bool) -> Result<()> {
     }
 
     let all_chunks = read_and_chunk(&files_to_ingest)?;
+    if !processing_enabled()? {
+        println!(
+            "\n  {} Processing disabled. Imported raw sessions only (no memory extraction).",
+            amber(ICON_STAR)
+        );
+        let pb = spinner("Updating source tracking...");
+        let all_file_paths: Vec<PathBuf> = files.iter().map(|f| f.path.clone()).collect();
+        match update_source_tracking(&abs_path, &all_file_paths) {
+            Ok(()) => pb.finish_with_message(check("Source tracking updated")),
+            Err(e) => {
+                pb.finish_with_message(amber("Source tracking skipped"));
+                eprintln!(
+                    "{}",
+                    amber(&format!("  ⚠ Could not update source tracking: {}", e))
+                );
+            }
+        }
+        println!(
+            "{}",
+            check(&format!(
+                "Raw import complete ({} files: {} new, {} modified, {} skipped).",
+                files.len(),
+                new_count,
+                modified_count,
+                skipped_count
+            ))
+        );
+        println!();
+        return Ok(());
+    }
+
     let (all_memories, errors) = process_all_chunks(&all_chunks).await?;
 
     let merged = merge_all_memories(&all_memories);
@@ -100,6 +131,17 @@ pub async fn run_for_files(base_path: &Path, files: &[FileInfo]) -> Result<()> {
 
     let all_chunks = read_and_chunk(files)?;
     if all_chunks.is_empty() {
+        return Ok(());
+    }
+
+    if !processing_enabled()? {
+        let all_file_paths: Vec<PathBuf> = files.iter().map(|f| f.path.clone()).collect();
+        if let Err(e) = update_source_tracking(base_path, &all_file_paths) {
+            eprintln!(
+                "{}",
+                amber(&format!("  ⚠ Could not update source tracking: {}", e))
+            );
+        }
         return Ok(());
     }
 

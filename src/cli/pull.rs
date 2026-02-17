@@ -15,7 +15,7 @@ use crate::cli::pull_tracking::{
 use crate::core::merger::merge_all_memories;
 use crate::types::Provider;
 use crate::ui::theme::*;
-use crate::vault::config::{assert_initialized, get_api_key};
+use crate::vault::config::{assert_initialized, get_api_key, processing_enabled};
 use crate::vault::write::write_memories_to_vault;
 
 // ─── Provider Import ──────────────────────────────────────────────────────────
@@ -83,6 +83,49 @@ pub async fn run(force: bool, cloud: bool, provider: Option<&str>) -> Result<()>
     let (all_chunks, parse_errors) = parse_sessions_to_chunks(&registry, &to_import);
     if all_chunks.is_empty() {
         println!("{}", dim("  No meaningful content found in sessions."));
+        println!();
+        return Ok(());
+    }
+
+    if !processing_enabled()? {
+        println!(
+            "\n  {} Processing disabled. Imported raw sessions only (no memory extraction).",
+            amber(ICON_STAR)
+        );
+
+        let pb = crate::cli::ingest_process::spinner("Updating source tracking...");
+        match update_pull_tracking(&to_import) {
+            Ok(()) => pb.finish_with_message(check("Source tracking updated")),
+            Err(e) => {
+                pb.finish_with_message(amber("Source tracking skipped"));
+                eprintln!(
+                    "{}",
+                    amber(&format!(
+                        "  ⚠ Could not update provider import source tracking: {}",
+                        e
+                    ))
+                );
+            }
+        }
+
+        if let Err(e) = update_pull_config_timestamps(&discovery.discovered_providers) {
+            eprintln!(
+                "{}",
+                amber(&format!(
+                    "  ⚠ Could not update provider import sync timestamps: {}",
+                    e
+                ))
+            );
+        }
+
+        println!(
+            "{}",
+            check(&format!(
+                "Raw provider import complete ({} sessions, {} chunks parsed).",
+                to_import.len(),
+                all_chunks.len()
+            ))
+        );
         println!();
         return Ok(());
     }

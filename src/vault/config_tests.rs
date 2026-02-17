@@ -1,7 +1,7 @@
 //! Tests for vault module.
 use std::fs;
 
-use crate::types::{KeysConfig, Provider, ProviderConfig, SoulVaultConfig};
+use crate::types::{KeysConfig, ProcessingMode, Provider, ProviderConfig, SoulVaultConfig};
 use crate::vault::config::{
     config_dir, config_path, identity_dir, keys_path, memories_dir, people_dir, topics_dir,
     vault_root,
@@ -36,7 +36,7 @@ fn test_config_serde_roundtrip() {
             enabled: true,
             last_import: None,
         }],
-        processing_llm: Provider::Claude,
+        processing_mode: ProcessingMode::Claude,
         vault_path: "/tmp/soul-vault".to_string(),
         created_at: "2026-02-14T00:00:00Z".to_string(),
         last_sync: None,
@@ -44,7 +44,7 @@ fn test_config_serde_roundtrip() {
 
     let json = serde_json::to_string_pretty(&config).unwrap();
     let parsed: SoulVaultConfig = serde_json::from_str(&json).unwrap();
-    assert_eq!(parsed.processing_llm, Provider::Claude);
+    assert_eq!(parsed.processing_mode, ProcessingMode::Claude);
     assert_eq!(parsed.providers.len(), 1);
 }
 

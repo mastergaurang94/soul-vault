@@ -8,7 +8,7 @@ use super::Provider;
 #[serde(rename_all = "camelCase")]
 pub struct SoulVaultConfig {
     pub providers: Vec<ProviderConfig>,
-    pub processing_llm: Provider,
+    pub processing_mode: ProcessingMode,
     pub vault_path: String,
     pub created_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -26,3 +26,44 @@ pub struct ProviderConfig {
 
 /// API keys stored as provider_name -> key.
 pub type KeysConfig = std::collections::HashMap<String, String>;
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ProcessingMode {
+    Disabled,
+    Claude,
+    ChatGpt,
+    Gemini,
+}
+
+impl ProcessingMode {
+    pub fn display_name(&self) -> &str {
+        match self {
+            ProcessingMode::Disabled => "Disabled (raw sessions only)",
+            ProcessingMode::Claude => "Claude",
+            ProcessingMode::ChatGpt => "ChatGPT",
+            ProcessingMode::Gemini => "Gemini",
+        }
+    }
+
+    pub fn as_provider(&self) -> Option<Provider> {
+        match self {
+            ProcessingMode::Disabled => None,
+            ProcessingMode::Claude => Some(Provider::Claude),
+            ProcessingMode::ChatGpt => Some(Provider::ChatGpt),
+            ProcessingMode::Gemini => Some(Provider::Gemini),
+        }
+    }
+
+    pub fn is_enabled(&self) -> bool {
+        !matches!(self, ProcessingMode::Disabled)
+    }
+
+    pub fn from_provider(provider: &Provider) -> Self {
+        match provider {
+            Provider::Claude => ProcessingMode::Claude,
+            Provider::ChatGpt => ProcessingMode::ChatGpt,
+            Provider::Gemini => ProcessingMode::Gemini,
+        }
+    }
+}

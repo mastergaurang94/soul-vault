@@ -11,7 +11,7 @@ use tokio::sync::mpsc;
 use crate::core::merger::{chunk_text, merge_all_memories};
 use crate::core::processor::process_chunk;
 use crate::types::{ChunkInfo, ExtractedMemories, FileInfo};
-use crate::vault::config::{assert_initialized, assert_path_exists};
+use crate::vault::config::{assert_initialized, assert_path_exists, processing_enabled};
 use crate::vault::local::{discover_files, extract_file_content};
 use crate::vault::sources::{classify_files, update_source_tracking};
 use crate::vault::write::write_memories_to_vault;
@@ -124,6 +124,22 @@ async fn run_import_inner(folder: &str, tx: &mpsc::Sender<ImportProgress>) -> Re
 
     // Phase 3: Read & Chunk
     let all_chunks = read_and_chunk(&files_to_ingest)?;
+
+    if !processing_enabled()? {
+        update_source_tracking(&abs_path, &file_paths)?;
+        tx.send(ImportProgress::Done(ImportResult {
+            new_count,
+            modified_count,
+            skipped_count,
+            facts_extracted: 0,
+            topics: Vec::new(),
+            people: Vec::new(),
+            errors: vec!["Processing disabled (raw sessions only).".to_string()],
+        }))
+        .await
+        .ok();
+        return Ok(());
+    }
 
     // Phase 4: Process through LLM
     let (all_memories, errors) = process_chunks_with_progress(&all_chunks, tx).await?;

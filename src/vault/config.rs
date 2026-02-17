@@ -7,7 +7,7 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 
-use crate::types::{KeysConfig, Provider, SoulVaultConfig, SoulVaultError};
+use crate::types::{KeysConfig, ProcessingMode, Provider, SoulVaultConfig, SoulVaultError};
 
 /// Returns the vault root directory: ~/soul-vault/
 pub fn vault_root() -> PathBuf {
@@ -250,4 +250,12 @@ pub fn assert_path_exists(path: &Path) -> Result<()> {
         .into());
     }
     Ok(())
+}
+
+pub fn read_processing_mode() -> Result<ProcessingMode> {
+    Ok(read_config()?.processing_mode)
+}
+
+pub fn processing_enabled() -> Result<bool> {
+    Ok(read_processing_mode()?.is_enabled())
 }

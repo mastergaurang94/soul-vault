@@ -1,11 +1,16 @@
 //! `soul init` — first-time setup wizard.
 
 use anyhow::Result;
-use std::io::{self, Write};
+use crossterm::{
+    cursor,
+    terminal::{Clear, ClearType},
+    ExecutableCommand,
+};
+use std::io::{self, IsTerminal, Write};
 
 use crate::auth::{connect_provider, is_logged_in};
 use crate::cli::init_validate::{validate_api_key, ApiKeyValidation};
-use crate::types::{Provider, ProviderConfig, SoulVaultConfig};
+use crate::types::{ProcessingMode, Provider, ProviderConfig, SoulVaultConfig};
 use crate::ui::theme::*;
 use crate::vault::config::{
     create_default_files, create_gitignore, create_vault_structure, get_api_key, is_initialized,
@@ -15,9 +20,21 @@ use crate::vault::config::{
 // ─── Init Command ─────────────────────────────────────────────────────────────
 
 pub async fn run() -> Result<()> {
-    println!("{}", banner());
-    println!("{}", dim("  First-time setup wizard\n"));
-    println!("{}", line());
+    run_with_banner(true).await
+}
+
+pub async fn run_without_banner() -> Result<()> {
+    run_with_banner(false).await
+}
+
+async fn run_with_banner(show_banner: bool) -> Result<()> {
+    if show_banner {
+        println!("{}", banner());
+        println!("{}", dim("  First-time setup wizard\n"));
+        println!("{}", line());
+    } else {
+        println!("{}", line());
+    }
 
     if is_initialized() {
         println!(
@@ -36,86 +53,59 @@ pub async fn run() -> Result<()> {
         println!();
     }
 
-    // Step 1: Create vault structure
-    print!("  Creating vault structure... ");
-    io::stdout().flush()?;
+    // Prepare vault structure quietly; errors will bubble with actionable context.
     create_vault_structure()?;
     create_gitignore()?;
     create_default_files()?;
-    println!("{}", check("Vault structure created"));
 
-    // Step 2: Provider setup
-    println!("\n{}", gold("  Configure providers:"));
-    println!(
-        "{}",
-        dim("  Choose one provider at a time, then select Done when finished.\n")
-    );
+    // Step 1: Provider setup
     let mut providers = default_provider_configs();
     configure_providers_loop(&mut providers).await?;
 
-    // Step 3: Processing LLM selection
-    println!("\n{}", gold("  Select processing LLM:"));
+    // Step 2: Processing mode selection
+    let mut processing_mode = select_processing_mode(&mut providers).await?;
+    println!();
     println!(
         "{}",
-        dim("  This is the AI that will extract memories from your conversations.\n")
+        check(&format!("Processing: {}", processing_mode.display_name()))
     );
-
-    let llm_options = [Provider::Claude, Provider::ChatGpt, Provider::Gemini];
-    let llm_labels = ["Claude", "ChatGPT", "Gemini"];
-
-    for (i, label) in llm_labels.iter().enumerate() {
-        println!("    {} {}", dim(&format!("{}.", i + 1)), label);
-    }
-
-    let choice = ask(&format!("\n  Choose {} ", dim("(1-3, default: 1)")))?;
-    let llm_index: usize = choice.trim().parse().unwrap_or(1);
-    let processing_llm = if (1..=3).contains(&llm_index) {
-        llm_options[llm_index - 1].clone()
-    } else {
-        Provider::Claude
-    };
-    println!(
-        "{}",
-        check(&format!(
-            "Processing LLM: {}",
-            processing_llm.display_name()
-        ))
-    );
-
-    // Step 4: Ensure processing LLM is configured
-    if !provider_has_credentials(&processing_llm) {
-        println!(
-            "\n  {} {} is selected as processing LLM but has no credentials.",
-            amber(ICON_STAR),
-            processing_llm.display_name()
-        );
-        let answer = ask(&format!(
-            "  Configure {} now? {} ",
-            processing_llm.display_name(),
-            dim("(Y/n)")
-        ))?;
-        if answer.trim().to_lowercase() != "n" {
-            configure_single_provider(&processing_llm, &mut providers).await?;
-        }
-    }
 
     // Step 5: Final setup summary + confirmation
-    render_setup_summary(&providers, &processing_llm);
-    let finish = ask(&format!(
-        "\n  Finish setup and save configuration? {} ",
-        dim("(Y/n)")
-    ))?;
-    if finish.trim().to_lowercase() == "n" {
-        println!(
-            "\n  {} Setup not finalized. Your vault folders and any entered credentials were kept.",
-            dim(ICON_DOT)
-        );
-        println!(
-            "  {} Run {} again to finish setup.\n",
-            dim(ICON_DOT),
-            cyan("soul init")
-        );
-        return Ok(());
+    loop {
+        render_setup_summary(&providers, &processing_mode);
+        let finish = ask(&format!(
+            "\n  Finish setup and save configuration? {} ",
+            dim("(Y/n)")
+        ))?;
+        if finish.trim().to_lowercase() != "n" {
+            break;
+        }
+
+        println!("\n  {} What would you like to do next?", dim(ICON_DOT));
+        println!("    {} Configure providers", dim("1."));
+        println!("    {} Change processing mode", dim("2."));
+        println!("    {} Cancel setup", dim("3."));
+        let next = ask(&format!("\n  Choose {} ", dim("(1-3, default: 1)")))?;
+        match next.trim() {
+            "2" => {
+                processing_mode = select_processing_mode(&mut providers).await?;
+            }
+            "3" => {
+                println!(
+                    "\n  {} Setup not finalized. Your vault folders and any entered credentials were kept.",
+                    dim(ICON_DOT)
+                );
+                println!(
+                    "  {} Run {} again to finish setup.\n",
+                    dim(ICON_DOT),
+                    cyan("soul init")
+                );
+                return Ok(());
+            }
+            _ => {
+                configure_providers_loop(&mut providers).await?;
+            }
+        }
     }
 
     // Step 6: Save config
@@ -123,7 +113,7 @@ pub async fn run() -> Result<()> {
     io::stdout().flush()?;
     let config = SoulVaultConfig {
         providers,
-        processing_llm,
+        processing_mode,
         vault_path: vault_root().display().to_string(),
         created_at: chrono::Utc::now().to_rfc3339(),
         last_sync: None,
@@ -183,25 +173,136 @@ fn default_provider_configs() -> Vec<ProviderConfig> {
 
 async fn configure_providers_loop(providers: &mut [ProviderConfig]) -> Result<()> {
     loop {
-        print_provider_menu(providers);
-        let choice = ask(&format!(
-            "\n  Select provider {} ",
-            dim("(1-4, default: 4)")
-        ))?;
-        let idx: usize = choice.trim().parse().unwrap_or(4);
-        match idx {
-            1 => configure_single_provider(&Provider::Claude, providers).await?,
-            2 => configure_single_provider(&Provider::ChatGpt, providers).await?,
-            3 => configure_single_provider(&Provider::Gemini, providers).await?,
-            4 => break,
-            _ => println!("  {} Choose 1, 2, 3, or 4.", amber(ICON_STAR)),
+        render_provider_setup_screen(providers)?;
+        println!();
+        let choice = ask("  Choose a provider [1-4] (Enter = Done): ")?;
+        match parse_provider_choice(&choice) {
+            ProviderChoice::Provider(provider) => {
+                configure_single_provider(&provider, providers).await?
+            }
+            ProviderChoice::Done => break,
+            ProviderChoice::Invalid => println!(
+                "  {} Use 1-4, provider name (claude/chatgpt/gemini), or Enter for Done.",
+                amber(ICON_STAR)
+            ),
         }
     }
     Ok(())
 }
 
+async fn select_processing_mode(providers: &mut [ProviderConfig]) -> Result<ProcessingMode> {
+    println!("\n{}", gold("  Step 2/2: Select processing mode"));
+    println!();
+    println!(
+        "{}",
+        dim("  This is the AI that will extract memories from your conversations.\n")
+    );
+
+    let llm_options = [Provider::Claude, Provider::ChatGpt, Provider::Gemini];
+    let llm_labels = ["Claude", "ChatGPT", "Gemini"];
+
+    for (i, label) in llm_labels.iter().enumerate() {
+        println!("    {} {}", dim(&format!("{}.", i + 1)), label);
+    }
+    println!(
+        "    {} Soul Vault Cloud {}",
+        dim("4."),
+        dim("(coming soon)")
+    );
+    println!("    {} Skip processing {}", dim("5."), dim("(raw mode)"));
+
+    let processing_mode = loop {
+        let choice = ask(&format!("\n  Choose {} ", dim("(1-5)")))?;
+        let llm_index: usize = match choice.trim().parse() {
+            Ok(value) => value,
+            Err(_) => {
+                println!("  {} Choose 1, 2, 3, 4, or 5.", amber(ICON_STAR));
+                continue;
+            }
+        };
+
+        let candidate_provider = match llm_index {
+            1..=3 => llm_options[llm_index - 1].clone(),
+            4 => {
+                println!(
+                    "  {} Soul Vault Cloud processing is coming soon. Please choose 1-3 for now.",
+                    amber(ICON_STAR)
+                );
+                continue;
+            }
+            5 => {
+                println!(
+                    "  {} Processing disabled. Soul Vault will keep raw sessions, but memory extraction features will be unavailable until you enable processing.",
+                    amber(ICON_STAR)
+                );
+                break ProcessingMode::Disabled;
+            }
+            _ => {
+                println!("  {} Choose 1, 2, 3, 4, or 5.", amber(ICON_STAR));
+                continue;
+            }
+        };
+
+        if provider_has_credentials(&candidate_provider) {
+            break ProcessingMode::from_provider(&candidate_provider);
+        }
+
+        println!(
+            "\n  {} {} was selected as processing mode but has no credentials.",
+            amber(ICON_STAR),
+            candidate_provider.display_name()
+        );
+        println!();
+        let answer = ask(&format!(
+            "  Configure {} now? {} ",
+            candidate_provider.display_name(),
+            dim("(Y/n)")
+        ))?;
+        if answer.trim().to_lowercase() != "n" {
+            configure_single_provider(&candidate_provider, providers).await?;
+        }
+
+        if provider_has_credentials(&candidate_provider) {
+            break ProcessingMode::from_provider(&candidate_provider);
+        }
+
+        println!(
+            "  {} {} is still not configured. Choose a processor that is ready.",
+            amber(ICON_STAR),
+            candidate_provider.display_name()
+        );
+    };
+
+    println!();
+    println!(
+        "{}",
+        check(&format!("Processing: {}", processing_mode.display_name()))
+    );
+
+    Ok(processing_mode)
+}
+
+fn render_provider_setup_screen(providers: &[ProviderConfig]) -> Result<()> {
+    clear_screen_if_tty()?;
+    println!("{}", banner());
+    println!("{}", dim("  First-time setup wizard"));
+    println!("{}", line());
+    println!("\n{}", gold("  Step 1/2: Configure providers"));
+    println!();
+    println!(
+        "{}",
+        dim("  Providers are where Soul Vault imports and/or syncs your conversations from.")
+    );
+    println!(
+        "{}",
+        dim("  Configure one at a time, then choose Done when finished.")
+    );
+    println!();
+    print_provider_menu(providers);
+    Ok(())
+}
+
 fn print_provider_menu(providers: &[ProviderConfig]) {
-    println!("\n{}", line());
     println!("{}", gold("  Providers"));
     for (i, provider) in [Provider::Claude, Provider::ChatGpt, Provider::Gemini]
         .iter()
@@ -242,17 +343,34 @@ fn set_provider_enabled(providers: &mut [ProviderConfig], provider: &Provider, e
     }
 }
 
+enum ProviderChoice {
+    Provider(Provider),
+    Done,
+    Invalid,
+}
+
+fn parse_provider_choice(input: &str) -> ProviderChoice {
+    let trimmed = input.trim().to_lowercase();
+    if trimmed.is_empty() || trimmed == "4" || trimmed == "done" {
+        return ProviderChoice::Done;
+    }
+
+    match trimmed.as_str() {
+        "1" | "claude" => ProviderChoice::Provider(Provider::Claude),
+        "2" | "chatgpt" | "chat-gpt" | "chat_gpt" | "openai" => {
+            ProviderChoice::Provider(Provider::ChatGpt)
+        }
+        "3" | "gemini" | "google" => ProviderChoice::Provider(Provider::Gemini),
+        _ => ProviderChoice::Invalid,
+    }
+}
+
 async fn configure_single_provider(
     provider: &Provider,
     providers: &mut [ProviderConfig],
 ) -> Result<()> {
     loop {
-        println!("\n{}", line());
-        println!(
-            "  {} {}",
-            gold("Configure provider:"),
-            bold_white(provider.display_name())
-        );
+        render_auth_method_screen(provider)?;
         println!("    {} API key", dim("1."));
         if supports_oauth(provider) {
             println!("    {} OAuth", dim("2."));
@@ -261,6 +379,7 @@ async fn configure_single_provider(
             println!("    {} OAuth {}", dim("2."), dim("(coming soon)"));
             println!("    {} Back", dim("3."));
         }
+        println!();
 
         let choice = ask(&format!(
             "  Select auth method {} ",
@@ -284,11 +403,8 @@ async fn configure_single_provider(
                     );
                     continue;
                 }
-                println!(
-                    "  {} Starting OAuth for {}...",
-                    dim(ICON_DOT),
-                    provider.display_name()
-                );
+                println!();
+                println!("  Starting OAuth for {}...", provider.display_name());
                 match connect_provider(provider).await {
                     Ok(()) => {
                         println!(
@@ -305,6 +421,22 @@ async fn configure_single_provider(
             _ => println!("  {} Choose 1, 2, or 3.", amber(ICON_STAR)),
         }
     }
+}
+
+fn render_auth_method_screen(provider: &Provider) -> Result<()> {
+    clear_screen_if_tty()?;
+    println!("{}", banner());
+    println!("{}", dim("  First-time setup wizard"));
+    println!("{}", line());
+    println!("\n{}", gold("  Step 1/2: Configure providers"));
+    println!();
+    println!(
+        "  {} {}",
+        bold_white(provider.display_name()),
+        dim("Choose auth method")
+    );
+    println!();
+    Ok(())
 }
 
 async fn setup_api_key(provider: &Provider) -> Result<bool> {
@@ -384,7 +516,7 @@ fn provider_has_credentials(provider: &Provider) -> bool {
     has_key || has_oauth
 }
 
-fn render_setup_summary(providers: &[ProviderConfig], processing_llm: &Provider) {
+fn render_setup_summary(providers: &[ProviderConfig], processing_mode: &ProcessingMode) {
     println!("\n{}", line());
     println!("{}", gold("  Setup summary"));
     for provider in [Provider::Claude, Provider::ChatGpt, Provider::Gemini] {
@@ -393,8 +525,8 @@ fn render_setup_summary(providers: &[ProviderConfig], processing_llm: &Provider)
     }
     println!(
         "    {:<8} {}",
-        "Processor",
-        bold_white(processing_llm.display_name())
+        "Processing",
+        bold_white(processing_mode.display_name())
     );
 }
 
@@ -427,6 +559,15 @@ fn ask(prompt: &str) -> Result<String> {
     Ok(input.trim().to_string())
 }
 
+fn clear_screen_if_tty() -> Result<()> {
+    if io::stdout().is_terminal() {
+        let mut out = io::stdout();
+        out.execute(Clear(ClearType::All))?;
+        out.execute(cursor::MoveTo(0, 0))?;
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -455,5 +596,18 @@ mod tests {
             provider_setup_status(&Provider::Claude, &providers),
             amber("Enabled")
         );
+    }
+
+    #[test]
+    fn parse_provider_choice_accepts_number_name_and_enter() {
+        assert!(matches!(
+            parse_provider_choice("1"),
+            ProviderChoice::Provider(Provider::Claude)
+        ));
+        assert!(matches!(
+            parse_provider_choice("chatgpt"),
+            ProviderChoice::Provider(Provider::ChatGpt)
+        ));
+        assert!(matches!(parse_provider_choice(""), ProviderChoice::Done));
     }
 }

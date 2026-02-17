@@ -1,5 +1,7 @@
 //! Tests for types module.
-use super::{Confidence, ExtractedMemories, Provider, ProviderConfig, SoulVaultConfig};
+use super::{
+    Confidence, ExtractedMemories, ProcessingMode, Provider, ProviderConfig, SoulVaultConfig,
+};
 
 #[test]
 fn test_provider_display() {
@@ -35,7 +37,7 @@ fn test_config_serde() {
             enabled: true,
             last_import: None,
         }],
-        processing_llm: Provider::Claude,
+        processing_mode: ProcessingMode::Claude,
         vault_path: "/home/user/soul-vault".to_string(),
         created_at: "2026-02-14T00:00:00Z".to_string(),
         last_sync: None,
@@ -43,7 +45,7 @@ fn test_config_serde() {
 
     let json = serde_json::to_string(&config).unwrap();
     let parsed: SoulVaultConfig = serde_json::from_str(&json).unwrap();
-    assert_eq!(parsed.processing_llm, Provider::Claude);
+    assert_eq!(parsed.processing_mode, ProcessingMode::Claude);
 }
 
 #[test]

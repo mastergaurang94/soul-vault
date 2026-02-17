@@ -1,6 +1,6 @@
 # Soul Vault — Project Status
 
-Last updated: 2026-02-16
+Last updated: 2026-02-17
 
 ## ✅ Completed
 
@@ -74,6 +74,15 @@ Last updated: 2026-02-16
   - `soul reset --permanent` performs irreversible delete
   - non-interactive permanent delete requires `--force --permanent`
   - TUI reset now requires typed confirmation (`RESET`) before execution
+- [x] Processing is now optional:
+  - config now uses `processing_mode` with a disabled/raw option
+  - init allows `Skip processing (raw mode)` and clearly warns memory extraction features are unavailable
+  - local/provider imports now keep source tracking working even when processing is disabled
+  - users can continue setup and use Soul Vault without selecting a processing mode
+- [x] Settings now includes processing mode controls:
+  - set processing directly in TUI Settings (`1-4`) without rerunning `soul init`
+  - selecting a processing provider auto-enables that provider in config
+  - settings warns when processing is selected but provider credentials are missing
 
 ## 🔨 In Progress
 
@@ -82,6 +91,7 @@ Last updated: 2026-02-16
 ## 📋 Backlog
 
 - [ ] Cloud API conversation fetch implementation for `soul import --cloud`
+- [ ] Managed `Soul Vault Cloud` processing option in onboarding (default processor path)
 - [ ] `soul search` — full-text vault search
 - [ ] `soul diff` — show changes since last import
 - [ ] `SOUL_VAULT_VAULT_PATH` env var for multi-vault/test workflows

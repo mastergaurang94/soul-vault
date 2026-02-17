@@ -1,11 +1,44 @@
 # Changelog
-Last updated: 2026-02-16
+Last updated: 2026-02-17
 
 
 All notable changes to Soul Vault will be documented in this file.
 Agents: append entries here after completing work.
 
 ---
+
+## 2026-02-17 — Phase 1: Optional Processing Mode (Raw Import Supported)
+
+### Config and onboarding
+- Replaced required processing mode config with `processing_mode`:
+  - `disabled` (raw sessions only)
+  - `claude`, `chat_gpt`, `gemini`
+- Updated `soul init` to support non-blocking setup:
+  - added `Skip processing (raw mode)` option in Step 2
+  - users can finish setup without selecting a processing mode
+  - added clear warning copy about memory extraction capabilities being unavailable in raw mode
+
+### Runtime behavior (CLI + TUI)
+- Local folder import (`soul import <folder>`) now short-circuits correctly when processing is disabled:
+  - still classifies files and updates source tracking
+  - skips LLM extraction and memory writes
+- Provider import (`soul import`) now supports the same raw-mode behavior:
+  - discovers/parses sessions
+  - updates provider source tracking
+  - skips LLM extraction and memory writes
+- TUI async import pipeline (`src/core/pipeline.rs`) now respects disabled processing mode and returns clean completion with zero extracted memories.
+- TUI provider-import runtime task now also respects disabled processing mode and completes as raw-only import.
+
+### Settings improvements
+- Settings now shows and allows changing processing mode directly in the TUI:
+  - `1` Disabled, `2` Claude, `3` ChatGPT, `4` Gemini
+- Added processing mode persistence helper in vault config.
+- Selecting a processing provider from Settings now auto-enables that provider in config.
+- Added status messaging when processing is selected but credentials are missing.
+
+### Status/visibility updates
+- `soul status` now shows processing mode from config (`Processing` row).
+- Settings vault metadata now shows `Processing` instead of legacy `LLM` wording.
 
 ## 2026-02-16 — Init Flow Redesign: Provider-By-Provider Setup
 
@@ -21,7 +54,7 @@ Agents: append entries here after completing work.
 ### Credential handling
 - API key path still validates immediately and saves key health state.
 - OAuth path is now available during init for supported providers (currently Claude).
-- If selected processing LLM has no credentials at the end, init prompts to configure it before finish.
+- If selected processing mode has no credentials at the end, init prompts to configure it before finish.
 - Summary uses credential-aware labels per provider: `Connected`, `API key set`, `Skipped`.
 
 ### Implementation details
@@ -475,7 +508,7 @@ Agents: append entries here after completing work.
   - `pages/import.rs` — Folder path input with tilde expansion and path validation
   - `pages/export.rs` — Format toggle, topic filter, output path, execute button, word count preview
   - `pages/watch.rs` — Folder path input with terminal command guidance
-  - `pages/settings.rs` — Config display (vault path, processing LLM, created date, providers)
+  - `pages/settings.rs` — Config display (vault path, processing mode, created date, providers)
 - Keyboard bindings:
   - Sidebar: j/k/arrows navigate, Enter select, q/Esc quit
   - Global: Tab toggle sidebar/content, 1-6 jump to page, ? help toggle

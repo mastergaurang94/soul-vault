@@ -24,7 +24,7 @@ fn setup_temp_vault(tmp: &std::path::Path) {
             {"name": "chatgpt", "enabled": false},
             {"name": "gemini", "enabled": false}
         ],
-        "processingLlm": "claude",
+        "processingMode": "claude",
         "vaultPath": tmp.display().to_string(),
         "createdAt": "2026-02-14T00:00:00Z"
     });
@@ -82,7 +82,7 @@ fn test_config_roundtrip() {
     let raw = fs::read_to_string(&config_path).unwrap();
     let config: serde_json::Value = serde_json::from_str(&raw).unwrap();
 
-    assert_eq!(config["processingLlm"], "claude");
+    assert_eq!(config["processingMode"], "claude");
     assert_eq!(config["providers"][0]["name"], "claude");
     assert_eq!(config["providers"][0]["enabled"], true);
 }

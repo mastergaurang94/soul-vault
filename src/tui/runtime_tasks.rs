@@ -134,7 +134,9 @@ pub(super) fn start_provider_import(import_page: &mut ImportPage, channels: &mut
         use crate::adapters::{conversation_to_text, AdapterRegistry};
         use crate::core::merger::{chunk_text, merge_all_memories};
         use crate::core::processor::process_chunk;
+        use crate::vault::config::processing_enabled;
         use crate::vault::write::write_memories_to_vault;
+        use crate::{cli::pull_tracking::update_pull_tracking, ui::theme::*};
 
         let registry = AdapterRegistry::new();
         let discovered = registry.discover_all();
@@ -224,6 +226,40 @@ pub(super) fn start_provider_import(import_page: &mut ImportPage, channels: &mut
                 .send("DONE:No meaningful content found.".to_string())
                 .await;
             return;
+        }
+
+        match processing_enabled() {
+            Ok(false) => {
+                let _ = tx
+                    .send(format!(
+                        "{} Processing disabled. Keeping raw sessions only.",
+                        amber(ICON_STAR)
+                    ))
+                    .await;
+                if let Err(e) = update_pull_tracking(&all_sessions) {
+                    let _ = tx
+                        .send(format!(
+                            "{} Could not update source tracking: {}",
+                            amber("!"),
+                            e
+                        ))
+                        .await;
+                }
+                let _ = tx
+                    .send(format!(
+                        "DONE:{} sessions imported as raw only\n0 memories extracted",
+                        all_sessions.len()
+                    ))
+                    .await;
+                return;
+            }
+            Ok(true) => {}
+            Err(e) => {
+                let _ = tx
+                    .send(format!("ERROR:Failed to read processing mode: {e}"))
+                    .await;
+                return;
+            }
         }
 
         let mut all_memories = Vec::new();

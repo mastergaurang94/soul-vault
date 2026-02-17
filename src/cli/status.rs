@@ -6,7 +6,7 @@ use std::path::Path;
 
 use crate::ui::theme::*;
 use crate::vault::config::{
-    assert_initialized, get_api_key, get_key_health, vault_root, ApiKeyHealth,
+    assert_initialized, get_api_key, get_key_health, read_config, vault_root, ApiKeyHealth,
 };
 use crate::vault::read::get_vault_stats;
 use crate::vault::sources::get_source_stats;
@@ -23,6 +23,7 @@ pub fn run() -> Result<()> {
     assert_initialized()?;
 
     let stats = get_vault_stats()?;
+    let config = read_config()?;
     let sources = get_source_stats().unwrap_or_default();
 
     // ─── Header ───────────────────────────────────────────────────────────
@@ -47,6 +48,7 @@ pub fn run() -> Result<()> {
     print_stat_row("People", &stats.people_count.to_string());
     print_stat_row("Vault size", &format_bytes(vault_size));
     print_stat_row("Total files", &vault_file_count.to_string());
+    print_stat_row("Processing", config.processing_mode.display_name());
 
     let last_sync_display = match &stats.last_sync {
         Some(ls) => format_time_ago(ls),

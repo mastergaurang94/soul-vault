@@ -7,7 +7,7 @@ mod memory;
 mod provider;
 mod vault;
 
-pub use config::{KeysConfig, ProviderConfig, SoulVaultConfig};
+pub use config::{KeysConfig, ProcessingMode, ProviderConfig, SoulVaultConfig};
 pub use discovery::{ChunkInfo, FileInfo};
 pub use error::SoulVaultError;
 #[allow(unused_imports)]

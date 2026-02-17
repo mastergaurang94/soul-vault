@@ -11,7 +11,7 @@ mod init_validate;
 mod interactive_menu;
 mod pull_pipeline;
 mod pull_summary;
-mod pull_tracking;
+pub(crate) mod pull_tracking;
 mod watch_events;
 mod watch_validate;
 

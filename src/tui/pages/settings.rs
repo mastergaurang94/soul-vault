@@ -12,10 +12,11 @@ use ratatui::{
 use crate::auth::{is_logged_in, remove_credentials};
 use crate::tui::app::App;
 use crate::tui::pages::{PageAction, PageWidget};
-use crate::types::{Provider, SoulVaultConfig};
+use crate::types::{ProcessingMode, Provider, SoulVaultConfig};
 use crate::ui::theme::rat;
 use crate::vault::config::{
-    get_api_key, get_key_health, read_config, vault_root, ApiKeyHealth, ApiKeyHealthRecord,
+    get_api_key, get_key_health, read_config, vault_root, write_config, ApiKeyHealth,
+    ApiKeyHealthRecord,
 };
 
 #[derive(Default)]
@@ -58,6 +59,10 @@ impl PageWidget for SettingsPage {
         }
 
         match key.code {
+            KeyCode::Char('1') => self.apply_processing_mode(ProcessingMode::Disabled),
+            KeyCode::Char('2') => self.apply_processing_mode(ProcessingMode::Claude),
+            KeyCode::Char('3') => self.apply_processing_mode(ProcessingMode::ChatGpt),
+            KeyCode::Char('4') => self.apply_processing_mode(ProcessingMode::Gemini),
             KeyCode::Char('j') | KeyCode::Down => {
                 self.selected_connection =
                     (self.selected_connection + 1) % connection_providers().len();
@@ -139,6 +144,43 @@ impl SettingsPage {
             }
         }
     }
+
+    fn apply_processing_mode(&mut self, mode: ProcessingMode) -> PageAction {
+        let mut config = match read_config() {
+            Ok(cfg) => cfg,
+            Err(e) => {
+                self.status_message = Some((false, format!("Failed to read config: {e}")));
+                return PageAction::Consumed;
+            }
+        };
+
+        if let Some(provider) = mode.as_provider() {
+            if let Some(entry) = config.providers.iter_mut().find(|p| p.name == provider) {
+                entry.enabled = true;
+            }
+        }
+
+        config.processing_mode = mode.clone();
+        if let Err(e) = write_config(&config) {
+            self.status_message = Some((false, format!("Failed to update config: {e}")));
+            return PageAction::Consumed;
+        }
+
+        self.status_message = Some((true, format!("Processing set to {}.", mode.display_name())));
+        if let Some(provider) = mode.as_provider() {
+            if !provider_has_credentials(&provider) {
+                self.status_message = Some((
+                    false,
+                    format!(
+                        "Processing set to {}, but credentials are not configured yet.",
+                        provider.display_name()
+                    ),
+                ));
+            }
+        }
+
+        PageAction::Consumed
+    }
 }
 
 fn render_not_init(area: Rect, buf: &mut Buffer) {
@@ -179,12 +221,19 @@ fn render_settings(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
         section_header("  Vault"),
         Line::from(""),
         kv_line("  Path", &root.display().to_string()),
-        kv_line("  LLM", config.processing_llm.display_name()),
+        kv_line("  Processing", config.processing_mode.display_name()),
         kv_line("  Created", &config.created_at),
+        Line::from(""),
+        section_header("  Processing mode"),
+        Line::from(""),
+    ];
+
+    lines.extend(processing_mode_lines(&config.processing_mode));
+    lines.extend([
         Line::from(""),
         section_header("  Providers"),
         Line::from(""),
-    ];
+    ]);
 
     for p in &config.providers {
         let (status, color) = provider_status(&p.name, p.enabled);
@@ -209,7 +258,11 @@ fn render_settings(area: Rect, buf: &mut Buffer, page: &SettingsPage) {
     lines.extend(connection_lines(&config, page.selected_connection));
     lines.push(Line::from(""));
     lines.push(Line::from(Span::styled(
-        "  Up/Down select · Enter action · Esc back",
+        "  Processing: 1 Disabled · 2 Claude · 3 ChatGPT · 4 Gemini",
+        Style::default().fg(rat::DIM),
+    )));
+    lines.push(Line::from(Span::styled(
+        "  Connections: Up/Down select · Enter action · Esc back",
         Style::default().fg(rat::DIM),
     )));
     if page.pending_oauth {
@@ -311,8 +364,47 @@ fn connection_state(config: &SoulVaultConfig, provider: &Provider) -> Connection
     }
 }
 
+fn processing_mode_lines(mode: &ProcessingMode) -> Vec<Line<'static>> {
+    let options = [
+        (
+            1usize,
+            ProcessingMode::Disabled,
+            "Disabled (raw sessions only)",
+        ),
+        (2usize, ProcessingMode::Claude, "Claude"),
+        (3usize, ProcessingMode::ChatGpt, "ChatGPT"),
+        (4usize, ProcessingMode::Gemini, "Gemini"),
+    ];
+
+    options
+        .iter()
+        .map(|(idx, candidate, label)| {
+            let selected = *mode == *candidate;
+            let marker = if selected { "•" } else { " " };
+            let color = if selected { rat::EMERALD } else { rat::DIM };
+            Line::from(vec![
+                Span::raw("    "),
+                Span::styled(
+                    format!("{} {}. {}", marker, idx, label),
+                    Style::default().fg(color),
+                ),
+            ])
+        })
+        .collect()
+}
+
 fn oauth_supported(provider: &Provider) -> bool {
     matches!(provider, Provider::Claude)
+}
+
+fn provider_has_credentials(provider: &Provider) -> bool {
+    let has_key = get_api_key(&provider.to_string())
+        .ok()
+        .flatten()
+        .map(|v| !v.trim().is_empty())
+        .unwrap_or(false);
+    let has_oauth = is_logged_in(provider).unwrap_or(false);
+    has_key || has_oauth
 }
 
 fn provider_enabled(config: &SoulVaultConfig, provider: &Provider) -> bool {

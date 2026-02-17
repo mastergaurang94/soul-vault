@@ -72,7 +72,7 @@ fn seed_initialized_vault(home: &Path) {
             { "name": "chatgpt", "enabled": true, "lastImport": null },
             { "name": "gemini", "enabled": true, "lastImport": null }
         ],
-        "processingLlm": "claude",
+        "processingMode": "claude",
         "vaultPath": vault.to_string_lossy(),
         "createdAt": "2026-01-01T00:00:00Z",
         "lastSync": null
@@ -1933,7 +1933,7 @@ fn reset_force_with_temp_vault_moves_vault_out_of_home() {
     // Write a minimal config.json so is_initialized() returns true
     let config = r#"{
         "providers": [],
-        "processingLlm": "claude",
+        "processingMode": "claude",
         "vaultPath": "/tmp/soul-vault",
         "createdAt": "2026-02-14T00:00:00Z"
     }"#;
@@ -1975,7 +1975,7 @@ fn reset_without_force_in_non_tty_fails() {
 
     let config = r#"{
         "providers": [],
-        "processingLlm": "claude",
+        "processingMode": "claude",
         "vaultPath": "/tmp/soul-vault",
         "createdAt": "2026-02-14T00:00:00Z"
     }"#;
@@ -2000,7 +2000,7 @@ fn reset_permanent_without_force_in_non_tty_fails() {
 
     let config = r#"{
         "providers": [],
-        "processingLlm": "claude",
+        "processingMode": "claude",
         "vaultPath": "/tmp/soul-vault",
         "createdAt": "2026-02-14T00:00:00Z"
     }"#;
@@ -2026,7 +2026,7 @@ fn reset_force_permanent_deletes_vault() {
 
     let config = r#"{
         "providers": [],
-        "processingLlm": "claude",
+        "processingMode": "claude",
         "vaultPath": "/tmp/soul-vault",
         "createdAt": "2026-02-14T00:00:00Z"
     }"#;

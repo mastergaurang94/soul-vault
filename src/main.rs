@@ -152,9 +152,10 @@ async fn main() {
 
 async fn run_no_subcommand() -> anyhow::Result<()> {
     if io::stdin().is_terminal() && !vault::config::is_initialized() {
+        println!("{}", ui::theme::banner());
+        println!("{}", ui::theme::dim("  First-time setup\n"));
         print!(
-            "  Vault not initialized. Run setup now with {}? {} ",
-            ui::theme::cyan("soul init"),
+            "  Vault not initialized. Run setup now? {} ",
             ui::theme::dim("(Y/n)")
         );
         io::stdout().flush()?;
@@ -171,7 +172,10 @@ async fn run_no_subcommand() -> anyhow::Result<()> {
         }
 
         println!();
-        cli::init::run().await?;
+        cli::init::run_without_banner().await?;
+        if !vault::config::is_initialized() {
+            return Ok(());
+        }
     }
 
     // No subcommand → full-screen TUI
