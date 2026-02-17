@@ -40,6 +40,24 @@ Agents: append entries here after completing work.
 - `soul status` now shows processing mode from config (`Processing` row).
 - Settings vault metadata now shows `Processing` instead of legacy `LLM` wording.
 
+## 2026-02-17 — Settings Guided Processing Setup + Cloud Placeholder
+
+### Settings guided setup
+- Added inline processing credential setup in Settings when a provider is selected without credentials:
+  - auth method picker (`API key`, `OAuth`, `Back`)
+  - inline API key entry with validation + save
+  - successful OAuth/API key setup now finalizes processing mode automatically
+
+### Cloud placeholder in Settings
+- Added non-blocking `Soul Vault Cloud (coming soon)` option to Settings processing controls.
+- Selecting cloud shows an informational message and leaves current processing mode unchanged.
+
+### Raw mode regression coverage
+- Added a focused CLI UX test to verify raw mode end-to-end behavior:
+  - processing disabled import succeeds
+  - source tracking is updated
+  - no memory files are written
+
 ## 2026-02-16 — Init Flow Redesign: Provider-By-Provider Setup
 
 ### Onboarding flow updates

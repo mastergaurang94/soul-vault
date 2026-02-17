@@ -83,6 +83,13 @@ Last updated: 2026-02-17
   - set processing directly in TUI Settings (`1-4`) without rerunning `soul init`
   - selecting a processing provider auto-enables that provider in config
   - settings warns when processing is selected but provider credentials are missing
+- [x] Settings now supports guided processing setup:
+  - when selecting a processing provider without credentials, Settings opens an inline auth chooser (`API key`, `OAuth`, `Back`)
+  - API keys can be entered, validated, and saved inline; successful setup finalizes processing mode automatically
+  - OAuth success can now finalize processing mode automatically from Settings
+- [x] Soul Vault Cloud placeholder is visible in Settings processing options:
+  - `5. Soul Vault Cloud (coming soon)` is shown in the processing list
+  - selecting it is non-blocking and keeps current processing mode unchanged
 
 ## 🔨 In Progress
 

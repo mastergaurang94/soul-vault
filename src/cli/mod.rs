@@ -7,7 +7,7 @@ mod export_types;
 mod ingest_process;
 mod ingest_scan;
 mod ingest_summary;
-mod init_validate;
+pub(crate) mod init_validate;
 mod interactive_menu;
 mod pull_pipeline;
 mod pull_summary;

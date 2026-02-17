@@ -155,6 +155,9 @@ fn handle_key(
         pages::PageAction::StartOAuthConnect(provider) => {
             runtime_tasks::start_oauth_connect(provider, channels);
         }
+        pages::PageAction::StartApiKeySetup(provider, key) => {
+            runtime_tasks::start_api_key_setup(provider, key, channels);
+        }
         pages::PageAction::Consumed | pages::PageAction::Ignored => {}
     }
 }

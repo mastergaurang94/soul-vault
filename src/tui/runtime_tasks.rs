@@ -17,12 +17,14 @@ pub(super) struct Channels {
     pub(super) watch_event_rx: Option<mpsc::Receiver<WatchEvent>>,
     pub(super) watch_stop_tx: Option<mpsc::Sender<()>>,
     pub(super) pull_rx: Option<mpsc::Receiver<String>>,
-    pub(super) oauth_rx: Option<mpsc::Receiver<OAuthUpdate>>,
+    pub(super) oauth_rx: Option<mpsc::Receiver<SettingsUpdate>>,
 }
 
-pub(super) enum OAuthUpdate {
-    Success(String),
-    Error(String),
+pub(super) enum SettingsUpdate {
+    OAuthSuccess(String),
+    OAuthError(String),
+    ApiKeySuccess { provider: Provider, message: String },
+    ApiKeyError(String),
 }
 
 pub(super) fn shutdown_watcher(channels: &mut Channels) {
@@ -87,8 +89,12 @@ pub(super) fn drain_oauth_updates(settings: &mut SettingsPage, channels: &mut Ch
         let mut should_clear = false;
         while let Ok(update) = rx.try_recv() {
             match update {
-                OAuthUpdate::Success(msg) => settings.on_oauth_complete(true, msg),
-                OAuthUpdate::Error(msg) => settings.on_oauth_complete(false, msg),
+                SettingsUpdate::OAuthSuccess(msg) => settings.on_oauth_complete(true, msg),
+                SettingsUpdate::OAuthError(msg) => settings.on_oauth_complete(false, msg),
+                SettingsUpdate::ApiKeySuccess { provider, message } => {
+                    settings.on_api_key_complete(true, provider, message)
+                }
+                SettingsUpdate::ApiKeyError(msg) => settings.on_api_key_error(msg),
             }
             should_clear = true;
         }
@@ -323,14 +329,85 @@ pub(super) fn start_oauth_connect(provider: Provider, channels: &mut Channels) {
         match crate::auth::connect_provider(&provider).await {
             Ok(()) => {
                 let _ = tx
-                    .send(OAuthUpdate::Success(format!(
+                    .send(SettingsUpdate::OAuthSuccess(format!(
                         "Connected to {}.",
                         provider.display_name()
                     )))
                     .await;
             }
             Err(e) => {
-                let _ = tx.send(OAuthUpdate::Error(e.to_string())).await;
+                let _ = tx.send(SettingsUpdate::OAuthError(e.to_string())).await;
+            }
+        }
+    });
+}
+
+pub(super) fn start_api_key_setup(provider: Provider, key: String, channels: &mut Channels) {
+    let (tx, rx) = mpsc::channel(1);
+    channels.oauth_rx = Some(rx);
+
+    tokio::spawn(async move {
+        use crate::cli::init_validate::{validate_api_key, ApiKeyValidation};
+        use crate::vault::config::{set_api_key, set_key_health, ApiKeyHealth};
+
+        let trimmed = key.trim();
+        if trimmed.is_empty() {
+            let _ = tx
+                .send(SettingsUpdate::ApiKeyError(
+                    "API key cannot be empty.".to_string(),
+                ))
+                .await;
+            return;
+        }
+
+        match validate_api_key(&provider, trimmed).await {
+            ApiKeyValidation::Verified => {
+                if let Err(e) = set_api_key(&provider.to_string(), trimmed) {
+                    let _ = tx
+                        .send(SettingsUpdate::ApiKeyError(format!(
+                            "Failed to save key: {e}"
+                        )))
+                        .await;
+                    return;
+                }
+                let _ = set_key_health(&provider, ApiKeyHealth::Verified, None);
+                let _ = tx
+                    .send(SettingsUpdate::ApiKeySuccess {
+                        provider: provider.clone(),
+                        message: format!("{} API key verified and saved.", provider.display_name()),
+                    })
+                    .await;
+            }
+            ApiKeyValidation::Unverified(reason) => {
+                if let Err(e) = set_api_key(&provider.to_string(), trimmed) {
+                    let _ = tx
+                        .send(SettingsUpdate::ApiKeyError(format!(
+                            "Failed to save key: {e}"
+                        )))
+                        .await;
+                    return;
+                }
+                let _ = set_key_health(&provider, ApiKeyHealth::Unverified, Some(reason.clone()));
+                let _ = tx
+                    .send(SettingsUpdate::ApiKeySuccess {
+                        provider: provider.clone(),
+                        message: format!(
+                            "{} API key saved (unverified: {}).",
+                            provider.display_name(),
+                            reason
+                        ),
+                    })
+                    .await;
+            }
+            ApiKeyValidation::Invalid(reason) => {
+                let _ = set_key_health(&provider, ApiKeyHealth::Invalid, Some(reason.clone()));
+                let _ = tx
+                    .send(SettingsUpdate::ApiKeyError(format!(
+                        "{} API key invalid: {}",
+                        provider.display_name(),
+                        reason
+                    )))
+                    .await;
             }
         }
     });

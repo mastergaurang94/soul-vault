@@ -64,15 +64,10 @@ async fn run_with_banner(show_banner: bool) -> Result<()> {
 
     // Step 2: Processing mode selection
     let mut processing_mode = select_processing_mode(&mut providers).await?;
-    println!();
-    println!(
-        "{}",
-        check(&format!("Processing: {}", processing_mode.display_name()))
-    );
 
     // Step 5: Final setup summary + confirmation
     loop {
-        render_setup_summary(&providers, &processing_mode);
+        render_finalize_screen(&providers, &processing_mode)?;
         let finish = ask(&format!(
             "\n  Finish setup and save configuration? {} ",
             dim("(Y/n)")
@@ -81,7 +76,7 @@ async fn run_with_banner(show_banner: bool) -> Result<()> {
             break;
         }
 
-        println!("\n  {} What would you like to do next?", dim(ICON_DOT));
+        println!("\n  What would you like to do next?");
         println!("    {} Configure providers", dim("1."));
         println!("    {} Change processing mode", dim("2."));
         println!("    {} Cancel setup", dim("3."));
@@ -92,14 +87,9 @@ async fn run_with_banner(show_banner: bool) -> Result<()> {
             }
             "3" => {
                 println!(
-                    "\n  {} Setup not finalized. Your vault folders and any entered credentials were kept.",
-                    dim(ICON_DOT)
+                    "\n  Setup not finalized. Your vault folders and any entered credentials were kept."
                 );
-                println!(
-                    "  {} Run {} again to finish setup.\n",
-                    dim(ICON_DOT),
-                    cyan("soul init")
-                );
+                println!("  Run {} again to finish setup.\n", cyan("soul init"));
                 return Ok(());
             }
             _ => {
@@ -232,9 +222,10 @@ async fn select_processing_mode(providers: &mut [ProviderConfig]) -> Result<Proc
             }
             5 => {
                 println!(
-                    "  {} Processing disabled. Soul Vault will keep raw sessions, but memory extraction features will be unavailable until you enable processing.",
+                    "  {} Processing disabled. Soul Vault will keep raw sessions, but memory extraction features will be unavailable",
                     amber(ICON_STAR)
                 );
+                println!("    until you enable processing.");
                 break ProcessingMode::Disabled;
             }
             _ => {
@@ -528,6 +519,14 @@ fn render_setup_summary(providers: &[ProviderConfig], processing_mode: &Processi
         "Processing",
         bold_white(processing_mode.display_name())
     );
+}
+
+fn render_finalize_screen(providers: &[ProviderConfig], processing_mode: &ProcessingMode) -> Result<()> {
+    clear_screen_if_tty()?;
+    println!("{}", banner());
+    println!("{}", dim("  First-time setup wizard"));
+    render_setup_summary(providers, processing_mode);
+    Ok(())
 }
 
 fn provider_setup_status(provider: &Provider, providers: &[ProviderConfig]) -> String {

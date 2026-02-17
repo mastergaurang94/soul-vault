@@ -200,12 +200,17 @@ impl PageWidget for ImportPage {
 fn handle_provider_key(key: KeyEvent, phase: &mut ProviderPhase) -> PageAction {
     match phase {
         ProviderPhase::Ready => match key.code {
+            KeyCode::Left => PageAction::BackToSidebar,
             KeyCode::Enter => PageAction::StartProviderImport,
             KeyCode::Esc => PageAction::BackToSidebar,
             _ => PageAction::Ignored,
         },
-        ProviderPhase::Running { .. } | ProviderPhase::Processing { .. } => PageAction::Ignored,
+        ProviderPhase::Running { .. } | ProviderPhase::Processing { .. } => match key.code {
+            KeyCode::Left => PageAction::BackToSidebar,
+            _ => PageAction::Ignored,
+        },
         ProviderPhase::Done { .. } | ProviderPhase::Error(_) => match key.code {
+            KeyCode::Left => PageAction::BackToSidebar,
             KeyCode::Enter | KeyCode::Char('r') => {
                 *phase = ProviderPhase::Ready;
                 PageAction::Consumed
@@ -230,9 +235,13 @@ fn handle_folder_key(
         FolderPhase::Scanning
         | FolderPhase::Classifying
         | FolderPhase::Processing { .. }
-        | FolderPhase::Writing => PageAction::Consumed,
+        | FolderPhase::Writing => match key.code {
+            KeyCode::Left => PageAction::BackToSidebar,
+            _ => PageAction::Consumed,
+        },
         FolderPhase::Done(_) | FolderPhase::NothingToImport { .. } | FolderPhase::Error(_) => {
             match key.code {
+                KeyCode::Left => PageAction::BackToSidebar,
                 KeyCode::Enter | KeyCode::Char('r') => {
                     *phase = FolderPhase::Input;
                     input.clear();

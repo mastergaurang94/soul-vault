@@ -89,6 +89,18 @@ fn seed_initialized_vault(home: &Path) {
         .expect("write preferences.md");
 }
 
+fn set_processing_mode(home: &Path, mode: &str) {
+    let config_path = home.join("soul-vault/.config/config.json");
+    let raw = fs::read_to_string(&config_path).expect("read config");
+    let mut config: serde_json::Value = serde_json::from_str(&raw).expect("parse config");
+    config["processingMode"] = serde_json::Value::String(mode.to_string());
+    fs::write(
+        config_path,
+        serde_json::to_string_pretty(&config).expect("serialize config"),
+    )
+    .expect("write config");
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // 1. FIRST-TIME USER EXPERIENCE
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -854,6 +866,64 @@ fn import_folder_skips_hidden_dirs() {
             || combined.contains("No API key"),
         "Should find 1 file (skip hidden). Got: {}",
         combined
+    );
+}
+
+#[test]
+#[allow(deprecated)]
+fn import_raw_mode_updates_sources_without_writing_memories() {
+    let home = hermetic_home(true);
+    set_processing_mode(&home, "disabled");
+
+    let input_dir = tempdir().unwrap();
+    fs::write(
+        input_dir.path().join("session.md"),
+        "# Chat\n\nUser: hi\nAssistant: hello",
+    )
+    .unwrap();
+
+    let output = Command::cargo_bin("soul")
+        .expect("binary should exist")
+        .env("HOME", home.to_string_lossy().to_string())
+        .args(["import", input_dir.path().to_str().unwrap()])
+        .output()
+        .expect("run import");
+
+    assert!(
+        output.status.success(),
+        "raw import should succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        combined.contains("Raw import complete"),
+        "expected raw-mode completion message, got: {}",
+        combined
+    );
+
+    let memories_dir = home.join("soul-vault/memories");
+    let memory_files: Vec<_> = fs::read_dir(&memories_dir)
+        .unwrap()
+        .filter_map(|e| e.ok())
+        .collect();
+    assert!(
+        memory_files.is_empty(),
+        "raw mode should not write memory files"
+    );
+
+    let sources_path = home.join("soul-vault/.config/sources.json");
+    let sources_raw = fs::read_to_string(sources_path).expect("read sources");
+    let sources_json: serde_json::Value =
+        serde_json::from_str(&sources_raw).expect("parse sources");
+    let sources = sources_json["sources"].as_array().expect("sources array");
+    assert!(
+        !sources.is_empty(),
+        "raw mode should still update source tracking"
     );
 }
 

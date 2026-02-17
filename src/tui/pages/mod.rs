@@ -43,6 +43,8 @@ pub enum PageAction {
     StartProviderImport,
     /// Start OAuth connect flow for provider.
     StartOAuthConnect(Provider),
+    /// Validate and save API key for provider.
+    StartApiKeySetup(Provider, String),
 }
 
 // ─── Page Trait ───────────────────────────────────────────────────────────────
